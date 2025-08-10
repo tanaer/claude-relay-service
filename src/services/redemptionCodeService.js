@@ -167,7 +167,31 @@ class RedemptionCodeService {
 
       // 检查兑换码状态
       if (codeData.status === 'used') {
-        return { success: false, error: '兑换码已被使用' }
+        // 如果兑换码已被使用，返回对应的API Key信息
+        const cardName = codeData.type === 'daily' ? '日卡' : '月卡'
+        const duration = parseInt(codeData.duration)
+        const costLimit = parseFloat(codeData.costLimit)
+        
+        // 计算原始过期时间（基于使用时间）
+        let originalExpiresAt = null
+        if (codeData.usedAt) {
+          const usedDate = new Date(codeData.usedAt)
+          originalExpiresAt = new Date(usedDate.getTime() + duration * 24 * 60 * 60 * 1000)
+        }
+        
+        return {
+          success: true,
+          alreadyUsed: true,
+          message: `此兑换码已被使用，对应的${cardName} API Key信息如下`,
+          data: {
+            apiKey: codeData.usedByApiKey || '信息不完整',
+            name: codeData.generatedApiKeyName || `${cardName}-${code}`,
+            usedAt: codeData.usedAt,
+            expiresAt: originalExpiresAt ? originalExpiresAt.toISOString() : null,
+            dailyCostLimit: costLimit,
+            duration: duration
+          }
+        }
       }
 
       const now = new Date()

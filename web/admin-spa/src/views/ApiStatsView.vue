@@ -170,21 +170,51 @@
             </button>
           </div>
 
-          <!-- 兑换成功结果显示 -->
-          <div v-if="redemptionResult" class="rounded-xl bg-green-50/50 p-4 backdrop-blur-sm">
-            <h4 class="mb-3 flex items-center text-sm font-medium text-green-900">
-              <i class="fas fa-check-circle mr-2"></i>
-              兑换成功
+          <!-- 兑换结果显示 -->
+          <div
+            v-if="redemptionResult"
+            :class="[
+              'rounded-xl p-4 backdrop-blur-sm',
+              redemptionResult.alreadyUsed ? 'bg-blue-50/50' : 'bg-green-50/50'
+            ]"
+          >
+            <h4
+              :class="[
+                'mb-3 flex items-center text-sm font-medium',
+                redemptionResult.alreadyUsed ? 'text-blue-900' : 'text-green-900'
+              ]"
+            >
+              <i
+                :class="[
+                  'mr-2',
+                  redemptionResult.alreadyUsed ? 'fas fa-info-circle' : 'fas fa-check-circle'
+                ]"
+              ></i>
+              {{ redemptionResult.alreadyUsed ? '兑换码信息' : '兑换成功' }}
             </h4>
-            <div class="space-y-2 text-sm text-green-800">
+            <div
+              :class="[
+                'space-y-2 text-sm',
+                redemptionResult.alreadyUsed ? 'text-blue-800' : 'text-green-800'
+              ]"
+            >
               <div class="flex justify-between">
                 <span>API Key:</span>
                 <div class="flex items-center gap-2">
-                  <code class="rounded bg-green-100 px-2 py-1 text-xs">{{
-                    redemptionResult.apiKey
-                  }}</code>
+                  <code
+                    :class="[
+                      'rounded px-2 py-1 text-xs',
+                      redemptionResult.alreadyUsed ? 'bg-blue-100' : 'bg-green-100'
+                    ]"
+                    >{{ redemptionResult.apiKey }}</code
+                  >
                   <button
-                    class="text-green-600 hover:text-green-800"
+                    :class="[
+                      'hover:text-opacity-80',
+                      redemptionResult.alreadyUsed
+                        ? 'text-blue-600 hover:text-blue-800'
+                        : 'text-green-600 hover:text-green-800'
+                    ]"
                     @click="copyToClipboard(redemptionResult.apiKey)"
                   >
                     <i class="fas fa-copy"></i>
@@ -202,6 +232,13 @@
               <div class="flex justify-between">
                 <span>每日费用限制:</span>
                 <span>${{ redemptionResult.dailyCostLimit }}</span>
+              </div>
+              <div
+                v-if="redemptionResult.alreadyUsed && redemptionResult.usedAt"
+                class="flex justify-between"
+              >
+                <span>使用时间:</span>
+                <span>{{ formatDateTime(redemptionResult.usedAt) }}</span>
               </div>
               <div class="flex justify-between">
                 <span>过期时间:</span>
@@ -322,8 +359,11 @@ const handleRedeem = async () => {
     const result = await response.json()
 
     if (result.success) {
-      showToast(result.message, 'success')
-      redemptionResult.value = result.data
+      showToast(result.message, result.alreadyUsed ? 'info' : 'success')
+      redemptionResult.value = {
+        ...result.data,
+        alreadyUsed: result.alreadyUsed || false
+      }
       redeemCode.value = ''
     } else {
       showToast(result.error || '兑换失败', 'error')

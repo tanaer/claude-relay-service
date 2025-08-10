@@ -152,24 +152,6 @@
             </div>
           </div>
 
-          <!-- API Key选择 -->
-          <div>
-            <label class="mb-2 block text-sm font-medium text-gray-700">选择API Key</label>
-            <select
-              v-model="selectedApiKeyId"
-              class="w-full rounded-xl border-2 border-gray-200 bg-white/50 px-4 py-3 text-gray-900 backdrop-blur-sm transition-colors focus:border-blue-500 focus:outline-none"
-              :disabled="isRedeeming || availableApiKeys.length === 0"
-            >
-              <option value="">请选择要激活的API Key</option>
-              <option v-for="key in availableApiKeys" :key="key.id" :value="key.id">
-                {{ key.name }} ({{ key.id.slice(0, 8) }}...)
-              </option>
-            </select>
-            <p v-if="availableApiKeys.length === 0" class="mt-1 text-xs text-red-500">
-              暂无可用的API Key，请先在统计查询中输入API Key
-            </p>
-          </div>
-
           <!-- 兑换按钮 -->
           <div class="pt-2">
             <button
@@ -188,6 +170,46 @@
             </button>
           </div>
 
+          <!-- 兑换成功结果显示 -->
+          <div v-if="redemptionResult" class="rounded-xl bg-green-50/50 p-4 backdrop-blur-sm">
+            <h4 class="mb-3 flex items-center text-sm font-medium text-green-900">
+              <i class="fas fa-check-circle mr-2"></i>
+              兑换成功
+            </h4>
+            <div class="space-y-2 text-sm text-green-800">
+              <div class="flex justify-between">
+                <span>API Key:</span>
+                <div class="flex items-center gap-2">
+                  <code class="rounded bg-green-100 px-2 py-1 text-xs">{{
+                    redemptionResult.apiKey
+                  }}</code>
+                  <button
+                    class="text-green-600 hover:text-green-800"
+                    @click="copyToClipboard(redemptionResult.apiKey)"
+                  >
+                    <i class="fas fa-copy"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="flex justify-between">
+                <span>名称:</span>
+                <span>{{ redemptionResult.name }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span>有效期:</span>
+                <span>{{ redemptionResult.duration }}天</span>
+              </div>
+              <div class="flex justify-between">
+                <span>每日费用限制:</span>
+                <span>${{ redemptionResult.dailyCostLimit }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span>过期时间:</span>
+                <span>{{ formatDateTime(redemptionResult.expiresAt) }}</span>
+              </div>
+            </div>
+          </div>
+
           <!-- 提示信息 -->
           <div class="rounded-xl bg-blue-50/50 p-4 backdrop-blur-sm">
             <h4 class="mb-2 flex items-center text-sm font-medium text-blue-900">
@@ -197,7 +219,7 @@
             <ul class="space-y-1 text-xs text-blue-800 md:text-sm">
               <li>• <strong>日卡 (D-xxxxxxxx):</strong> 有效期1天，每日费用限制$20</li>
               <li>• <strong>月卡 (M-xxxxxxxx):</strong> 有效期30天，每日费用限制$100</li>
-              <li>• 兑换成功后会更新API Key的过期时间和费用限制</li>
+              <li>• 兑换成功后会自动生成对应的API Key</li>
               <li>• 每个兑换码只能使用一次</li>
             </ul>
           </div>
@@ -236,9 +258,8 @@ const currentTab = ref('redeem') // 默认打开兑换码页面
 
 // 兑换码相关数据
 const redeemCode = ref('')
-const selectedApiKeyId = ref('')
 const isRedeeming = ref(false)
-const availableApiKeys = ref([])
+const redemptionResult = ref(null)
 
 const {
   apiKey,
@@ -256,14 +277,40 @@ const { queryStats, switchPeriod, loadStatsWithApiId, loadOemSettings, reset } =
 
 // 计算属性
 const canRedeem = computed(() => {
-  return redeemCode.value.trim() && selectedApiKeyId.value && !isRedeeming.value
+  return redeemCode.value.trim() && !isRedeeming.value
 })
+
+// 复制到剪贴板
+const copyToClipboard = async (text) => {
+  try {
+    await navigator.clipboard.writeText(text)
+    showToast('已复制到剪贴板', 'success')
+  } catch (error) {
+    showToast('复制失败', 'error')
+  }
+}
+
+// 格式化日期时间
+const formatDateTime = (dateString) => {
+  if (!dateString) return '-'
+  const date = new Date(dateString)
+  return date.toLocaleString('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
 
 // 兑换码处理函数
 const handleRedeem = async () => {
   if (!canRedeem.value) return
 
   isRedeeming.value = true
+  redemptionResult.value = null
+
   try {
     const response = await fetch('/redeem', {
       method: 'POST',
@@ -271,8 +318,7 @@ const handleRedeem = async () => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        code: redeemCode.value.trim(),
-        apiKeyId: selectedApiKeyId.value
+        code: redeemCode.value.trim()
       })
     })
 
@@ -280,46 +326,17 @@ const handleRedeem = async () => {
 
     if (result.success) {
       showToast(result.message, 'success')
+      redemptionResult.value = result.data
       redeemCode.value = ''
-      selectedApiKeyId.value = ''
-      // 刷新API Key数据
-      if (statsData.value) {
-        queryStats()
-      }
     } else {
       showToast(result.error || '兑换失败', 'error')
     }
   } catch (error) {
-    // console.error('Redemption error:', error)
     showToast('兑换失败，请稍后重试', 'error')
   } finally {
     isRedeeming.value = false
   }
 }
-
-// 监听statsData变化，更新可用的API Keys
-watch(
-  statsData,
-  (newData) => {
-    if (newData && newData.apiKeyInfo) {
-      availableApiKeys.value = [
-        {
-          id: newData.apiKeyInfo.id,
-          name: newData.apiKeyInfo.name || 'Unnamed Key'
-        }
-      ]
-
-      // 如果只有一个API Key，自动选择
-      if (!selectedApiKeyId.value) {
-        selectedApiKeyId.value = newData.apiKeyInfo.id
-      }
-    } else {
-      availableApiKeys.value = []
-      selectedApiKeyId.value = ''
-    }
-  },
-  { immediate: true }
-)
 
 // 处理键盘快捷键
 const handleKeyDown = (event) => {

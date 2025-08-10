@@ -149,7 +149,7 @@ class RedemptionCodeService {
   }
 
   // 兑换码
-  async redeemCode(code, apiKeyId) {
+  async redeemCode(code) {
     try {
       const client = redis.getClientSafe()
 
@@ -170,36 +170,48 @@ class RedemptionCodeService {
         return { success: false, error: '兑换码已被使用' }
       }
 
-      // 获取API Key信息
-      const apiKey = await apiKeyService.getApiKeyById(apiKeyId)
-      if (!apiKey) {
-        return { success: false, error: 'API Key不存在' }
-      }
-
-      // 计算新的过期时间
       const now = new Date()
       const duration = parseInt(codeData.duration)
-      const newExpiresAt = new Date(now.getTime() + duration * 24 * 60 * 60 * 1000)
+      const costLimit = parseFloat(codeData.costLimit)
+      const expiresAt = new Date(now.getTime() + duration * 24 * 60 * 60 * 1000)
 
-      // 更新API Key的费用限制和过期时间
-      const updateData = {
-        dailyCostLimit: parseFloat(codeData.costLimit),
-        expiresAt: newExpiresAt.toISOString()
+      // 生成新的API Key
+      const cardName = codeData.type === 'daily' ? '日卡' : '月卡'
+      const apiKeyName = `${cardName}-${code}`
+
+      const newApiKey = await apiKeyService.generateApiKey({
+        name: apiKeyName,
+        description: `通过兑换码 ${code} 生成的${cardName}`,
+        dailyCostLimit: costLimit,
+        expiresAt: expiresAt.toISOString(),
+        isActive: true,
+        tags: [codeData.type === 'daily' ? 'daily-card' : 'monthly-card', 'redeemed']
+      })
+
+      if (!newApiKey.success) {
+        return { success: false, error: '生成API Key失败' }
       }
-
-      await apiKeyService.updateApiKey(apiKeyId, updateData)
 
       // 标记兑换码为已使用
       await client.hset(`redemption_code:${codeId}`, {
         status: 'used',
         usedAt: now.toISOString(),
-        usedByApiKey: apiKey.name || apiKeyId
+        usedByApiKey: newApiKey.apiKey,
+        generatedApiKeyName: apiKeyName
       })
 
-      logger.info(`✅ Redemption code ${code} used by API Key ${apiKey.name}`)
+      logger.info(`✅ Redemption code ${code} used, generated API Key: ${newApiKey.apiKey}`)
+
       return {
         success: true,
-        message: `兑换成功！${this.codeTypes[codeData.type].name}已激活，有效期${duration}天，每日费用限制$${codeData.costLimit}`
+        message: `兑换成功！已生成${cardName} API Key`,
+        data: {
+          apiKey: newApiKey.apiKey,
+          name: apiKeyName,
+          expiresAt: expiresAt.toISOString(),
+          dailyCostLimit: costLimit,
+          duration: duration
+        }
       }
     } catch (error) {
       logger.error('❌ Failed to redeem code:', error)

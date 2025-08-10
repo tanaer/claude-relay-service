@@ -346,30 +346,22 @@ router.post('/auth/refresh', async (req, res) => {
 // 🎫 兑换码功能
 router.post('/redeem', async (req, res) => {
   try {
-    const { code, apiKeyId } = req.body
+    const { code } = req.body
 
-    if (!code || !apiKeyId) {
+    if (!code) {
       return res.status(400).json({
         success: false,
-        error: '兑换码和API Key ID都不能为空'
+        error: '兑换码不能为空'
       })
     }
 
-    // 验证API Key存在
-    const apiKey = await apiKeyService.getApiKeyById(apiKeyId)
-    if (!apiKey) {
-      return res.status(400).json({
-        success: false,
-        error: 'API Key不存在'
-      })
-    }
-
-    const result = await redemptionCodeService.redeemCode(code, apiKeyId)
+    const result = await redemptionCodeService.redeemCode(code)
 
     if (result.success) {
       return res.json({
         success: true,
-        message: result.message
+        message: result.message,
+        data: result.data
       })
     } else {
       return res.status(400).json({

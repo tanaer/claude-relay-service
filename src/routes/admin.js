@@ -5,6 +5,7 @@ const claudeConsoleAccountService = require('../services/claudeConsoleAccountSer
 const bedrockAccountService = require('../services/bedrockAccountService')
 const geminiAccountService = require('../services/geminiAccountService')
 const accountGroupService = require('../services/accountGroupService')
+const redemptionCodeService = require('../services/redemptionCodeService')
 const redis = require('../models/redis')
 const { authenticateAdmin } = require('../middleware/auth')
 const logger = require('../utils/logger')
@@ -4692,6 +4693,88 @@ router.put('/openai-accounts/:id/toggle', authenticateAdmin, async (req, res) =>
       message: '切换账户状态失败',
       error: error.message
     })
+  }
+})
+
+// 🎫 兑换码管理
+
+// 获取兑换码统计
+router.get('/redemption-codes/stats', authenticateAdmin, async (req, res) => {
+  try {
+    const stats = await redemptionCodeService.getRedemptionStats()
+    return res.json({ success: true, data: stats })
+  } catch (error) {
+    logger.error('❌ Failed to get redemption code stats:', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to get redemption code stats', message: error.message })
+  }
+})
+
+// 获取所有兑换码
+router.get('/redemption-codes', authenticateAdmin, async (req, res) => {
+  try {
+    const { status, type, code, apiKey } = req.query
+    const filters = { status, type, code, apiKey }
+
+    const codes = await redemptionCodeService.getAllRedemptionCodes(filters)
+    return res.json({ success: true, data: codes })
+  } catch (error) {
+    logger.error('❌ Failed to get redemption codes:', error)
+    return res.status(500).json({ error: 'Failed to get redemption codes', message: error.message })
+  }
+})
+
+// 生成兑换码
+router.post('/redemption-codes/generate', authenticateAdmin, async (req, res) => {
+  try {
+    const { type, count = 20 } = req.body
+
+    if (!type || !['daily', 'monthly'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid code type. Must be "daily" or "monthly"' })
+    }
+
+    if (count < 1 || count > 100) {
+      return res.status(400).json({ error: 'Count must be between 1 and 100' })
+    }
+
+    const codes = await redemptionCodeService.generateBatchRedemptionCodes(type, count)
+    return res.json({
+      success: true,
+      message: `Generated ${codes.length} ${type} codes`,
+      data: codes
+    })
+  } catch (error) {
+    logger.error('❌ Failed to generate redemption codes:', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to generate redemption codes', message: error.message })
+  }
+})
+
+// 提取可用兑换码
+router.get('/redemption-codes/extract/:type', authenticateAdmin, async (req, res) => {
+  try {
+    const { type } = req.params
+    const { count = 20 } = req.query
+
+    if (!type || !['daily', 'monthly'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid code type. Must be "daily" or "monthly"' })
+    }
+
+    const codes = await redemptionCodeService.getAvailableRedemptionCodes(type, parseInt(count))
+    const codeStrings = codes.map((code) => code.code)
+
+    return res.json({
+      success: true,
+      data: codeStrings,
+      message: `Extracted ${codeStrings.length} available ${type} codes`
+    })
+  } catch (error) {
+    logger.error('❌ Failed to extract redemption codes:', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to extract redemption codes', message: error.message })
   }
 })
 

@@ -6,7 +6,7 @@
         <LogoTitle
           :loading="oemLoading"
           :logo-src="oemSettings.siteIconData || oemSettings.siteIcon"
-          :subtitle="currentTab === 'stats' ? 'API Key 使用统计' : '使用教程'"
+          :subtitle="currentTab === 'stats' ? 'API Key 使用统计' : currentTab === 'redeem' ? '兑换码激活' : '使用教程'"
           :title="oemSettings.siteName"
         />
         <div class="flex items-center gap-3">
@@ -25,7 +25,7 @@
     <div class="mb-6 md:mb-8">
       <div class="flex justify-center">
         <div
-          class="inline-flex w-full max-w-md rounded-full border border-white/20 bg-white/10 p-1 shadow-lg backdrop-blur-xl md:w-auto"
+          class="inline-flex w-full max-w-2xl rounded-full border border-white/20 bg-white/10 p-1 shadow-lg backdrop-blur-xl md:w-auto"
         >
           <button
             :class="['tab-pill-button', currentTab === 'stats' ? 'active' : '']"
@@ -33,6 +33,13 @@
           >
             <i class="fas fa-chart-line mr-1 md:mr-2" />
             <span class="text-sm md:text-base">统计查询</span>
+          </button>
+          <button
+            :class="['tab-pill-button', currentTab === 'redeem' ? 'active' : '']"
+            @click="currentTab = 'redeem'"
+          >
+            <i class="fas fa-ticket-alt mr-1 md:mr-2" />
+            <span class="text-sm md:text-base">兑换码</span>
           </button>
           <button
             :class="['tab-pill-button', currentTab === 'tutorial' ? 'active' : '']"
@@ -110,6 +117,84 @@
       </div>
     </div>
 
+    <!-- 兑换码内容 -->
+    <div v-if="currentTab === 'redeem'" class="tab-content">
+      <div class="glass-strong rounded-3xl p-4 shadow-xl md:p-6">
+        <div class="mb-6">
+          <h3 class="mb-2 text-lg font-semibold text-gray-900 md:text-xl">兑换码激活</h3>
+          <p class="text-sm text-gray-600 md:text-base">输入兑换码激活日卡或月卡，提升API Key的费用限制</p>
+        </div>
+        
+        <!-- 兑换表单 -->
+        <div class="space-y-4 md:space-y-6">
+          <!-- 兑换码输入 -->
+          <div>
+            <label class="mb-2 block text-sm font-medium text-gray-700">兑换码</label>
+            <div class="relative">
+              <input
+                v-model="redeemCode"
+                type="text"
+                placeholder="请输入兑换码，如：D-xxxxxxxx 或 M-xxxxxxxx"
+                class="w-full rounded-xl border-2 border-gray-200 bg-white/50 px-4 py-3 text-gray-900 placeholder-gray-500 backdrop-blur-sm transition-colors focus:border-blue-500 focus:outline-none"
+                :disabled="isRedeeming"
+              />
+              <div class="absolute right-3 top-1/2 -translate-y-1/2">
+                <i class="fas fa-ticket-alt text-gray-400"></i>
+              </div>
+            </div>
+          </div>
+          
+          <!-- API Key选择 -->
+          <div>
+            <label class="mb-2 block text-sm font-medium text-gray-700">选择API Key</label>
+            <select
+              v-model="selectedApiKeyId"
+              class="w-full rounded-xl border-2 border-gray-200 bg-white/50 px-4 py-3 text-gray-900 backdrop-blur-sm transition-colors focus:border-blue-500 focus:outline-none"
+              :disabled="isRedeeming || availableApiKeys.length === 0"
+            >
+              <option value="">请选择要激活的API Key</option>
+              <option v-for="key in availableApiKeys" :key="key.id" :value="key.id">
+                {{ key.name }} ({{ key.id.slice(0, 8) }}...)
+              </option>
+            </select>
+            <p v-if="availableApiKeys.length === 0" class="mt-1 text-xs text-red-500">
+              暂无可用的API Key，请先在统计查询中输入API Key
+            </p>
+          </div>
+          
+          <!-- 兑换按钮 -->
+          <div class="pt-2">
+            <button
+              @click="handleRedeem"
+              :disabled="!canRedeem"
+              class="w-full rounded-xl px-6 py-3 font-semibold text-white shadow-lg transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-50 md:w-auto"
+              :class="canRedeem 
+                ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 hover:shadow-xl' 
+                : 'bg-gray-400'"
+            >
+              <i v-if="isRedeeming" class="fas fa-spinner fa-spin mr-2"></i>
+              <i v-else class="fas fa-gift mr-2"></i>
+              {{ isRedeeming ? '兑换中...' : '立即兑换' }}
+            </button>
+          </div>
+          
+          <!-- 提示信息 -->
+          <div class="rounded-xl bg-blue-50/50 p-4 backdrop-blur-sm">
+            <h4 class="mb-2 flex items-center text-sm font-medium text-blue-900">
+              <i class="fas fa-info-circle mr-2"></i>
+              兑换说明
+            </h4>
+            <ul class="space-y-1 text-xs text-blue-800 md:text-sm">
+              <li>• <strong>日卡 (D-xxxxxxxx):</strong> 有效期1天，每日费用限制$20</li>
+              <li>• <strong>月卡 (M-xxxxxxxx):</strong> 有效期30天，每日费用限制$100</li>
+              <li>• 兑换成功后会更新API Key的过期时间和费用限制</li>
+              <li>• 每个兑换码只能使用一次</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 教程内容 -->
     <div v-if="currentTab === 'tutorial'" class="tab-content">
       <div class="glass-strong rounded-3xl shadow-xl">
@@ -120,10 +205,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
+import { showToast } from '@/utils/toast'
 import LogoTitle from '@/components/common/LogoTitle.vue'
 import ApiKeyInput from '@/components/apistats/ApiKeyInput.vue'
 import StatsOverview from '@/components/apistats/StatsOverview.vue'
@@ -136,7 +222,13 @@ const route = useRoute()
 const apiStatsStore = useApiStatsStore()
 
 // 当前标签页
-const currentTab = ref('stats')
+const currentTab = ref('redeem') // 默认打开兑换码页面
+
+// 兑换码相关数据
+const redeemCode = ref('')
+const selectedApiKeyId = ref('')
+const isRedeeming = ref(false)
+const availableApiKeys = ref([])
 
 const {
   apiKey,
@@ -151,6 +243,67 @@ const {
 } = storeToRefs(apiStatsStore)
 
 const { queryStats, switchPeriod, loadStatsWithApiId, loadOemSettings, reset } = apiStatsStore
+
+// 计算属性
+const canRedeem = computed(() => {
+  return redeemCode.value.trim() && selectedApiKeyId.value && !isRedeeming.value
+})
+
+// 兑换码处理函数
+const handleRedeem = async () => {
+  if (!canRedeem.value) return
+  
+  isRedeeming.value = true
+  try {
+    const response = await fetch('/redeem', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        code: redeemCode.value.trim(),
+        apiKeyId: selectedApiKeyId.value
+      })
+    })
+    
+    const result = await response.json()
+    
+    if (result.success) {
+      showToast(result.message, 'success')
+      redeemCode.value = ''
+      selectedApiKeyId.value = ''
+      // 刷新API Key数据
+      if (statsData.value) {
+        queryStats()
+      }
+    } else {
+      showToast(result.error || '兑换失败', 'error')
+    }
+  } catch (error) {
+    console.error('Redemption error:', error)
+    showToast('兑换失败，请稍后重试', 'error')
+  } finally {
+    isRedeeming.value = false
+  }
+}
+
+// 监听statsData变化，更新可用的API Keys
+watch(statsData, (newData) => {
+  if (newData && newData.apiKeyInfo) {
+    availableApiKeys.value = [{
+      id: newData.apiKeyInfo.id,
+      name: newData.apiKeyInfo.name || 'Unnamed Key'
+    }]
+    
+    // 如果只有一个API Key，自动选择
+    if (!selectedApiKeyId.value) {
+      selectedApiKeyId.value = newData.apiKeyInfo.id
+    }
+  } else {
+    availableApiKeys.value = []
+    selectedApiKeyId.value = ''
+  }
+}, { immediate: true })
 
 // 处理键盘快捷键
 const handleKeyDown = (event) => {

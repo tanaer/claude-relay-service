@@ -6,6 +6,8 @@ const fs = require('fs')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
+const redemptionCodeService = require('../services/redemptionCodeService')
+const apiKeyService = require('../services/apiKeyService')
 
 const router = express.Router()
 
@@ -337,6 +339,49 @@ router.post('/auth/refresh', async (req, res) => {
     return res.status(500).json({
       error: 'Token refresh failed',
       message: 'Internal server error'
+    })
+  }
+})
+
+// 🎫 兑换码功能
+router.post('/redeem', async (req, res) => {
+  try {
+    const { code, apiKeyId } = req.body
+
+    if (!code || !apiKeyId) {
+      return res.status(400).json({
+        success: false,
+        error: '兑换码和API Key ID都不能为空'
+      })
+    }
+
+    // 验证API Key存在
+    const apiKey = await apiKeyService.getApiKeyById(apiKeyId)
+    if (!apiKey) {
+      return res.status(400).json({
+        success: false,
+        error: 'API Key不存在'
+      })
+    }
+
+    const result = await redemptionCodeService.redeemCode(code, apiKeyId)
+
+    if (result.success) {
+      return res.json({
+        success: true,
+        message: result.message
+      })
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: result.error
+      })
+    }
+  } catch (error) {
+    logger.error('❌ Redemption failed:', error)
+    return res.status(500).json({
+      success: false,
+      error: '兑换失败，请稍后重试'
     })
   }
 })

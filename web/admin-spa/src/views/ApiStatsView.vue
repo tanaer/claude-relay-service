@@ -6,7 +6,13 @@
         <LogoTitle
           :loading="oemLoading"
           :logo-src="oemSettings.siteIconData || oemSettings.siteIcon"
-          :subtitle="currentTab === 'stats' ? 'API Key 使用统计' : currentTab === 'redeem' ? '兑换码激活' : '使用教程'"
+          :subtitle="
+            currentTab === 'stats'
+              ? 'API Key 使用统计'
+              : currentTab === 'redeem'
+                ? '兑换码激活'
+                : '使用教程'
+          "
           :title="oemSettings.siteName"
         />
         <div class="flex items-center gap-3">
@@ -122,9 +128,11 @@
       <div class="glass-strong rounded-3xl p-4 shadow-xl md:p-6">
         <div class="mb-6">
           <h3 class="mb-2 text-lg font-semibold text-gray-900 md:text-xl">兑换码激活</h3>
-          <p class="text-sm text-gray-600 md:text-base">输入兑换码激活日卡或月卡，提升API Key的费用限制</p>
+          <p class="text-sm text-gray-600 md:text-base">
+            输入兑换码激活日卡或月卡，提升API Key的费用限制
+          </p>
         </div>
-        
+
         <!-- 兑换表单 -->
         <div class="space-y-4 md:space-y-6">
           <!-- 兑换码输入 -->
@@ -133,17 +141,17 @@
             <div class="relative">
               <input
                 v-model="redeemCode"
+                :disabled="isRedeeming"
                 type="text"
                 placeholder="请输入兑换码，如：D-xxxxxxxx 或 M-xxxxxxxx"
                 class="w-full rounded-xl border-2 border-gray-200 bg-white/50 px-4 py-3 text-gray-900 placeholder-gray-500 backdrop-blur-sm transition-colors focus:border-blue-500 focus:outline-none"
-                :disabled="isRedeeming"
               />
               <div class="absolute right-3 top-1/2 -translate-y-1/2">
                 <i class="fas fa-ticket-alt text-gray-400"></i>
               </div>
             </div>
           </div>
-          
+
           <!-- API Key选择 -->
           <div>
             <label class="mb-2 block text-sm font-medium text-gray-700">选择API Key</label>
@@ -161,23 +169,25 @@
               暂无可用的API Key，请先在统计查询中输入API Key
             </p>
           </div>
-          
+
           <!-- 兑换按钮 -->
           <div class="pt-2">
             <button
-              @click="handleRedeem"
               :disabled="!canRedeem"
               class="w-full rounded-xl px-6 py-3 font-semibold text-white shadow-lg transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-50 md:w-auto"
-              :class="canRedeem 
-                ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 hover:shadow-xl' 
-                : 'bg-gray-400'"
+              :class="
+                canRedeem
+                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 hover:shadow-xl'
+                  : 'bg-gray-400'
+              "
+              @click="handleRedeem"
             >
               <i v-if="isRedeeming" class="fas fa-spinner fa-spin mr-2"></i>
               <i v-else class="fas fa-gift mr-2"></i>
               {{ isRedeeming ? '兑换中...' : '立即兑换' }}
             </button>
           </div>
-          
+
           <!-- 提示信息 -->
           <div class="rounded-xl bg-blue-50/50 p-4 backdrop-blur-sm">
             <h4 class="mb-2 flex items-center text-sm font-medium text-blue-900">
@@ -252,7 +262,7 @@ const canRedeem = computed(() => {
 // 兑换码处理函数
 const handleRedeem = async () => {
   if (!canRedeem.value) return
-  
+
   isRedeeming.value = true
   try {
     const response = await fetch('/redeem', {
@@ -265,9 +275,9 @@ const handleRedeem = async () => {
         apiKeyId: selectedApiKeyId.value
       })
     })
-    
+
     const result = await response.json()
-    
+
     if (result.success) {
       showToast(result.message, 'success')
       redeemCode.value = ''
@@ -280,7 +290,7 @@ const handleRedeem = async () => {
       showToast(result.error || '兑换失败', 'error')
     }
   } catch (error) {
-    console.error('Redemption error:', error)
+    // console.error('Redemption error:', error)
     showToast('兑换失败，请稍后重试', 'error')
   } finally {
     isRedeeming.value = false
@@ -288,22 +298,28 @@ const handleRedeem = async () => {
 }
 
 // 监听statsData变化，更新可用的API Keys
-watch(statsData, (newData) => {
-  if (newData && newData.apiKeyInfo) {
-    availableApiKeys.value = [{
-      id: newData.apiKeyInfo.id,
-      name: newData.apiKeyInfo.name || 'Unnamed Key'
-    }]
-    
-    // 如果只有一个API Key，自动选择
-    if (!selectedApiKeyId.value) {
-      selectedApiKeyId.value = newData.apiKeyInfo.id
+watch(
+  statsData,
+  (newData) => {
+    if (newData && newData.apiKeyInfo) {
+      availableApiKeys.value = [
+        {
+          id: newData.apiKeyInfo.id,
+          name: newData.apiKeyInfo.name || 'Unnamed Key'
+        }
+      ]
+
+      // 如果只有一个API Key，自动选择
+      if (!selectedApiKeyId.value) {
+        selectedApiKeyId.value = newData.apiKeyInfo.id
+      }
+    } else {
+      availableApiKeys.value = []
+      selectedApiKeyId.value = ''
     }
-  } else {
-    availableApiKeys.value = []
-    selectedApiKeyId.value = ''
-  }
-}, { immediate: true })
+  },
+  { immediate: true }
+)
 
 // 处理键盘快捷键
 const handleKeyDown = (event) => {
@@ -323,7 +339,7 @@ const handleKeyDown = (event) => {
 
 // 初始化
 onMounted(() => {
-  console.log('API Stats Page loaded')
+  // console.log('API Stats Page loaded')
 
   // 加载 OEM 设置
   loadOemSettings()

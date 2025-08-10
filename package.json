@@ -32,6 +32,8 @@
     "lint:check": "eslint src/**/*.js cli/**/*.js scripts/**/*.js",
     "format": "prettier --write \"src/**/*.js\" \"cli/**/*.js\" \"scripts/**/*.js\"",
     "format:check": "prettier --check \"src/**/*.js\" \"cli/**/*.js\" \"scripts/**/*.js\"",
+    "format:web": "cd web/admin-spa && npx prettier --write \"src/**/*.{js,vue,ts,tsx,json,css,scss,md}\"",
+    "format:all": "npm run format && npm run format:web",
     "docker:build": "docker build -t claude-relay-service .",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",

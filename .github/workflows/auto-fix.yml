@@ -1,0 +1,131 @@
+name: Auto Fix
+
+on:
+  workflow_dispatch: # 手动触发
+  schedule:
+    - cron: '0 2 * * 0' # 每周日凌晨2点运行
+
+jobs:
+  auto-fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install backend dependencies
+        run: npm install
+
+      - name: Install frontend dependencies
+        run: cd web/admin-spa && npm install
+
+      - name: Auto-fix ESLint issues (Backend)
+        run: |
+          echo "Auto-fixing ESLint issues in backend..."
+          npx eslint src/**/*.js cli/**/*.js scripts/**/*.js --fix --format stylish || true
+
+      - name: Auto-fix ESLint issues (Frontend)
+        run: |
+          echo "Auto-fixing ESLint issues in frontend..."
+          cd web/admin-spa && npx eslint src/**/*.{js,vue,ts} --fix --format stylish || true
+
+      - name: Format with Prettier (Backend)
+        run: |
+          echo "Formatting backend code with Prettier..."
+          npx prettier --write "src/**/*.js" "cli/**/*.js" "scripts/**/*.js"
+
+      - name: Format with Prettier (Frontend)
+        run: |
+          echo "Formatting frontend code with Prettier..."
+          cd web/admin-spa && npx prettier --write "src/**/*.{js,vue,ts,tsx,json,css,scss,md}"
+
+      - name: Remove trailing whitespace
+        run: |
+          echo "Removing trailing whitespace..."
+          find . -type f \( -name "*.js" -o -name "*.vue" -o -name "*.ts" -o -name "*.json" -o -name "*.md" \) \
+            -not -path "./node_modules/*" \
+            -not -path "./web/admin-spa/node_modules/*" \
+            -not -path "./.git/*" \
+            -exec sed -i 's/[[:space:]]*$//' {} \;
+
+      - name: Fix line endings (LF)
+        run: |
+          echo "Converting line endings to LF..."
+          find . -type f \( -name "*.js" -o -name "*.vue" -o -name "*.ts" -o -name "*.json" -o -name "*.md" \) \
+            -not -path "./node_modules/*" \
+            -not -path "./web/admin-spa/node_modules/*" \
+            -not -path "./.git/*" \
+            -exec dos2unix {} \; 2>/dev/null || true
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "changes=true" >> $GITHUB_OUTPUT
+            echo "Files have been auto-fixed"
+          else
+            echo "changes=false" >> $GITHUB_OUTPUT
+            echo "No auto-fix changes needed"
+          fi
+
+      - name: Create Pull Request
+        if: steps.changes.outputs.changes == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: |
+            🔧 Auto-fix code quality issues
+            
+            - Auto-fixed ESLint issues
+            - Formatted code with Prettier
+            - Removed trailing whitespace
+            - Normalized line endings
+          title: "🔧 Auto-fix code quality issues"
+          body: |
+            ## Auto-Fix Summary
+            
+            This PR contains automatic code quality fixes:
+            
+            - ✅ Auto-fixed ESLint issues
+            - 🎨 Formatted code with Prettier
+            - 🧹 Removed trailing whitespace
+            - 📝 Normalized line endings to LF
+            
+            ### Changes Made
+            
+            The following tools were used to improve code quality:
+            - **ESLint**: Fixed auto-fixable linting issues
+            - **Prettier**: Applied consistent code formatting
+            - **sed**: Removed trailing whitespace
+            - **dos2unix**: Normalized line endings
+            
+            Please review the changes and merge if they look good.
+            
+            ---
+            *This PR was created automatically by the Auto-Fix workflow.*
+          branch: auto-fix/code-quality
+          delete-branch: true
+          reviewers: |
+            # Add your GitHub usernames here for auto-review
+            # example-user
+          labels: |
+            automated
+            code-quality
+            maintenance
+
+      - name: Comment on successful run
+        if: steps.changes.outputs.changes == 'false'
+        run: |
+          echo "✅ Code quality check passed - no fixes needed!"

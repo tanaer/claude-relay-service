@@ -269,8 +269,8 @@ class Application {
           }
           if (!version) {
             try {
-              const packageJson = require('../package.json')
-              version = packageJson.version
+              const { version: packageVersion } = require('../package.json')
+              version = packageVersion
             } catch (error) {
               version = '1.0.0'
             }

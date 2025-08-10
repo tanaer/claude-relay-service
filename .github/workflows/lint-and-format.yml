@@ -1,0 +1,71 @@
+name: Lint and Format
+
+on:
+  push:
+    branches: [main, devlocal]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-format:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install backend dependencies
+        run: npm install
+
+      - name: Install frontend dependencies
+        run: cd web/admin-spa && npm install
+
+      - name: Lint backend code
+        run: npm run lint
+
+      - name: Format backend code with Prettier
+        run: npx prettier --write "src/**/*.js" "cli/**/*.js" "scripts/**/*.js"
+
+      - name: Format frontend code with Prettier
+        run: cd web/admin-spa && npx prettier --write "src/**/*.{js,vue,ts,tsx,json,css,scss,md}"
+
+      - name: Check for changes
+        id: verify-changed-files
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Files have been formatted"
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No formatting changes needed"
+          fi
+
+      - name: Commit and push if changed
+        if: steps.verify-changed-files.outputs.changed == 'true' && github.event_name == 'push'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git commit -m "🎨 Auto-format code with Prettier and ESLint [skip ci]"
+          git push
+
+      - name: Create PR comment for formatting changes
+        if: steps.verify-changed-files.outputs.changed == 'true' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '🎨 Code has been automatically formatted with Prettier and ESLint. Please review the changes.'
+            })

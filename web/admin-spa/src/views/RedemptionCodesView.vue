@@ -74,37 +74,37 @@
           <div class="flex flex-wrap gap-2">
             <!-- 生成按钮 -->
             <button
-              @click="generateCodes('daily')"
               :disabled="isGenerating"
               class="btn btn-primary flex items-center gap-2"
+              @click="generateCodes('daily')"
             >
               <i class="fas fa-plus"></i>
               生成日卡 (20个)
             </button>
             <button
-              @click="generateCodes('monthly')"
               :disabled="isGenerating"
               class="btn btn-secondary flex items-center gap-2"
+              @click="generateCodes('monthly')"
             >
               <i class="fas fa-plus"></i>
               生成月卡 (20个)
             </button>
 
             <!-- 提取按钮 -->
-            <button @click="extractCodes('daily')" class="btn btn-success flex items-center gap-2">
+            <button class="btn btn-success flex items-center gap-2" @click="extractCodes('daily')">
               <i class="fas fa-download"></i>
               提取日卡 (20个)
             </button>
             <button
-              @click="extractCodes('monthly')"
               class="btn btn-success flex items-center gap-2"
+              @click="extractCodes('monthly')"
             >
               <i class="fas fa-download"></i>
               提取月卡 (20个)
             </button>
 
             <!-- 刷新按钮 -->
-            <button @click="refreshData()" class="btn btn-outline flex items-center gap-2">
+            <button class="btn btn-outline flex items-center gap-2" @click="refreshData()">
               <i class="fas fa-sync-alt" :class="{ 'fa-spin': isLoading }"></i>
               刷新
             </button>
@@ -152,22 +152,22 @@
             </thead>
             <tbody class="divide-y divide-gray-200 bg-white">
               <tr v-if="isLoading">
-                <td colspan="6" class="px-6 py-4 text-center">
+                <td class="px-6 py-4 text-center" colspan="6">
                   <i class="fas fa-spinner fa-spin mr-2"></i>
                   加载中...
                 </td>
               </tr>
               <tr v-else-if="codes.length === 0">
-                <td colspan="6" class="px-6 py-4 text-center text-gray-500">暂无兑换码数据</td>
+                <td class="px-6 py-4 text-center text-gray-500" colspan="6">暂无兑换码数据</td>
               </tr>
-              <tr v-else v-for="code in codes" :key="code.id" class="hover:bg-gray-50">
+              <tr v-for="code in codes" v-else :key="code.id" class="hover:bg-gray-50">
                 <td class="whitespace-nowrap px-6 py-4">
                   <div class="flex items-center gap-2">
                     <code class="font-mono text-sm">{{ code.code }}</code>
                     <button
-                      @click="copyToClipboard(code.code)"
                       class="text-gray-400 hover:text-blue-500"
                       title="复制兑换码"
+                      @click="copyToClipboard(code.code)"
                     >
                       <i class="fas fa-copy"></i>
                     </button>

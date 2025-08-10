@@ -1,0 +1,65 @@
+# 依赖和构建输出
+node_modules/
+dist/
+build/
+.output/
+.nuxt/
+.next/
+
+# 日志文件
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 临时文件
+.tmp/
+temp/
+tmp/
+
+# 缓存目录
+.cache/
+.parcel-cache/
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+
+# IDE文件
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git文件
+.git/
+.gitignore
+
+# 配置文件（某些不应格式化）
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# 数据文件
+data/
+*.db
+*.sqlite
+
+# 证书和密钥
+*.pem
+*.key
+*.crt
+
+# 特定于项目的排除
+VERSION
+.env*
+init.json
+
+# 压缩文件
+*.min.js
+*.min.css
+
+# 文档（如果不想格式化）
+CHANGELOG.md
+LICENSE

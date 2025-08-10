@@ -1,0 +1,95 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [main, devlocal]
+  pull_request:
+    branches: [main]
+
+jobs:
+  code-quality:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install backend dependencies
+        run: npm install
+
+      - name: Install frontend dependencies
+        run: cd web/admin-spa && npm install
+
+      - name: Run ESLint (Backend)
+        run: |
+          echo "Running ESLint on backend files..."
+          npx eslint src/**/*.js cli/**/*.js scripts/**/*.js --format stylish
+        continue-on-error: true
+
+      - name: Run ESLint (Frontend)
+        run: |
+          echo "Running ESLint on frontend files..."
+          cd web/admin-spa && npx eslint src/**/*.{js,vue,ts} --format stylish
+        continue-on-error: true
+
+      - name: Check Prettier formatting (Backend)
+        run: |
+          echo "Checking Prettier formatting on backend files..."
+          npx prettier --check "src/**/*.js" "cli/**/*.js" "scripts/**/*.js"
+        continue-on-error: true
+
+      - name: Check Prettier formatting (Frontend)
+        run: |
+          echo "Checking Prettier formatting on frontend files..."
+          cd web/admin-spa && npx prettier --check "src/**/*.{js,vue,ts,tsx,json,css,scss,md}"
+        continue-on-error: true
+
+      - name: Run backend tests (if available)
+        run: |
+          if [ -f "package.json" ] && [ -d "test" ] || [ -d "tests" ] || [ -d "__tests__" ]; then
+            echo "Running backend tests..."
+            npm test
+          else
+            echo "No backend tests found"
+          fi
+        continue-on-error: true
+
+      - name: Run frontend tests (if available)
+        run: |
+          cd web/admin-spa
+          if [ -f "package.json" ] && ([ -d "test" ] || [ -d "tests" ] || [ -d "__tests__" ]); then
+            echo "Running frontend tests..."
+            npm test
+          else
+            echo "No frontend tests found"
+          fi
+        continue-on-error: true
+
+      - name: Security audit (Backend)
+        run: |
+          echo "Running security audit on backend..."
+          npm audit --audit-level moderate
+        continue-on-error: true
+
+      - name: Security audit (Frontend)
+        run: |
+          echo "Running security audit on frontend..."
+          cd web/admin-spa && npm audit --audit-level moderate
+        continue-on-error: true
+
+      - name: Check for TODO/FIXME comments
+        run: |
+          echo "Checking for TODO/FIXME comments..."
+          TODO_COUNT=$(grep -r "TODO\|FIXME" src/ web/admin-spa/src/ --include="*.js" --include="*.vue" --include="*.ts" | wc -l || echo 0)
+          echo "Found $TODO_COUNT TODO/FIXME comments"
+          if [ $TODO_COUNT -gt 0 ]; then
+            echo "TODO/FIXME comments found:"
+            grep -r "TODO\|FIXME" src/ web/admin-spa/src/ --include="*.js" --include="*.vue" --include="*.ts" -n || true
+          fi
+        continue-on-error: true

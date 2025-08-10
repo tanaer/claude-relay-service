@@ -225,6 +225,42 @@ class Application {
         logger.warn('⚠️ Admin SPA dist directory not found, skipping /admin-next route')
       }
 
+      // 🎫 用户兑换码功能 (直接挂载到根路径，用户友好)
+      this.app.post('/redeem', async (req, res) => {
+        try {
+          const redemptionCodeService = require('./services/redemptionCodeService')
+          const { code } = req.body
+
+          if (!code) {
+            return res.status(400).json({
+              success: false,
+              error: '兑换码不能为空'
+            })
+          }
+
+          const result = await redemptionCodeService.redeemCode(code)
+
+          if (result.success) {
+            return res.json({
+              success: true,
+              message: result.message,
+              data: result.data
+            })
+          } else {
+            return res.status(400).json({
+              success: false,
+              error: result.error
+            })
+          }
+        } catch (error) {
+          logger.error('❌ Redemption failed:', error)
+          return res.status(500).json({
+            success: false,
+            error: '兑换失败，请稍后重试'
+          })
+        }
+      })
+
       // 🛣️ 路由
       this.app.use('/api', apiRoutes)
       this.app.use('/claude', apiRoutes) // /claude 路由别名，与 /api 功能相同

@@ -1,5 +1,5 @@
 <template>
-  <div class="mb-6 grid grid-cols-1 gap-4 md:mb-8 md:gap-6 lg:grid-cols-2">
+  <div class="mb-6 space-y-4 md:mb-8 md:space-y-6">
     <!-- API Key 基本信息 -->
     <div class="card p-4 md:p-6">
       <h3 class="mb-3 flex items-center text-lg font-bold text-gray-900 md:mb-4 md:text-xl">
@@ -33,10 +33,10 @@
           }}</span>
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-sm text-gray-600 md:text-base">创建时间</span>
-          <span class="break-all text-xs font-medium text-gray-900 md:text-base">{{
-            formatDate(statsData.createdAt)
-          }}</span>
+          <span class="text-sm text-gray-600 md:text-base">每日费用限制</span>
+          <span class="text-sm font-medium text-gray-900 md:text-base">
+            ${{ statsData.dailyCostLimit || '无限制' }}
+          </span>
         </div>
         <div class="flex items-start justify-between">
           <span class="mt-1 flex-shrink-0 text-sm text-gray-600 md:text-base">过期时间</span>
@@ -67,50 +67,70 @@
       </div>
     </div>
 
-    <!-- 使用统计概览 -->
+    <!-- Token 使用进度 -->
     <div class="card p-4 md:p-6">
-      <h3
-        class="mb-3 flex flex-col text-lg font-bold text-gray-900 sm:flex-row sm:items-center md:mb-4 md:text-xl"
-      >
-        <span class="flex items-center">
-          <i class="fas fa-chart-bar mr-2 text-sm text-green-500 md:mr-3 md:text-base" />
-          使用统计概览
-        </span>
-        <span class="text-xs font-normal text-gray-600 sm:ml-2 md:text-sm"
+      <h3 class="mb-3 flex items-center text-lg font-bold text-gray-900 md:mb-4 md:text-xl">
+        <i class="fas fa-chart-bar mr-2 text-sm text-green-500 md:mr-3 md:text-base" />
+        Token 使用情况
+        <span class="ml-2 text-xs font-normal text-gray-600 md:text-sm"
           >({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span
         >
       </h3>
-      <div class="grid grid-cols-2 gap-3 md:gap-4">
-        <div class="stat-card text-center">
-          <div class="text-lg font-bold text-green-600 md:text-3xl">
-            {{ formatNumber(currentPeriodData.requests) }}
+
+      <div class="space-y-4">
+        <!-- 进度条 -->
+        <div class="relative">
+          <div class="mb-2 flex items-center justify-between">
+            <span class="text-sm text-gray-600">总Token使用量</span>
+            <span class="text-sm font-medium text-gray-900">
+              {{ formatNumber(currentPeriodData.allTokens) }} / {{ formatNumber(maxTokens) }}
+            </span>
           </div>
-          <div class="text-xs text-gray-600 md:text-sm">
-            {{ statsPeriod === 'daily' ? '今日' : '本月' }}请求数
+
+          <div class="h-3 w-full overflow-hidden rounded-full bg-gray-200">
+            <div
+              class="h-full rounded-full transition-all duration-500 ease-out"
+              :class="getProgressBarClass(tokenProgress)"
+              :style="{ width: tokenProgress + '%' }"
+            ></div>
+          </div>
+
+          <div class="mt-2 flex items-center justify-between text-xs text-gray-500">
+            <span>0</span>
+            <span>{{ tokenProgress.toFixed(1) }}%</span>
+            <span>{{ formatNumber(maxTokens) }}</span>
           </div>
         </div>
-        <div class="stat-card text-center">
-          <div class="text-lg font-bold text-blue-600 md:text-3xl">
-            {{ formatNumber(currentPeriodData.allTokens) }}
+
+        <!-- 详细信息 -->
+        <div class="grid grid-cols-2 gap-4">
+          <div class="text-center">
+            <div class="text-lg font-bold text-blue-600 md:text-2xl">
+              {{ formatNumber(currentPeriodData.inputTokens) }}
+            </div>
+            <div class="text-xs text-gray-600 md:text-sm">输入Token</div>
           </div>
-          <div class="text-xs text-gray-600 md:text-sm">
-            {{ statsPeriod === 'daily' ? '今日' : '本月' }}Token数
+          <div class="text-center">
+            <div class="text-lg font-bold text-purple-600 md:text-2xl">
+              {{ formatNumber(currentPeriodData.outputTokens) }}
+            </div>
+            <div class="text-xs text-gray-600 md:text-sm">输出Token</div>
           </div>
         </div>
-        <div class="stat-card text-center">
-          <div class="text-lg font-bold text-purple-600 md:text-3xl">
-            {{ currentPeriodData.formattedCost || '$0.000000' }}
+
+        <!-- 费用信息 -->
+        <div class="rounded-lg bg-gray-50 p-3">
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-600"
+              >{{ statsPeriod === 'daily' ? '今日' : '本月' }}费用</span
+            >
+            <span class="text-lg font-bold text-green-600">
+              {{ currentPeriodData.formattedCost || '$0.000000' }}
+            </span>
           </div>
-          <div class="text-xs text-gray-600 md:text-sm">
-            {{ statsPeriod === 'daily' ? '今日' : '本月' }}费用
-          </div>
-        </div>
-        <div class="stat-card text-center">
-          <div class="text-lg font-bold text-yellow-600 md:text-3xl">
-            {{ formatNumber(currentPeriodData.inputTokens) }}
-          </div>
-          <div class="text-xs text-gray-600 md:text-sm">
-            {{ statsPeriod === 'daily' ? '今日' : '本月' }}输入Token
+          <div v-if="statsData.dailyCostLimit" class="mt-1 flex items-center justify-between">
+            <span class="text-xs text-gray-500">每日限制</span>
+            <span class="text-xs text-gray-500">${{ statsData.dailyCostLimit }}</span>
           </div>
         </div>
       </div>
@@ -121,20 +141,44 @@
 <script setup>
 import { storeToRefs } from 'pinia'
 import { useApiStatsStore } from '@/stores/apistats'
-import dayjs from 'dayjs'
+import { computed } from 'vue'
 
 const apiStatsStore = useApiStatsStore()
 const { statsData, statsPeriod, currentPeriodData } = storeToRefs(apiStatsStore)
 
-// 格式化日期
-const formatDate = (dateString) => {
-  if (!dateString) return '无'
+// 计算最大Token数（基于每日费用限制）
+const maxTokens = computed(() => {
+  if (!statsData.value?.dailyCostLimit) return 1000000 // 默认值，如果没有限制
 
-  try {
-    const date = dayjs(dateString)
-    return date.format('YYYY年MM月DD日 HH:mm')
-  } catch (error) {
-    return '格式错误'
+  // 使用Claude平均价格估算：输入约$0.003/1K tokens，输出约$0.015/1K tokens
+  // 假设输入输出比例为1:1，平均价格为$0.009/1K tokens
+  const avgCostPer1KTokens = 0.009
+  const dailyCostLimit = parseFloat(statsData.value.dailyCostLimit)
+
+  return Math.round((dailyCostLimit / avgCostPer1KTokens) * 1000)
+})
+
+// 计算Token使用进度百分比
+const tokenProgress = computed(() => {
+  const currentTokens = currentPeriodData.value?.allTokens || 0
+  const maxTokenValue = maxTokens.value
+
+  if (maxTokenValue === 0) return 0
+
+  const progress = (currentTokens / maxTokenValue) * 100
+  return Math.min(progress, 100) // 限制最大100%
+})
+
+// 根据进度获取进度条颜色
+const getProgressBarClass = (progress) => {
+  if (progress >= 90) {
+    return 'bg-gradient-to-r from-red-500 to-red-600'
+  } else if (progress >= 70) {
+    return 'bg-gradient-to-r from-yellow-500 to-orange-500'
+  } else if (progress >= 50) {
+    return 'bg-gradient-to-r from-blue-500 to-cyan-500'
+  } else {
+    return 'bg-gradient-to-r from-green-500 to-emerald-500'
   }
 }
 

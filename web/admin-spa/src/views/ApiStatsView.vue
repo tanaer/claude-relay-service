@@ -112,13 +112,13 @@
           <StatsOverview />
 
           <!-- Token 分布和限制配置 -->
-          <div class="mb-6 grid grid-cols-1 gap-4 md:mb-8 md:gap-6 lg:grid-cols-2">
+          <!-- <div class="mb-6 grid grid-cols-1 gap-4 md:mb-8 md:gap-6 lg:grid-cols-2">
             <TokenDistribution />
             <LimitConfig />
-          </div>
+          </div> -->
 
           <!-- 模型使用统计 -->
-          <ModelUsageStats />
+          <!-- <ModelUsageStats /> -->
         </div>
       </div>
     </div>
@@ -245,9 +245,6 @@ import { showToast } from '@/utils/toast'
 import LogoTitle from '@/components/common/LogoTitle.vue'
 import ApiKeyInput from '@/components/apistats/ApiKeyInput.vue'
 import StatsOverview from '@/components/apistats/StatsOverview.vue'
-import TokenDistribution from '@/components/apistats/TokenDistribution.vue'
-import LimitConfig from '@/components/apistats/LimitConfig.vue'
-import ModelUsageStats from '@/components/apistats/ModelUsageStats.vue'
 import TutorialView from './TutorialView.vue'
 
 const route = useRoute()

@@ -37,7 +37,11 @@ class ApiClient {
   // 获取认证 token
   getAuthToken() {
     const authToken = localStorage.getItem('authToken')
-    return authToken || null
+    // 检查无效的token值
+    if (!authToken || authToken === 'null' || authToken === 'undefined' || authToken.length < 32) {
+      return null
+    }
+    return authToken
   }
 
   // 构建请求配置

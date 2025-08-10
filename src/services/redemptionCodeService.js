@@ -210,7 +210,7 @@ class RedemptionCodeService {
           name: apiKeyName,
           expiresAt: expiresAt.toISOString(),
           dailyCostLimit: costLimit,
-          duration: duration
+          duration
         }
       }
     } catch (error) {

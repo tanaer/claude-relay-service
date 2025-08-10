@@ -7,7 +7,6 @@ const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
 const redemptionCodeService = require('../services/redemptionCodeService')
-const apiKeyService = require('../services/apiKeyService')
 
 const router = express.Router()
 

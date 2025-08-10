@@ -349,10 +349,15 @@ const authenticateAdmin = async (req, res, next) => {
 
   try {
     // 安全提取token，支持多种方式
-    const token =
+    let token =
       req.headers['authorization']?.replace(/^Bearer\s+/i, '') ||
       req.cookies?.adminToken ||
       req.headers['x-admin-token']
+
+    // 清理无效的token值
+    if (token === 'null' || token === 'undefined' || token === '') {
+      token = null
+    }
 
     if (!token) {
       logger.security(`🔒 Missing admin token attempt from ${req.ip || 'unknown'}`)

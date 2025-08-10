@@ -218,7 +218,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { showToast } from '../utils/toast'
-import CustomDropdown from '../components/CustomDropdown.vue'
+import CustomDropdown from '../components/common/CustomDropdown.vue'
 
 // 响应式数据
 const isLoading = ref(false)

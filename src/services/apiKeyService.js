@@ -11,86 +11,96 @@ class ApiKeyService {
 
   // 🔑 生成新的API Key
   async generateApiKey(options = {}) {
-    const {
-      name = 'Unnamed Key',
-      description = '',
-      tokenLimit = config.limits.defaultTokenLimit,
-      expiresAt = null,
-      claudeAccountId = null,
-      claudeConsoleAccountId = null,
-      geminiAccountId = null,
-      permissions = 'all', // 'claude', 'gemini', 'all'
-      isActive = true,
-      concurrencyLimit = 0,
-      rateLimitWindow = null,
-      rateLimitRequests = null,
-      enableModelRestriction = false,
-      restrictedModels = [],
-      enableClientRestriction = false,
-      allowedClients = [],
-      dailyCostLimit = 0,
-      tags = []
-    } = options
+    try {
+      const {
+        name = 'Unnamed Key',
+        description = '',
+        tokenLimit = config.limits.defaultTokenLimit,
+        expiresAt = null,
+        claudeAccountId = null,
+        claudeConsoleAccountId = null,
+        geminiAccountId = null,
+        permissions = 'all', // 'claude', 'gemini', 'all'
+        isActive = true,
+        concurrencyLimit = 0,
+        rateLimitWindow = null,
+        rateLimitRequests = null,
+        enableModelRestriction = false,
+        restrictedModels = [],
+        enableClientRestriction = false,
+        allowedClients = [],
+        dailyCostLimit = 0,
+        tags = []
+      } = options
 
-    // 生成简单的API Key (64字符十六进制)
-    const apiKey = `${this.prefix}${this._generateSecretKey()}`
-    const keyId = uuidv4()
-    const hashedKey = this._hashApiKey(apiKey)
+      // 生成简单的API Key (64字符十六进制)
+      const apiKey = `${this.prefix}${this._generateSecretKey()}`
+      const keyId = uuidv4()
+      const hashedKey = this._hashApiKey(apiKey)
 
-    const keyData = {
-      id: keyId,
-      name,
-      description,
-      apiKey: hashedKey,
-      tokenLimit: String(tokenLimit ?? 0),
-      concurrencyLimit: String(concurrencyLimit ?? 0),
-      rateLimitWindow: String(rateLimitWindow ?? 0),
-      rateLimitRequests: String(rateLimitRequests ?? 0),
-      isActive: String(isActive),
-      claudeAccountId: claudeAccountId || '',
-      claudeConsoleAccountId: claudeConsoleAccountId || '',
-      geminiAccountId: geminiAccountId || '',
-      permissions: permissions || 'all',
-      enableModelRestriction: String(enableModelRestriction),
-      restrictedModels: JSON.stringify(restrictedModels || []),
-      enableClientRestriction: String(enableClientRestriction || false),
-      allowedClients: JSON.stringify(allowedClients || []),
-      dailyCostLimit: String(dailyCostLimit || 0),
-      tags: JSON.stringify(tags || []),
-      createdAt: new Date().toISOString(),
-      lastUsedAt: '',
-      expiresAt: expiresAt || '',
-      createdBy: 'admin' // 可以根据需要扩展用户系统
-    }
+      const keyData = {
+        id: keyId,
+        name,
+        description,
+        apiKey: hashedKey,
+        tokenLimit: String(tokenLimit ?? 0),
+        concurrencyLimit: String(concurrencyLimit ?? 0),
+        rateLimitWindow: String(rateLimitWindow ?? 0),
+        rateLimitRequests: String(rateLimitRequests ?? 0),
+        isActive: String(isActive),
+        claudeAccountId: claudeAccountId || '',
+        claudeConsoleAccountId: claudeConsoleAccountId || '',
+        geminiAccountId: geminiAccountId || '',
+        permissions: permissions || 'all',
+        enableModelRestriction: String(enableModelRestriction),
+        restrictedModels: JSON.stringify(restrictedModels || []),
+        enableClientRestriction: String(enableClientRestriction || false),
+        allowedClients: JSON.stringify(allowedClients || []),
+        dailyCostLimit: String(dailyCostLimit || 0),
+        tags: JSON.stringify(tags || []),
+        createdAt: new Date().toISOString(),
+        lastUsedAt: '',
+        expiresAt: expiresAt || '',
+        createdBy: 'admin' // 可以根据需要扩展用户系统
+      }
 
-    // 保存API Key数据并建立哈希映射
-    await redis.setApiKey(keyId, keyData, hashedKey)
+      // 保存API Key数据并建立哈希映射
+      await redis.setApiKey(keyId, keyData, hashedKey)
 
-    logger.success(`🔑 Generated new API key: ${name} (${keyId})`)
+      logger.success(`🔑 Generated new API key: ${name} (${keyId})`)
 
-    return {
-      id: keyId,
-      apiKey, // 只在创建时返回完整的key
-      name: keyData.name,
-      description: keyData.description,
-      tokenLimit: parseInt(keyData.tokenLimit),
-      concurrencyLimit: parseInt(keyData.concurrencyLimit),
-      rateLimitWindow: parseInt(keyData.rateLimitWindow || 0),
-      rateLimitRequests: parseInt(keyData.rateLimitRequests || 0),
-      isActive: keyData.isActive === 'true',
-      claudeAccountId: keyData.claudeAccountId,
-      claudeConsoleAccountId: keyData.claudeConsoleAccountId,
-      geminiAccountId: keyData.geminiAccountId,
-      permissions: keyData.permissions,
-      enableModelRestriction: keyData.enableModelRestriction === 'true',
-      restrictedModels: JSON.parse(keyData.restrictedModels),
-      enableClientRestriction: keyData.enableClientRestriction === 'true',
-      allowedClients: JSON.parse(keyData.allowedClients || '[]'),
-      dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
-      tags: JSON.parse(keyData.tags || '[]'),
-      createdAt: keyData.createdAt,
-      expiresAt: keyData.expiresAt,
-      createdBy: keyData.createdBy
+      return {
+        success: true,
+        id: keyId,
+        apiKey, // 只在创建时返回完整的key
+        name: keyData.name,
+        description: keyData.description,
+        tokenLimit: parseInt(keyData.tokenLimit),
+        concurrencyLimit: parseInt(keyData.concurrencyLimit),
+        rateLimitWindow: parseInt(keyData.rateLimitWindow || 0),
+        rateLimitRequests: parseInt(keyData.rateLimitRequests || 0),
+        isActive: keyData.isActive === 'true',
+        claudeAccountId: keyData.claudeAccountId,
+        claudeConsoleAccountId: keyData.claudeConsoleAccountId,
+        geminiAccountId: keyData.geminiAccountId,
+        permissions: keyData.permissions,
+        enableModelRestriction: keyData.enableModelRestriction === 'true',
+        restrictedModels: JSON.parse(keyData.restrictedModels),
+        enableClientRestriction: keyData.enableClientRestriction === 'true',
+        allowedClients: JSON.parse(keyData.allowedClients || '[]'),
+        dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
+        tags: JSON.parse(keyData.tags || '[]'),
+        createdAt: keyData.createdAt,
+        expiresAt: keyData.expiresAt,
+        createdBy: keyData.createdBy
+      }
+    } catch (error) {
+      logger.error('❌ Failed to generate API key:', {
+        error: error.message,
+        stack: error.stack,
+        options: JSON.stringify(options, null, 2)
+      })
+      throw error
     }
   }
 

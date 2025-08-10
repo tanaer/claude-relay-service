@@ -179,16 +179,23 @@ class RedemptionCodeService {
       const cardName = codeData.type === 'daily' ? '日卡' : '月卡'
       const apiKeyName = `${cardName}-${code}`
 
-      const newApiKey = await apiKeyService.generateApiKey({
-        name: apiKeyName,
-        description: `通过兑换码 ${code} 生成的${cardName}`,
-        dailyCostLimit: costLimit,
-        expiresAt: expiresAt.toISOString(),
-        isActive: true,
-        tags: [codeData.type === 'daily' ? 'daily-card' : 'monthly-card', 'redeemed']
-      })
+      let newApiKey
+      try {
+        newApiKey = await apiKeyService.generateApiKey({
+          name: apiKeyName,
+          description: `通过兑换码 ${code} 生成的${cardName}`,
+          dailyCostLimit: costLimit,
+          expiresAt: expiresAt.toISOString(),
+          isActive: true,
+          tags: [codeData.type === 'daily' ? 'daily-card' : 'monthly-card', 'redeemed']
+        })
+      } catch (generateError) {
+        logger.error('❌ Failed to generate API key during redemption:', generateError)
+        return { success: false, error: '生成API Key失败' }
+      }
 
-      if (!newApiKey.success) {
+      if (!newApiKey || !newApiKey.success || !newApiKey.apiKey) {
+        logger.error('❌ Generated API key is invalid or missing apiKey property')
         return { success: false, error: '生成API Key失败' }
       }
 

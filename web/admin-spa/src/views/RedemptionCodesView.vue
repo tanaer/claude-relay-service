@@ -268,7 +268,7 @@ const loadCodes = async () => {
 
     const response = await fetch(`/admin/redemption-codes?${params}`, {
       headers: {
-        Authorization: `Bearer ${localStorage.getItem('adminToken')}`
+        Authorization: `Bearer ${localStorage.getItem('authToken')}`
       }
     })
 
@@ -291,7 +291,7 @@ const loadStats = async () => {
   try {
     const response = await fetch('/admin/redemption-codes/stats', {
       headers: {
-        Authorization: `Bearer ${localStorage.getItem('adminToken')}`
+        Authorization: `Bearer ${localStorage.getItem('authToken')}`
       }
     })
 
@@ -315,7 +315,7 @@ const generateCodes = async (type) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('adminToken')}`
+        Authorization: `Bearer ${localStorage.getItem('authToken')}`
       },
       body: JSON.stringify({ type, count: 20 })
     })
@@ -342,7 +342,7 @@ const extractCodes = async (type) => {
   try {
     const response = await fetch(`/admin/redemption-codes/extract/${type}?count=20`, {
       headers: {
-        Authorization: `Bearer ${localStorage.getItem('adminToken')}`
+        Authorization: `Bearer ${localStorage.getItem('authToken')}`
       }
     })
 

@@ -141,10 +141,10 @@
             <div class="relative">
               <input
                 v-model="redeemCode"
-                :disabled="isRedeeming"
-                type="text"
-                placeholder="请输入兑换码，如：D-xxxxxxxx 或 M-xxxxxxxx"
                 class="w-full rounded-xl border-2 border-gray-200 bg-white/50 px-4 py-3 text-gray-900 placeholder-gray-500 backdrop-blur-sm transition-colors focus:border-blue-500 focus:outline-none"
+                :disabled="isRedeeming"
+                placeholder="请输入兑换码，如：D-xxxxxxxx 或 M-xxxxxxxx"
+                type="text"
               />
               <div class="absolute right-3 top-1/2 -translate-y-1/2">
                 <i class="fas fa-ticket-alt text-gray-400"></i>
@@ -173,13 +173,13 @@
           <!-- 兑换按钮 -->
           <div class="pt-2">
             <button
-              :disabled="!canRedeem"
               class="w-full rounded-xl px-6 py-3 font-semibold text-white shadow-lg transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-50 md:w-auto"
               :class="
                 canRedeem
                   ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 hover:shadow-xl'
                   : 'bg-gray-400'
               "
+              :disabled="!canRedeem"
               @click="handleRedeem"
             >
               <i v-if="isRedeeming" class="fas fa-spinner fa-spin mr-2"></i>

@@ -55,16 +55,16 @@
             <div class="flex gap-2">
               <input
                 v-model="filters.code"
-                type="text"
-                placeholder="搜索兑换码..."
                 class="w-40 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                placeholder="搜索兑换码..."
+                type="text"
                 @input="debounceSearch"
               />
               <input
                 v-model="filters.apiKey"
-                type="text"
-                placeholder="搜索API Key..."
                 class="w-40 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                placeholder="搜索API Key..."
+                type="text"
                 @input="debounceSearch"
               />
             </div>
@@ -74,16 +74,16 @@
           <div class="flex flex-wrap gap-2">
             <!-- 生成按钮 -->
             <button
-              :disabled="isGenerating"
               class="btn btn-primary flex items-center gap-2"
+              :disabled="isGenerating"
               @click="generateCodes('daily')"
             >
               <i class="fas fa-plus"></i>
               生成日卡 (20个)
             </button>
             <button
-              :disabled="isGenerating"
               class="btn btn-secondary flex items-center gap-2"
+              :disabled="isGenerating"
               @click="generateCodes('monthly')"
             >
               <i class="fas fa-plus"></i>

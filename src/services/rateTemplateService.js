@@ -393,18 +393,32 @@ class RateTemplateService {
 
         // 如果API Key没有设置倍率模板，尝试从绑定的账户或分组获取
         if (!templateId) {
-          // 检查API Key是否绑定到分组
-          if (apiKeyData?.groupId) {
-            const groupData = await client.hgetall(`account_group:${apiKeyData.groupId}`)
+          // 检查API Key是否绑定到分组（通过 claudeAccountId 或 geminiAccountId 的 group: 前缀）
+          let boundGroupId = null
+          if (apiKeyData?.claudeAccountId?.startsWith('group:')) {
+            boundGroupId = apiKeyData.claudeAccountId.replace('group:', '')
+          } else if (apiKeyData?.geminiAccountId?.startsWith('group:')) {
+            boundGroupId = apiKeyData.geminiAccountId.replace('group:', '')
+          } else if (apiKeyData?.groupId) {
+            // 兼容直接 groupId 字段
+            boundGroupId = apiKeyData.groupId
+          }
+
+          if (boundGroupId) {
+            const groupData = await client.hgetall(`account_group:${boundGroupId}`)
             templateId = groupData?.rateTemplateId
-            searchPath.push(`API Key group ${apiKeyData.groupId}: ${templateId || 'null'}`)
+            searchPath.push(`API Key group ${boundGroupId}: ${templateId || 'null'}`)
             logger.info(
-              `🔍 API Key bound to group ${apiKeyData.groupId}: rateTemplateId=${templateId || 'null'}`
+              `🔍 API Key bound to group ${boundGroupId}: rateTemplateId=${templateId || 'null'}`
             )
           }
 
-          // 检查Claude账户绑定
-          if (!templateId && apiKeyData?.claudeAccountId) {
+          // 检查Claude账户绑定（只有在不是分组绑定时）
+          if (
+            !templateId &&
+            apiKeyData?.claudeAccountId &&
+            !apiKeyData.claudeAccountId.startsWith('group:')
+          ) {
             const accountData = await client.hgetall(`claude_account:${apiKeyData.claudeAccountId}`)
             templateId = accountData?.rateTemplateId
             searchPath.push(`Claude account ${apiKeyData.claudeAccountId}: ${templateId || 'null'}`)
@@ -443,8 +457,12 @@ class RateTemplateService {
             }
           }
 
-          // 检查Gemini账户绑定
-          if (!templateId && apiKeyData?.geminiAccountId) {
+          // 检查Gemini账户绑定（只有在不是分组绑定时）
+          if (
+            !templateId &&
+            apiKeyData?.geminiAccountId &&
+            !apiKeyData.geminiAccountId.startsWith('group:')
+          ) {
             const accountData = await client.hgetall(`gemini_account:${apiKeyData.geminiAccountId}`)
             templateId = accountData?.rateTemplateId
             searchPath.push(`Gemini account ${apiKeyData.geminiAccountId}: ${templateId || 'null'}`)

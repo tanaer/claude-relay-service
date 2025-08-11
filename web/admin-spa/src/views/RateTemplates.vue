@@ -230,7 +230,10 @@ const handleSave = async (data) => {
   try {
     if (editingTemplate.value) {
       // 更新模板
-      const response = await apiClient.put(`/admin/rate-templates/${editingTemplate.value.id}`, data)
+      const response = await apiClient.put(
+        `/admin/rate-templates/${editingTemplate.value.id}`,
+        data
+      )
       if (response.data.success) {
         showToast('更新成功', 'success')
         closeDialog()

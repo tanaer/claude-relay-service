@@ -300,15 +300,16 @@ const emit = defineEmits(['close', 'save'])
 // 默认模型列表
 const defaultModels = ref([
   // Claude 系列
+  'claude-sonnet-4-20250514',
+  'claude-opus-4-1-20250805',
+  'claude-opus-4-20250514',
   'claude-3-5-sonnet-20241022',
   'claude-3-5-haiku-20241022',
-  'claude-3-opus-20240229',
-  'claude-3-sonnet-20240229',
-  'claude-3-haiku-20240307',
-  'claude-2.1',
-  'claude-2.0',
-  'claude-instant-1.2',
   // GPT 系列
+  'gpt-5-mini-2025-08-07',
+  'gpt-5-2025-08-07',
+  'gpt-5',
+  'gpt-5-mini',
   'gpt-4o',
   'gpt-4o-mini',
   'gpt-4-turbo',
@@ -317,10 +318,8 @@ const defaultModels = ref([
   'gpt-3.5-turbo',
   'gpt-3.5-turbo-16k',
   // Gemini 系列
-  'gemini-1.5-pro',
-  'gemini-1.5-flash',
-  'gemini-1.0-pro',
-  'gemini-2.0-flash-exp',
+  'gemini-2.5-pro',
+  'gemini-2.5-flash',
   // 其他模型
   'llama-3.1-405b',
   'llama-3.1-70b',

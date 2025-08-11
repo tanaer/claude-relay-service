@@ -4787,7 +4787,7 @@ router.get('/redemption-codes/extract/:type', authenticateAdmin, async (req, res
 // 获取所有倍率模板
 router.get('/rate-templates', authenticateAdmin, async (req, res) => {
   try {
-    const templates = await rateTemplateService.getAllTemplates()
+    const templates = await rateTemplateService.getTemplates()
     res.json({
       success: true,
       data: templates

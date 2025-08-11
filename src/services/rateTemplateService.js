@@ -6,6 +6,19 @@ class RateTemplateService {
   constructor() {
     this.TEMPLATES_KEY = 'rate_templates'
     this.TEMPLATE_PREFIX = 'rate_template:'
+    this.defaultModels = [
+      'claude-3-5-sonnet-20241022',
+      'claude-3-5-haiku-20241022',
+      'claude-3-opus-20240229',
+      'claude-3-sonnet-20240229',
+      'claude-3-haiku-20240307',
+      'gemini-1.5-pro-latest',
+      'gemini-1.5-flash-latest',
+      'gemini-2.0-flash-exp',
+      'us-east-1.anthropic.claude-3-5-sonnet-20241022-v2:0',
+      'us-east-1.anthropic.claude-3-5-haiku-20241022-v1:0',
+      'us-east-1.anthropic.claude-3-opus-20240229-v1:0'
+    ]
   }
 
   // 创建倍率模板
@@ -14,7 +27,10 @@ class RateTemplateService {
       const { name, description = '', rates = {}, isDefault = false } = templateData
 
       if (!name) {
-        throw new Error('模板名称为必填项')
+        return {
+          success: false,
+          error: '模板名称为必填项'
+        }
       }
 
       const client = redis.getClientSafe()
@@ -43,13 +59,19 @@ class RateTemplateService {
       logger.success(`✅ Created rate template: ${name} (${templateId})`)
 
       return {
-        ...template,
-        rates: typeof template.rates === 'string' ? JSON.parse(template.rates) : template.rates,
-        isDefault: template.isDefault === '1'
+        success: true,
+        data: {
+          ...template,
+          rates: typeof template.rates === 'string' ? JSON.parse(template.rates) : template.rates,
+          isDefault: template.isDefault === '1'
+        }
       }
     } catch (error) {
       logger.error('❌ Failed to create rate template:', error)
-      throw error
+      return {
+        success: false,
+        error: error.message
+      }
     }
   }
 
@@ -117,7 +139,10 @@ class RateTemplateService {
       // 检查模板是否存在
       const exists = await client.exists(templateKey)
       if (!exists) {
-        throw new Error('模板不存在')
+        return {
+          success: false,
+          error: '模板不存在'
+        }
       }
 
       // 如果设置为默认模板，先取消其他默认模板
@@ -150,10 +175,16 @@ class RateTemplateService {
       const updatedTemplate = await this.getTemplate(templateId)
       logger.success(`✅ Updated rate template: ${updatedTemplate.name}`)
 
-      return updatedTemplate
+      return {
+        success: true,
+        data: updatedTemplate
+      }
     } catch (error) {
       logger.error('❌ Failed to update template:', error)
-      throw error
+      return {
+        success: false,
+        error: error.message
+      }
     }
   }
 
@@ -164,11 +195,17 @@ class RateTemplateService {
       const template = await this.getTemplate(templateId)
 
       if (!template) {
-        throw new Error('模板不存在')
+        return {
+          success: false,
+          error: '模板不存在'
+        }
       }
 
       if (template.isDefault) {
-        throw new Error('不能删除默认模板')
+        return {
+          success: false,
+          error: '不能删除默认模板'
+        }
       }
 
       // 删除模板
@@ -176,10 +213,16 @@ class RateTemplateService {
       await client.srem(this.TEMPLATES_KEY, templateId)
 
       logger.success(`✅ Deleted rate template: ${template.name}`)
-      return true
+      return {
+        success: true,
+        message: '模板删除成功'
+      }
     } catch (error) {
       logger.error('❌ Failed to delete template:', error)
-      throw error
+      return {
+        success: false,
+        error: error.message
+      }
     }
   }
 
@@ -188,7 +231,10 @@ class RateTemplateService {
     try {
       const template = await this.getTemplate(templateId)
       if (!template) {
-        throw new Error('模板不存在')
+        return {
+          success: false,
+          error: '模板不存在'
+        }
       }
 
       // 先取消其他默认模板
@@ -198,10 +244,16 @@ class RateTemplateService {
       await this.updateTemplate(templateId, { isDefault: true })
 
       logger.success(`✅ Set default template: ${template.name}`)
-      return true
+      return {
+        success: true,
+        message: '默认模板设置成功'
+      }
     } catch (error) {
       logger.error('❌ Failed to set default template:', error)
-      throw error
+      return {
+        success: false,
+        error: error.message
+      }
     }
   }
 
@@ -239,6 +291,51 @@ class RateTemplateService {
     } catch (error) {
       logger.error('❌ Failed to get default template:', error)
       return null
+    }
+  }
+
+  // 批量设置某一列的倍率
+  async batchSetColumnRate(templateId, column, rate) {
+    try {
+      const template = await this.getTemplate(templateId)
+      if (!template) {
+        return {
+          success: false,
+          error: '模板不存在'
+        }
+      }
+
+      const rates = template.rates || {}
+
+      // 根据列类型设置倍率
+      if (column === 'all') {
+        // 设置所有模型
+        for (const model of this.defaultModels) {
+          rates[model] = rate
+        }
+      } else if (this.defaultModels.includes(column)) {
+        // 设置特定模型
+        rates[column] = rate
+      } else {
+        return {
+          success: false,
+          error: '无效的列名'
+        }
+      }
+
+      await this.updateTemplate(templateId, { rates })
+
+      return {
+        success: true,
+        message: '批量设置倍率成功',
+        data: await this.getTemplate(templateId)
+      }
+    } catch (error) {
+      logger.error('❌ Failed to batch set column rate:', error)
+      return {
+        success: false,
+        error: error.message
+      }
     }
   }
 

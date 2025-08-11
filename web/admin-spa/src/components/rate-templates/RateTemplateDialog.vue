@@ -373,7 +373,7 @@ const initFormData = () => {
       rates: { ...props.template.rates },
       customModels: props.template.customModels || []
     }
-    
+
     // 确保所有当前默认模型都有倍率设置
     for (const model of defaultModels.value) {
       if (!formData.value.rates[model]) {

@@ -183,7 +183,6 @@ const refreshTemplates = () => {
 const editTemplate = (template) => {
   editingTemplate.value = template
   showCreateDialog.value = false // 确保创建对话框关闭
-  console.log('editingTemplate.value:', editingTemplate.value)
 }
 
 // 设为默认模板

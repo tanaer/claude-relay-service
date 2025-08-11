@@ -145,7 +145,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { showToast } from '@/utils/toast'
-import api from '@/services/api'
+import { apiClient } from '@/config/api'
 import RateTemplateDialog from '@/components/rate-templates/RateTemplateDialog.vue'
 
 // 响应式数据
@@ -158,7 +158,7 @@ const editingTemplate = ref(null)
 const fetchTemplates = async () => {
   loading.value = true
   try {
-    const response = await api.get('/admin/rate-templates')
+    const response = await apiClient.get('/admin/rate-templates')
     if (response.data.success) {
       templates.value = response.data.data
     }
@@ -188,7 +188,7 @@ const setAsDefault = async (template) => {
   }
 
   try {
-    const response = await api.post(`/admin/rate-templates/${template.id}/set-default`)
+    const response = await apiClient.post(`/admin/rate-templates/${template.id}/set-default`)
     if (response.data.success) {
       showToast('设置默认模板成功', 'success')
       fetchTemplates()
@@ -206,7 +206,7 @@ const deleteTemplate = async (template) => {
   }
 
   try {
-    const response = await api.delete(`/admin/rate-templates/${template.id}`)
+    const response = await apiClient.delete(`/admin/rate-templates/${template.id}`)
     if (response.data.success) {
       showToast('删除成功', 'success')
       fetchTemplates()
@@ -230,7 +230,7 @@ const handleSave = async (data) => {
   try {
     if (editingTemplate.value) {
       // 更新模板
-      const response = await api.put(`/admin/rate-templates/${editingTemplate.value.id}`, data)
+      const response = await apiClient.put(`/admin/rate-templates/${editingTemplate.value.id}`, data)
       if (response.data.success) {
         showToast('更新成功', 'success')
         closeDialog()
@@ -238,7 +238,7 @@ const handleSave = async (data) => {
       }
     } else {
       // 创建模板
-      const response = await api.post('/admin/rate-templates', data)
+      const response = await apiClient.post('/admin/rate-templates', data)
       if (response.data.success) {
         showToast('创建成功', 'success')
         closeDialog()

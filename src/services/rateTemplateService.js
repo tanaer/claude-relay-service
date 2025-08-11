@@ -386,6 +386,11 @@ class RateTemplateService {
         templateId = apiKeyData?.rateTemplateId
         searchPath.push(`API Key direct: ${templateId || 'null'}`)
 
+        // 输出API Key的详细信息用于调试
+        logger.info(
+          `🔍 API Key ${entityId} data: claudeAccountId=${apiKeyData?.claudeAccountId || 'null'}, geminiAccountId=${apiKeyData?.geminiAccountId || 'null'}`
+        )
+
         // 如果API Key没有设置倍率模板，尝试从绑定的账户获取
         if (!templateId) {
           // 检查Claude账户绑定
@@ -393,6 +398,11 @@ class RateTemplateService {
             const accountData = await client.hgetall(`claude_account:${apiKeyData.claudeAccountId}`)
             templateId = accountData?.rateTemplateId
             searchPath.push(`Claude account ${apiKeyData.claudeAccountId}: ${templateId || 'null'}`)
+
+            // 输出Claude账户的详细信息用于调试
+            logger.info(
+              `🔍 Claude account ${apiKeyData.claudeAccountId} data: accountType=${accountData?.accountType || 'null'}, rateTemplateId=${accountData?.rateTemplateId || 'null'}`
+            )
 
             // 如果账户也没有倍率模板，根据账户类型获取系统分组模板
             if (!templateId && accountData?.accountType) {
@@ -403,11 +413,22 @@ class RateTemplateService {
                 if (group) {
                   templateId = group.rateTemplateId
                   searchPath.push(`Account group ${group.id}: ${templateId || 'null'}`)
+                  logger.info(
+                    `🔍 Found account group ${group.id}: rateTemplateId=${templateId || 'null'}`
+                  )
+                } else {
+                  searchPath.push(`Account group: not found`)
+                  logger.warn(
+                    `🔍 No account group found for Claude account ${apiKeyData.claudeAccountId}`
+                  )
                 }
               } else if (['shared', 'dedicated'].includes(accountData.accountType)) {
                 // 检查系统分组（共享账户池、专属账户池）的倍率模板
                 templateId = await this.getSystemGroupRateTemplate(accountData.accountType)
                 searchPath.push(`System group ${accountData.accountType}: ${templateId || 'null'}`)
+                logger.info(
+                  `🔍 System group ${accountData.accountType}: templateId=${templateId || 'null'}`
+                )
               }
             }
           }
@@ -418,6 +439,11 @@ class RateTemplateService {
             templateId = accountData?.rateTemplateId
             searchPath.push(`Gemini account ${apiKeyData.geminiAccountId}: ${templateId || 'null'}`)
 
+            // 输出Gemini账户的详细信息用于调试
+            logger.info(
+              `🔍 Gemini account ${apiKeyData.geminiAccountId} data: accountType=${accountData?.accountType || 'null'}, rateTemplateId=${accountData?.rateTemplateId || 'null'}`
+            )
+
             // 如果账户也没有倍率模板，根据账户类型获取系统分组模板
             if (!templateId && accountData?.accountType) {
               if (accountData.accountType === 'group') {
@@ -427,11 +453,22 @@ class RateTemplateService {
                 if (group) {
                   templateId = group.rateTemplateId
                   searchPath.push(`Account group ${group.id}: ${templateId || 'null'}`)
+                  logger.info(
+                    `🔍 Found account group ${group.id}: rateTemplateId=${templateId || 'null'}`
+                  )
+                } else {
+                  searchPath.push(`Account group: not found`)
+                  logger.warn(
+                    `🔍 No account group found for Gemini account ${apiKeyData.geminiAccountId}`
+                  )
                 }
               } else if (['shared', 'dedicated'].includes(accountData.accountType)) {
                 // 检查系统分组（共享账户池、专属账户池）的倍率模板
                 templateId = await this.getSystemGroupRateTemplate(accountData.accountType)
                 searchPath.push(`System group ${accountData.accountType}: ${templateId || 'null'}`)
+                logger.info(
+                  `🔍 System group ${accountData.accountType}: templateId=${templateId || 'null'}`
+                )
               }
             }
           }
@@ -496,7 +533,9 @@ class RateTemplateService {
       }
 
       const template = await this.getTemplate(templateId)
-      logger.info(`🔍 Found template ${templateId}: ${template ? 'exists' : 'missing'}`)
+      logger.info(
+        `🔍 Found template ${templateId}: ${template ? 'exists' : 'missing'}, rates=${JSON.stringify(template?.rates || {})}`
+      )
       return template?.rates || {}
     } catch (error) {
       logger.error('❌ Failed to get rates for entity:', error)

@@ -185,41 +185,41 @@
                     </td>
                     <td class="px-3 py-2">
                       <input
-                        :value="getModelRate(model, 'input')"
                         class="block w-full rounded-md border-gray-300 text-center text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
                         min="0"
                         step="0.1"
                         type="number"
+                        :value="getModelRate(model, 'input')"
                         @input="updateModelRate(model, 'input', $event.target.value)"
                       />
                     </td>
                     <td class="px-3 py-2">
                       <input
-                        :value="getModelRate(model, 'output')"
                         class="block w-full rounded-md border-gray-300 text-center text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
                         min="0"
                         step="0.1"
                         type="number"
+                        :value="getModelRate(model, 'output')"
                         @input="updateModelRate(model, 'output', $event.target.value)"
                       />
                     </td>
                     <td class="px-3 py-2">
                       <input
-                        :value="getModelRate(model, 'cacheCreate')"
                         class="block w-full rounded-md border-gray-300 text-center text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
                         min="0"
                         step="0.1"
                         type="number"
+                        :value="getModelRate(model, 'cacheCreate')"
                         @input="updateModelRate(model, 'cacheCreate', $event.target.value)"
                       />
                     </td>
                     <td class="px-3 py-2">
                       <input
-                        :value="getModelRate(model, 'cacheRead')"
                         class="block w-full rounded-md border-gray-300 text-center text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
                         min="0"
                         step="0.1"
                         type="number"
+                        :value="getModelRate(model, 'cacheRead')"
                         @input="updateModelRate(model, 'cacheRead', $event.target.value)"
                       />
                     </td>

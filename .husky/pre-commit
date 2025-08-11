@@ -1,0 +1,32 @@
+#!/usr/bin/env sh
+
+echo "Running pre-commit auto-format and checks..."
+
+# 确保在正确的目录
+if [ ! -f "package.json" ]; then
+    echo "Error: Not in project root directory!"
+    exit 1
+fi
+
+# 格式化和修复所有文件
+echo "Formatting and fixing code..."
+npm run fix:all
+
+# 检查格式化后是否还有问题
+echo "Running final validation..."
+npm run lint:check
+if [ $? -ne 0 ]; then
+    echo "Backend lint issues detected!"
+    exit 1
+fi
+
+# 检查前端
+cd web/admin-spa
+npm run lint:check
+if [ $? -ne 0 ]; then
+    echo "Frontend lint issues detected!"
+    exit 1
+fi
+
+cd ../..
+echo "All pre-commit checks passed!"

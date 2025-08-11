@@ -254,9 +254,9 @@
                         ? 'bg-blue-600 hover:bg-blue-700'
                         : 'bg-green-600 hover:bg-green-700'
                     "
+                    :href="getSetupUrl(redemptionResult.apiKey)"
                     rel="noopener"
                     target="_blank"
-                    :href="getSetupUrl(redemptionResult.apiKey)"
                   >
                     <i class="fas fa-download"></i>
                     下载安装脚本

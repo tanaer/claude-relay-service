@@ -34,6 +34,11 @@
     "format:check": "prettier --check \"src/**/*.js\" \"cli/**/*.js\" \"scripts/**/*.js\"",
     "format:web": "cd web/admin-spa && npx prettier --write \"src/**/*.{js,vue,ts,tsx,json,css,scss,md}\"",
     "format:all": "npm run format && npm run format:web",
+    "lint:all": "npm run lint && cd web/admin-spa && npm run lint:fix",
+    "fix:all": "npm run format:all && npm run lint:all",
+    "pre-commit": "npm run fix:all && npm run lint:check && cd web/admin-spa && npm run lint:check",
+    "setup:hooks": "node scripts/setup-hooks.js",
+    "prepare": "husky install || true",
     "docker:build": "docker build -t claude-relay-service .",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
@@ -79,13 +84,33 @@
     "eslint": "^8.53.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
+    "husky": "^8.0.3",
     "jest": "^29.7.0",
+    "lint-staged": "^15.2.0",
     "nodemon": "^3.0.1",
     "prettier": "^3.6.2",
     "supertest": "^6.3.3"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "*.{js,jsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "web/admin-spa/src/**/*.{vue,js,jsx,ts,tsx}": [
+      "cd web/admin-spa && npx prettier --write",
+      "cd web/admin-spa && npx eslint --fix"
+    ],
+    "web/admin-spa/src/**/*.{css,scss,json,md}": [
+      "cd web/admin-spa && npx prettier --write"
+    ]
   },
   "keywords": [
     "claude",

@@ -47,6 +47,7 @@ const tabs = [
   { key: 'apiKeys', name: 'API Keys', shortName: 'API', icon: 'fas fa-key' },
   { key: 'accounts', name: '账户管理', shortName: '账户', icon: 'fas fa-user-circle' },
   { key: 'redemption-codes', name: '兑换码', shortName: '兑换码', icon: 'fas fa-ticket-alt' },
+  { key: 'rate-templates', name: '计费倍率', shortName: '倍率', icon: 'fas fa-percentage' },
   { key: 'tutorial', name: '使用教程', shortName: '教程', icon: 'fas fa-graduation-cap' },
   { key: 'settings', name: '其他设置', shortName: '设置', icon: 'fas fa-cogs' }
 ]

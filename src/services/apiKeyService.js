@@ -30,7 +30,8 @@ class ApiKeyService {
         enableClientRestriction = false,
         allowedClients = [],
         dailyCostLimit = 0,
-        tags = []
+        tags = [],
+        rateTemplateId = null
       } = options
 
       // 生成简单的API Key (64字符十六进制)
@@ -58,6 +59,7 @@ class ApiKeyService {
         allowedClients: JSON.stringify(allowedClients || []),
         dailyCostLimit: String(dailyCostLimit || 0),
         tags: JSON.stringify(tags || []),
+        rateTemplateId: rateTemplateId || '',
         createdAt: new Date().toISOString(),
         lastUsedAt: '',
         expiresAt: expiresAt || '',
@@ -90,6 +92,7 @@ class ApiKeyService {
         allowedClients: JSON.parse(keyData.allowedClients || '[]'),
         dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
         tags: JSON.parse(keyData.tags || '[]'),
+        rateTemplateId: keyData.rateTemplateId || null,
         createdAt: keyData.createdAt,
         expiresAt: keyData.expiresAt,
         createdBy: keyData.createdBy
@@ -189,6 +192,7 @@ class ApiKeyService {
           dailyCostLimit: parseFloat(keyData.dailyCostLimit || 0),
           dailyCost: dailyCost || 0,
           tags,
+          rateTemplateId: keyData.rateTemplateId || null,
           usage
         }
       }
@@ -218,6 +222,7 @@ class ApiKeyService {
         key.permissions = key.permissions || 'all' // 兼容旧数据
         key.dailyCostLimit = parseFloat(key.dailyCostLimit || 0)
         key.dailyCost = (await redis.getDailyCost(key.id)) || 0
+        key.rateTemplateId = key.rateTemplateId || null
 
         // 获取当前时间窗口的请求次数和Token使用量
         if (key.rateLimitWindow > 0) {
@@ -316,7 +321,8 @@ class ApiKeyService {
         'enableClientRestriction',
         'allowedClients',
         'dailyCostLimit',
-        'tags'
+        'tags',
+        'rateTemplateId'
       ]
       const updatedData = { ...keyData }
 
@@ -381,7 +387,7 @@ class ApiKeyService {
 
       // 计算费用
       const CostCalculator = require('../utils/costCalculator')
-      const costInfo = CostCalculator.calculateCost(
+      const originalCostInfo = CostCalculator.calculateCost(
         {
           input_tokens: inputTokens,
           output_tokens: outputTokens,
@@ -390,6 +396,31 @@ class ApiKeyService {
         },
         model
       )
+
+      // 应用倍率模板
+      const rateTemplateService = require('./rateTemplateService')
+      const rates = await rateTemplateService.getRatesForEntity(keyId, 'apikey')
+
+      let costInfo = originalCostInfo
+      if (rates && rates[model]) {
+        const modelRates = rates[model]
+        // 应用倍率到各个费用组成部分
+        costInfo = {
+          ...originalCostInfo,
+          costs: {
+            input: originalCostInfo.costs.input * (modelRates.input || 1),
+            output: originalCostInfo.costs.output * (modelRates.output || 1),
+            cacheWrite: originalCostInfo.costs.cacheWrite * (modelRates.cacheCreate || 1),
+            cacheRead: originalCostInfo.costs.cacheRead * (modelRates.cacheRead || 1),
+            total:
+              originalCostInfo.costs.input * (modelRates.input || 1) +
+              originalCostInfo.costs.output * (modelRates.output || 1) +
+              originalCostInfo.costs.cacheWrite * (modelRates.cacheCreate || 1) +
+              originalCostInfo.costs.cacheRead * (modelRates.cacheRead || 1)
+          },
+          appliedRates: modelRates
+        }
+      }
 
       // 记录API Key级别的使用统计
       await redis.incrementTokenUsage(

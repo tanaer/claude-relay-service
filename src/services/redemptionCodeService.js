@@ -171,14 +171,14 @@ class RedemptionCodeService {
         const cardName = codeData.type === 'daily' ? '日卡' : '月卡'
         const duration = parseInt(codeData.duration)
         const costLimit = parseFloat(codeData.costLimit)
-        
+
         // 计算原始过期时间（基于使用时间）
         let originalExpiresAt = null
         if (codeData.usedAt) {
           const usedDate = new Date(codeData.usedAt)
           originalExpiresAt = new Date(usedDate.getTime() + duration * 24 * 60 * 60 * 1000)
         }
-        
+
         return {
           success: true,
           alreadyUsed: true,
@@ -189,7 +189,7 @@ class RedemptionCodeService {
             usedAt: codeData.usedAt,
             expiresAt: originalExpiresAt ? originalExpiresAt.toISOString() : null,
             dailyCostLimit: costLimit,
-            duration: duration
+            duration
           }
         }
       }

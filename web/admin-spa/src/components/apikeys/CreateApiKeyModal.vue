@@ -303,6 +303,24 @@
           </div>
 
           <div>
+            <label class="mb-2 block text-sm font-semibold text-gray-700">计费倍率模板</label>
+            <select
+              v-model="form.rateTemplateId"
+              class="form-input w-full"
+              :disabled="rateTemplatesLoading"
+            >
+              <option value="">使用默认倍率</option>
+              <option v-for="template in rateTemplates" :key="template.id" :value="template.id">
+                {{ template.name }}
+                {{ template.isDefault ? '(默认)' : '' }}
+              </option>
+            </select>
+            <p class="mt-2 text-xs text-gray-500">
+              选择计费倍率模板来调整不同模型的费用计算倍率
+            </p>
+          </div>
+
+          <div>
             <label class="mb-2 block text-sm font-semibold text-gray-700">并发限制 (可选)</label>
             <input
               v-model="form.concurrencyLimit"
@@ -599,6 +617,8 @@ const apiKeysStore = useApiKeysStore()
 const loading = ref(false)
 const accountsLoading = ref(false)
 const localAccounts = ref({ claude: [], gemini: [], claudeGroups: [], geminiGroups: [] })
+const rateTemplates = ref([])
+const rateTemplatesLoading = ref(false)
 
 // 表单验证状态
 const errors = ref({
@@ -639,13 +659,35 @@ const form = reactive({
   modelInput: '',
   enableClientRestriction: false,
   allowedClients: [],
-  tags: []
+  tags: [],
+  rateTemplateId: ''
 })
+
+// 加载倍率模板
+const loadRateTemplates = async () => {
+  rateTemplatesLoading.value = true
+  try {
+    const response = await apiClient.get('/admin/rate-templates')
+    if (response.data.success) {
+      rateTemplates.value = response.data.data
+      // 如果有默认模板，自动选中
+      const defaultTemplate = rateTemplates.value.find(t => t.isDefault)
+      if (defaultTemplate && !form.rateTemplateId) {
+        form.rateTemplateId = defaultTemplate.id
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load rate templates:', error)
+  } finally {
+    rateTemplatesLoading.value = false
+  }
+}
 
 // 加载支持的客户端和已存在的标签
 onMounted(async () => {
   supportedClients.value = await clientsStore.loadSupportedClients()
   availableTags.value = await apiKeysStore.fetchTags()
+  loadRateTemplates()
   // 初始化账号数据
   if (props.accounts) {
     localAccounts.value = {
@@ -872,6 +914,7 @@ const createApiKey = async () => {
           : 0,
       expiresAt: form.expiresAt || undefined,
       permissions: form.permissions,
+      rateTemplateId: form.rateTemplateId || undefined,
       tags: form.tags.length > 0 ? form.tags : undefined,
       enableModelRestriction: form.enableModelRestriction,
       restrictedModels: form.restrictedModels,

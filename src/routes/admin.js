@@ -6,6 +6,7 @@ const bedrockAccountService = require('../services/bedrockAccountService')
 const geminiAccountService = require('../services/geminiAccountService')
 const accountGroupService = require('../services/accountGroupService')
 const redemptionCodeService = require('../services/redemptionCodeService')
+const rateTemplateService = require('../services/rateTemplateService')
 const redis = require('../models/redis')
 const { authenticateAdmin } = require('../middleware/auth')
 const logger = require('../utils/logger')
@@ -4775,6 +4776,201 @@ router.get('/redemption-codes/extract/:type', authenticateAdmin, async (req, res
     return res
       .status(500)
       .json({ error: 'Failed to extract redemption codes', message: error.message })
+  }
+})
+
+// 💰 倍率模板管理
+
+// 获取所有倍率模板
+router.get('/rate-templates', authenticateAdmin, async (req, res) => {
+  try {
+    const templates = await rateTemplateService.getAllTemplates()
+    res.json({
+      success: true,
+      data: templates
+    })
+  } catch (error) {
+    logger.error('Failed to get rate templates:', error)
+    res.status(500).json({
+      success: false,
+      error: '获取倍率模板失败'
+    })
+  }
+})
+
+// 获取单个倍率模板
+router.get('/rate-templates/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+    const template = await rateTemplateService.getTemplate(id)
+
+    if (!template) {
+      return res.status(404).json({
+        success: false,
+        error: '倍率模板不存在'
+      })
+    }
+
+    res.json({
+      success: true,
+      data: template
+    })
+  } catch (error) {
+    logger.error('Failed to get rate template:', error)
+    res.status(500).json({
+      success: false,
+      error: '获取倍率模板失败'
+    })
+  }
+})
+
+// 创建新的倍率模板
+router.post('/rate-templates', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await rateTemplateService.createTemplate(req.body)
+
+    if (!result.success) {
+      return res.status(400).json(result)
+    }
+
+    res.json(result)
+  } catch (error) {
+    logger.error('Failed to create rate template:', error)
+    res.status(500).json({
+      success: false,
+      error: '创建倍率模板失败'
+    })
+  }
+})
+
+// 更新倍率模板
+router.put('/rate-templates/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+    const result = await rateTemplateService.updateTemplate(id, req.body)
+
+    if (!result.success) {
+      return res.status(400).json(result)
+    }
+
+    res.json(result)
+  } catch (error) {
+    logger.error('Failed to update rate template:', error)
+    res.status(500).json({
+      success: false,
+      error: '更新倍率模板失败'
+    })
+  }
+})
+
+// 批量设置某一列的倍率
+router.post('/rate-templates/:id/batch-column', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+    const { column, rate } = req.body
+
+    if (!column || rate === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: '参数不完整'
+      })
+    }
+
+    const result = await rateTemplateService.batchSetColumnRate(id, column, rate)
+
+    if (!result.success) {
+      return res.status(400).json(result)
+    }
+
+    res.json(result)
+  } catch (error) {
+    logger.error('Failed to batch set column rate:', error)
+    res.status(500).json({
+      success: false,
+      error: '批量设置倍率失败'
+    })
+  }
+})
+
+// 删除倍率模板
+router.delete('/rate-templates/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+    const result = await rateTemplateService.deleteTemplate(id)
+
+    if (!result.success) {
+      return res.status(400).json(result)
+    }
+
+    res.json(result)
+  } catch (error) {
+    logger.error('Failed to delete rate template:', error)
+    res.status(500).json({
+      success: false,
+      error: '删除倍率模板失败'
+    })
+  }
+})
+
+// 设置默认倍率模板
+router.post('/rate-templates/:id/set-default', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+    const result = await rateTemplateService.setDefaultTemplate(id)
+
+    if (!result.success) {
+      return res.status(400).json(result)
+    }
+
+    res.json(result)
+  } catch (error) {
+    logger.error('Failed to set default template:', error)
+    res.status(500).json({
+      success: false,
+      error: '设置默认模板失败'
+    })
+  }
+})
+
+// 获取默认倍率模板
+router.get('/rate-templates-default', authenticateAdmin, async (req, res) => {
+  try {
+    const template = await rateTemplateService.getDefaultTemplate()
+
+    if (!template) {
+      return res.status(404).json({
+        success: false,
+        error: '默认倍率模板不存在'
+      })
+    }
+
+    res.json({
+      success: true,
+      data: template
+    })
+  } catch (error) {
+    logger.error('Failed to get default template:', error)
+    res.status(500).json({
+      success: false,
+      error: '获取默认模板失败'
+    })
+  }
+})
+
+// 获取可用的模型列表
+router.get('/rate-templates-models', authenticateAdmin, async (req, res) => {
+  try {
+    const models = rateTemplateService.defaultModels || []
+    res.json({
+      success: true,
+      data: models
+    })
+  } catch (error) {
+    logger.error('Failed to get model list:', error)
+    res.status(500).json({
+      success: false,
+      error: '获取模型列表失败'
+    })
   }
 })
 

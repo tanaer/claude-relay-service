@@ -12,6 +12,7 @@ const TutorialView = () => import('@/views/TutorialView.vue')
 const SettingsView = () => import('@/views/SettingsView.vue')
 const ApiStatsView = () => import('@/views/ApiStatsView.vue')
 const RedemptionCodesView = () => import('@/views/RedemptionCodesView.vue')
+const RateTemplatesView = () => import('@/views/RateTemplates.vue')
 
 const routes = [
   {
@@ -87,6 +88,18 @@ const routes = [
         path: '',
         name: 'RedemptionCodes',
         component: RedemptionCodesView
+      }
+    ]
+  },
+  {
+    path: '/rate-templates',
+    component: MainLayout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'RateTemplates',
+        component: RateTemplatesView
       }
     ]
   },

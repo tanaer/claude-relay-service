@@ -227,6 +227,24 @@
           </div>
 
           <div>
+            <label class="mb-3 block text-sm font-semibold text-gray-700">计费倍率模板</label>
+            <select
+              v-model="form.rateTemplateId"
+              class="form-input w-full"
+              :disabled="rateTemplatesLoading"
+            >
+              <option value="">使用默认倍率</option>
+              <option v-for="template in rateTemplates" :key="template.id" :value="template.id">
+                {{ template.name }}
+                {{ template.isDefault ? '(默认)' : '' }}
+              </option>
+            </select>
+            <p class="mt-2 text-xs text-gray-500">
+              选择计费倍率模板来调整不同模型的费用计算倍率
+            </p>
+          </div>
+
+          <div>
             <label class="mb-3 block text-sm font-semibold text-gray-700">并发限制</label>
             <input
               v-model="form.concurrencyLimit"
@@ -503,6 +521,8 @@ const apiKeysStore = useApiKeysStore()
 const loading = ref(false)
 const accountsLoading = ref(false)
 const localAccounts = ref({ claude: [], gemini: [], claudeGroups: [], geminiGroups: [] })
+const rateTemplates = ref([])
+const rateTemplatesLoading = ref(false)
 
 // 支持的客户端列表
 const supportedClients = ref([])
@@ -533,7 +553,8 @@ const form = reactive({
   enableClientRestriction: false,
   allowedClients: [],
   tags: [],
-  isActive: true
+  isActive: true,
+  rateTemplateId: ''
 })
 
 // 添加限制的模型
@@ -611,6 +632,7 @@ const updateApiKey = async () => {
           ? parseFloat(form.dailyCostLimit)
           : 0,
       permissions: form.permissions,
+      rateTemplateId: form.rateTemplateId || undefined,
       tags: form.tags
     }
 
@@ -726,11 +748,27 @@ const refreshAccounts = async () => {
   }
 }
 
+// 加载倍率模板
+const loadRateTemplates = async () => {
+  rateTemplatesLoading.value = true
+  try {
+    const response = await apiClient.get('/admin/rate-templates')
+    if (response.data.success) {
+      rateTemplates.value = response.data.data
+    }
+  } catch (error) {
+    console.error('Failed to load rate templates:', error)
+  } finally {
+    rateTemplatesLoading.value = false
+  }
+}
+
 // 初始化表单数据
 onMounted(async () => {
   // 加载支持的客户端和已存在的标签
   supportedClients.value = await clientsStore.loadSupportedClients()
   availableTags.value = await apiKeysStore.fetchTags()
+  loadRateTemplates()
 
   // 初始化账号数据
   if (props.accounts) {
@@ -749,6 +787,7 @@ onMounted(async () => {
   form.concurrencyLimit = props.apiKey.concurrencyLimit || ''
   form.dailyCostLimit = props.apiKey.dailyCostLimit || ''
   form.permissions = props.apiKey.permissions || 'all'
+  form.rateTemplateId = props.apiKey.rateTemplateId || ''
   // 处理 Claude 账号（区分 OAuth 和 Console）
   if (props.apiKey.claudeConsoleAccountId) {
     form.claudeAccountId = `console:${props.apiKey.claudeConsoleAccountId}`

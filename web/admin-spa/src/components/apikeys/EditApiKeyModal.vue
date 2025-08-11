@@ -239,9 +239,7 @@
                 {{ template.isDefault ? '(默认)' : '' }}
               </option>
             </select>
-            <p class="mt-2 text-xs text-gray-500">
-              选择计费倍率模板来调整不同模型的费用计算倍率
-            </p>
+            <p class="mt-2 text-xs text-gray-500">选择计费倍率模板来调整不同模型的费用计算倍率</p>
           </div>
 
           <div>

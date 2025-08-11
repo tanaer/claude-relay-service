@@ -315,9 +315,7 @@
                 {{ template.isDefault ? '(默认)' : '' }}
               </option>
             </select>
-            <p class="mt-2 text-xs text-gray-500">
-              选择计费倍率模板来调整不同模型的费用计算倍率
-            </p>
+            <p class="mt-2 text-xs text-gray-500">选择计费倍率模板来调整不同模型的费用计算倍率</p>
           </div>
 
           <div>
@@ -671,7 +669,7 @@ const loadRateTemplates = async () => {
     if (response.data.success) {
       rateTemplates.value = response.data.data
       // 如果有默认模板，自动选中
-      const defaultTemplate = rateTemplates.value.find(t => t.isDefault)
+      const defaultTemplate = rateTemplates.value.find((t) => t.isDefault)
       if (defaultTemplate && !form.rateTemplateId) {
         form.rateTemplateId = defaultTemplate.id
       }

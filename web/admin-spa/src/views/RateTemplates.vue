@@ -49,19 +49,29 @@
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
               <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th
+                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                >
                   模板名称
                 </th>
-                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th
+                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                >
                   描述
                 </th>
-                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th
+                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                >
                   状态
                 </th>
-                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th
+                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                >
                   创建时间
                 </th>
-                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th
+                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                >
                   操作
                 </th>
               </tr>
@@ -97,10 +107,7 @@
                   {{ formatDate(template.createdAt) }}
                 </td>
                 <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                  <button
-                    class="text-blue-600 hover:text-blue-900"
-                    @click="editTemplate(template)"
-                  >
+                  <button class="text-blue-600 hover:text-blue-900" @click="editTemplate(template)">
                     编辑
                   </button>
                   <button

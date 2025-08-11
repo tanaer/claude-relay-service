@@ -555,7 +555,17 @@ class ClaudeRelayService {
     onRequest,
     requestOptions = {}
   ) {
-    const url = new URL(this.claudeApiUrl)
+    // 如该官方账户存在自定义官网 API 地址，则优先使用
+    let baseUrl = this.claudeApiUrl
+    try {
+      const accountData = await claudeAccountService.getAccount(accountId)
+      if (accountData && accountData.officialApiUrl && accountData.officialApiUrl.trim()) {
+        baseUrl = accountData.officialApiUrl.trim()
+      }
+    } catch (e) {
+      // 忽略获取失败，继续使用默认地址
+    }
+    const url = new URL(baseUrl)
 
     // 获取过滤后的客户端 headers
     const filteredHeaders = this._filterClientHeaders(clientHeaders)
@@ -829,8 +839,19 @@ class ClaudeRelayService {
       })
     }
 
+    // 如该官方账户存在自定义官网 API 地址，则优先使用
+    let baseUrl = this.claudeApiUrl
+    try {
+      const accountData = await claudeAccountService.getAccount(accountId)
+      if (accountData && accountData.officialApiUrl && accountData.officialApiUrl.trim()) {
+        baseUrl = accountData.officialApiUrl.trim()
+      }
+    } catch (e) {
+      // 忽略获取失败
+    }
+
     return new Promise((resolve, reject) => {
-      const url = new URL(this.claudeApiUrl)
+      const url = new URL(baseUrl)
 
       const options = {
         hostname: url.hostname,

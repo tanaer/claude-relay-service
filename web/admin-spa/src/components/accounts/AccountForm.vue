@@ -606,6 +606,24 @@
                 </div>
               </div>
 
+              <!-- 官方 Claude（手动）可选：自定义 API 地址 -->
+              <div v-if="form.platform === 'claude'" class="grid grid-cols-1 gap-4">
+                <div>
+                  <label class="mb-2 block text-sm font-semibold text-gray-700"
+                    >自定义官网 API 地址（可选）</label
+                  >
+                  <input
+                    v-model="form.officialApiUrl"
+                    class="form-input w-full"
+                    placeholder="例如：https://api.anthropic.com/v1/messages 或代理网关地址"
+                    type="text"
+                  />
+                  <p class="mt-1 text-xs text-gray-500">
+                    如填写，将在调用时以此地址替代默认官网地址。
+                  </p>
+                </div>
+              </div>
+
               <div>
                 <label class="mb-3 block text-sm font-semibold text-gray-700">Access Token *</label>
                 <textarea
@@ -1334,6 +1352,8 @@ const form = ref({
   projectId: props.account?.projectId || '',
   accessToken: '',
   refreshToken: '',
+  // 官方 Claude（非 Console）可选：自定义官网 API 地址
+  officialApiUrl: '',
   proxy: initProxyConfig(),
   // Claude Console 特定字段
   apiUrl: props.account?.apiUrl || '',
@@ -1703,6 +1723,10 @@ const createAccount = async () => {
         refreshToken: form.value.refreshToken || '',
         expiresAt: Date.now() + expiresInMs,
         scopes: ['user:inference']
+      }
+      // 传递可选的自定义官网 API 地址
+      if (form.value.officialApiUrl && form.value.officialApiUrl.trim()) {
+        data.officialApiUrl = form.value.officialApiUrl.trim()
       }
       data.priority = form.value.priority || 50
     } else if (form.value.platform === 'gemini') {

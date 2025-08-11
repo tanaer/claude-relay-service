@@ -1217,6 +1217,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       password,
       refreshToken,
       claudeAiOauth,
+      // 新增：前端可选传入的自定义官网 API 地址
+      officialApiUrl,
       proxy,
       accountType,
       priority,
@@ -1254,6 +1256,7 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       password,
       refreshToken,
       claudeAiOauth,
+      officialApiUrl,
       proxy,
       accountType: accountType || 'shared', // 默认为共享类型
       priority: priority || 50 // 默认优先级为50

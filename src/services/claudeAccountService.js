@@ -35,6 +35,8 @@ class ClaudeAccountService {
       password = '',
       refreshToken = '',
       claudeAiOauth = null, // Claude标准格式的OAuth数据
+      // 新增：官方 Claude 账户可选的自定义官网 API 地址
+      officialApiUrl = '',
       proxy = null, // { type: 'socks5', host: 'localhost', port: 1080, username: '', password: '' }
       isActive = true,
       accountType = 'shared', // 'dedicated' or 'shared'
@@ -60,6 +62,8 @@ class ClaudeAccountService {
         refreshToken: this._encryptSensitiveData(claudeAiOauth.refreshToken),
         expiresAt: claudeAiOauth.expiresAt.toString(),
         scopes: claudeAiOauth.scopes.join(' '),
+        // 落库：官方自定义 API 地址（原样存储，不加密）
+        officialApiUrl: officialApiUrl || '',
         proxy: proxy ? JSON.stringify(proxy) : '',
         isActive: isActive.toString(),
         accountType, // 账号类型：'dedicated' 或 'shared'
@@ -84,6 +88,7 @@ class ClaudeAccountService {
         accessToken: '',
         expiresAt: '',
         scopes: '',
+        officialApiUrl: officialApiUrl || '',
         proxy: proxy ? JSON.stringify(proxy) : '',
         isActive: isActive.toString(),
         accountType, // 账号类型：'dedicated' 或 'shared'
@@ -108,6 +113,7 @@ class ClaudeAccountService {
       description,
       email,
       isActive,
+      officialApiUrl: officialApiUrl || '',
       proxy,
       accountType,
       priority,
@@ -396,6 +402,8 @@ class ClaudeAccountService {
         'claudeAiOauth',
         'accountType',
         'priority',
+        // 允许更新官方自定义 API 地址
+        'officialApiUrl',
         'schedulable',
         'rateTemplateId'
       ]

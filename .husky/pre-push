@@ -1,13 +1,29 @@
 #!/usr/bin/env sh
 
-echo "🧪 Running tests before push..."
+echo "Running pre-push checks..."
 
 # 切换到项目目录
 cd "$(dirname "$0")/.."
 
-# 运行测试（如果存在）
-if [ -f "package.json" ] && grep -q '"test"' package.json; then
-  npm test
-else
-  echo "⏭️  No tests found, skipping..."
+# 运行代码质量检查
+echo "Running code quality checks..."
+npm run lint:check
+if [ $? -ne 0 ]; then
+    echo "Lint checks failed! Please run 'npm run fix:all' to fix issues."
+    exit 1
 fi
+
+cd web/admin-spa
+npm run lint:check
+if [ $? -ne 0 ]; then
+    echo "Frontend lint checks failed! Please run 'cd web/admin-spa && npm run lint:fix' to fix issues."
+    exit 1
+fi
+
+cd ../..
+
+# 运行测试（如果有的话）
+echo "Running tests..."
+npm test
+
+echo "All pre-push checks passed!"

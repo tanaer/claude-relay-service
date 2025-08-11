@@ -379,10 +379,12 @@ class RateTemplateService {
     try {
       const client = redis.getClientSafe()
       let templateId = null
+      const searchPath = []
 
       if (entityType === 'apikey') {
         const apiKeyData = await client.hgetall(`api_key:${entityId}`)
         templateId = apiKeyData?.rateTemplateId
+        searchPath.push(`API Key direct: ${templateId || 'null'}`)
 
         // 如果API Key没有设置倍率模板，尝试从绑定的账户获取
         if (!templateId) {
@@ -390,6 +392,7 @@ class RateTemplateService {
           if (apiKeyData?.claudeAccountId) {
             const accountData = await client.hgetall(`claude_account:${apiKeyData.claudeAccountId}`)
             templateId = accountData?.rateTemplateId
+            searchPath.push(`Claude account ${apiKeyData.claudeAccountId}: ${templateId || 'null'}`)
 
             // 如果账户也没有倍率模板，根据账户类型获取系统分组模板
             if (!templateId && accountData?.accountType) {
@@ -399,10 +402,12 @@ class RateTemplateService {
                 const group = await accountGroupService.getAccountGroup(apiKeyData.claudeAccountId)
                 if (group) {
                   templateId = group.rateTemplateId
+                  searchPath.push(`Account group ${group.id}: ${templateId || 'null'}`)
                 }
               } else if (['shared', 'dedicated'].includes(accountData.accountType)) {
                 // 检查系统分组（共享账户池、专属账户池）的倍率模板
                 templateId = await this.getSystemGroupRateTemplate(accountData.accountType)
+                searchPath.push(`System group ${accountData.accountType}: ${templateId || 'null'}`)
               }
             }
           }
@@ -411,6 +416,7 @@ class RateTemplateService {
           if (!templateId && apiKeyData?.geminiAccountId) {
             const accountData = await client.hgetall(`gemini_account:${apiKeyData.geminiAccountId}`)
             templateId = accountData?.rateTemplateId
+            searchPath.push(`Gemini account ${apiKeyData.geminiAccountId}: ${templateId || 'null'}`)
 
             // 如果账户也没有倍率模板，根据账户类型获取系统分组模板
             if (!templateId && accountData?.accountType) {
@@ -420,10 +426,12 @@ class RateTemplateService {
                 const group = await accountGroupService.getAccountGroup(apiKeyData.geminiAccountId)
                 if (group) {
                   templateId = group.rateTemplateId
+                  searchPath.push(`Account group ${group.id}: ${templateId || 'null'}`)
                 }
               } else if (['shared', 'dedicated'].includes(accountData.accountType)) {
                 // 检查系统分组（共享账户池、专属账户池）的倍率模板
                 templateId = await this.getSystemGroupRateTemplate(accountData.accountType)
+                searchPath.push(`System group ${accountData.accountType}: ${templateId || 'null'}`)
               }
             }
           }
@@ -431,6 +439,7 @@ class RateTemplateService {
       } else if (entityType === 'claude_account') {
         const accountData = await client.hgetall(`claude_account:${entityId}`)
         templateId = accountData?.rateTemplateId
+        searchPath.push(`Claude account direct: ${templateId || 'null'}`)
 
         // 如果账户没有倍率模板，根据账户类型获取模板
         if (!templateId && accountData?.accountType) {
@@ -439,14 +448,17 @@ class RateTemplateService {
             const group = await accountGroupService.getAccountGroup(entityId)
             if (group) {
               templateId = group.rateTemplateId
+              searchPath.push(`Account group ${group.id}: ${templateId || 'null'}`)
             }
           } else if (['shared', 'dedicated'].includes(accountData.accountType)) {
             templateId = await this.getSystemGroupRateTemplate(accountData.accountType)
+            searchPath.push(`System group ${accountData.accountType}: ${templateId || 'null'}`)
           }
         }
       } else if (entityType === 'gemini_account') {
         const accountData = await client.hgetall(`gemini_account:${entityId}`)
         templateId = accountData?.rateTemplateId
+        searchPath.push(`Gemini account direct: ${templateId || 'null'}`)
 
         // 如果账户没有倍率模板，根据账户类型获取模板
         if (!templateId && accountData?.accountType) {
@@ -455,26 +467,36 @@ class RateTemplateService {
             const group = await accountGroupService.getAccountGroup(entityId)
             if (group) {
               templateId = group.rateTemplateId
+              searchPath.push(`Account group ${group.id}: ${templateId || 'null'}`)
             }
           } else if (['shared', 'dedicated'].includes(accountData.accountType)) {
             templateId = await this.getSystemGroupRateTemplate(accountData.accountType)
+            searchPath.push(`System group ${accountData.accountType}: ${templateId || 'null'}`)
           }
         }
       } else if (entityType === 'account_group') {
         const groupData = await client.hgetall(`account_group:${entityId}`)
         templateId = groupData?.rateTemplateId
+        searchPath.push(`Account group direct: ${templateId || 'null'}`)
       } else if (entityType === 'system_group') {
         // 直接获取系统分组的倍率模板
         templateId = await this.getSystemGroupRateTemplate(entityId)
+        searchPath.push(`System group direct: ${templateId || 'null'}`)
       }
+
+      logger.info(
+        `🔍 Rate template search for ${entityType}:${entityId} - Path: ${searchPath.join(' -> ')}`
+      )
 
       // 如果没有指定模板，使用默认模板
       if (!templateId) {
         const defaultTemplate = await this.getDefaultTemplate()
+        logger.info(`🔍 Using default template: ${defaultTemplate?.id || 'none'}`)
         return defaultTemplate?.rates || {}
       }
 
       const template = await this.getTemplate(templateId)
+      logger.info(`🔍 Found template ${templateId}: ${template ? 'exists' : 'missing'}`)
       return template?.rates || {}
     } catch (error) {
       logger.error('❌ Failed to get rates for entity:', error)

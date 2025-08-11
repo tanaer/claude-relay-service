@@ -249,10 +249,14 @@
                 <div class="flex items-center gap-3">
                   <a
                     class="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-white shadow transition-all duration-300"
-                    :class="redemptionResult.alreadyUsed ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'"
-                    :href="getSetupUrl(redemptionResult.apiKey)"
-                    target="_blank"
+                    :class="
+                      redemptionResult.alreadyUsed
+                        ? 'bg-blue-600 hover:bg-blue-700'
+                        : 'bg-green-600 hover:bg-green-700'
+                    "
                     rel="noopener"
+                    target="_blank"
+                    :href="getSetupUrl(redemptionResult.apiKey)"
                   >
                     <i class="fas fa-download"></i>
                     下载安装脚本

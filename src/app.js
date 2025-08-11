@@ -278,13 +278,7 @@ class Application {
         try {
           const apiKey = req.query.apiKey || ''
 
-          const templatePath = path.join(
-            __dirname,
-            '..',
-            'resources',
-            'scripts',
-            'setup.ps1'
-          )
+          const templatePath = path.join(__dirname, '..', 'resources', 'scripts', 'setup.ps1')
 
           if (!fs.existsSync(templatePath)) {
             return res.status(404).send('setup.ps1 template not found')

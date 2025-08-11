@@ -159,8 +159,10 @@ const fetchTemplates = async () => {
   loading.value = true
   try {
     const response = await apiClient.get('/admin/rate-templates')
-    if (response.data.success) {
-      templates.value = response.data.data
+    if (response.success) {
+      templates.value = response.data
+    } else {
+      showToast('获取倍率模板失败', 'error')
     }
   } catch (error) {
     showToast('获取倍率模板失败', 'error')
@@ -189,9 +191,11 @@ const setAsDefault = async (template) => {
 
   try {
     const response = await apiClient.post(`/admin/rate-templates/${template.id}/set-default`)
-    if (response.data.success) {
+    if (response.success) {
       showToast('设置默认模板成功', 'success')
       fetchTemplates()
+    } else {
+      showToast(response.error || '设置默认模板失败', 'error')
     }
   } catch (error) {
     showToast('设置默认模板失败', 'error')
@@ -207,11 +211,11 @@ const deleteTemplate = async (template) => {
 
   try {
     const response = await apiClient.delete(`/admin/rate-templates/${template.id}`)
-    if (response.data.success) {
+    if (response.success) {
       showToast('删除成功', 'success')
       fetchTemplates()
     } else {
-      showToast(response.data.error || '删除失败', 'error')
+      showToast(response.error || '删除失败', 'error')
     }
   } catch (error) {
     showToast('删除失败', 'error')
@@ -234,18 +238,22 @@ const handleSave = async (data) => {
         `/admin/rate-templates/${editingTemplate.value.id}`,
         data
       )
-      if (response.data.success) {
+      if (response.success) {
         showToast('更新成功', 'success')
         closeDialog()
         fetchTemplates()
+      } else {
+        showToast(response.error || '更新失败', 'error')
       }
     } else {
       // 创建模板
       const response = await apiClient.post('/admin/rate-templates', data)
-      if (response.data.success) {
+      if (response.success) {
         showToast('创建成功', 'success')
         closeDialog()
         fetchTemplates()
+      } else {
+        showToast(response.error || '创建失败', 'error')
       }
     }
   } catch (error) {

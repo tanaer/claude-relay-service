@@ -4974,4 +4974,59 @@ router.get('/rate-templates-models', authenticateAdmin, async (req, res) => {
   }
 })
 
+// 获取系统分组的倍率模板
+router.get('/system-groups/:accountType/rate-template', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountType } = req.params
+
+    if (!['shared', 'dedicated'].includes(accountType)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid account type. Must be "shared" or "dedicated"'
+      })
+    }
+
+    const templateId = await rateTemplateService.getSystemGroupRateTemplate(accountType)
+
+    res.json({
+      success: true,
+      data: { templateId }
+    })
+  } catch (error) {
+    logger.error('Failed to get system group rate template:', error)
+    res.status(500).json({
+      success: false,
+      error: '获取系统分组倍率模板失败'
+    })
+  }
+})
+
+// 设置系统分组的倍率模板
+router.put('/system-groups/:accountType/rate-template', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountType } = req.params
+    const { templateId } = req.body
+
+    if (!['shared', 'dedicated'].includes(accountType)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid account type. Must be "shared" or "dedicated"'
+      })
+    }
+
+    await rateTemplateService.setSystemGroupRateTemplate(accountType, templateId)
+
+    res.json({
+      success: true,
+      message: `System group rate template ${templateId ? 'set' : 'cleared'} for ${accountType} accounts`
+    })
+  } catch (error) {
+    logger.error('Failed to set system group rate template:', error)
+    res.status(500).json({
+      success: false,
+      error: '设置系统分组倍率模板失败'
+    })
+  }
+})
+
 module.exports = router

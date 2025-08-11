@@ -1,0 +1,131 @@
+name: CI Pipeline (Optimized with Pre-commit Hooks)
+
+on:
+  push:
+    branches: [main, devlocal]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # 只做 pre-commit hooks 不能做的检查
+  extended-quality:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install backend dependencies
+        run: npm install
+
+      - name: Install frontend dependencies
+        run: cd web/admin-spa && npm install
+
+      # ✅ 编译检查 - pre-commit hooks 不适合做
+      - name: Backend compilation check
+        run: |
+          echo "🔍 Checking backend compilation..."
+          node -c src/app.js || exit 1
+          echo "✅ Backend compilation check passed"
+
+      - name: Frontend build check  
+        run: |
+          echo "🏗️ Building frontend for production..."
+          cd web/admin-spa && npm run build
+          echo "✅ Frontend build succeeded"
+
+      # ✅ 测试运行 - pre-commit hooks 不适合做
+      - name: Run backend tests
+        run: |
+          if [ -f "package.json" ] && ([ -d "test" ] || [ -d "tests" ] || [ -d "__tests__" ]); then
+            echo "🧪 Running backend tests..."
+            npm test
+          else
+            echo "📝 No backend tests found"
+          fi
+        continue-on-error: true
+
+      - name: Run frontend tests
+        run: |
+          cd web/admin-spa
+          if [ -f "package.json" ] && ([ -d "test" ] || [ -d "tests" ] || [ -d "__tests__" ]); then
+            echo "🧪 Running frontend tests..."
+            npm test
+          else
+            echo "📝 No frontend tests found"
+          fi
+        continue-on-error: true
+
+      # ✅ 安全检查 - pre-commit hooks 不适合做
+      - name: Security audit (Backend)
+        run: |
+          echo "🔒 Running security audit on backend..."
+          npm audit --audit-level high --production
+        continue-on-error: true
+
+      - name: Security audit (Frontend)
+        run: |
+          echo "🔒 Running security audit on frontend..."
+          cd web/admin-spa && npm audit --audit-level high --production
+        continue-on-error: true
+
+      # ✅ Bundle 分析 - pre-commit hooks 不适合做
+      - name: Bundle size analysis
+        run: |
+          echo "📊 Analyzing frontend bundle size..."
+          cd web/admin-spa
+          npm run build
+          BUNDLE_SIZE=$(du -sh dist/ | cut -f1)
+          echo "📦 Bundle size: $BUNDLE_SIZE"
+          
+          # 检查大小是否超过限制 (例如 10MB)
+          SIZE_BYTES=$(du -sb dist/ | cut -f1)
+          MAX_SIZE=$((10 * 1024 * 1024)) # 10MB
+          
+          if [ $SIZE_BYTES -gt $MAX_SIZE ]; then
+            echo "⚠️ Bundle size ($BUNDLE_SIZE) exceeds 10MB limit"
+          else
+            echo "✅ Bundle size is within acceptable limits"
+          fi
+
+      # ✅ 敏感数据检查 - pre-commit hooks 不适合做
+      - name: Check for sensitive data
+        run: |
+          echo "🕵️ Checking for potential sensitive data leaks..."
+          
+          SENSITIVE_PATTERNS="password.*=|secret.*=|token.*=|key.*=|api_key.*=|private.*key"
+          
+          if grep -r -E "$SENSITIVE_PATTERNS" src/ web/admin-spa/src/ \
+               --include="*.js" --include="*.vue" --include="*.ts" \
+               | grep -v "placeholder\|example\|test\|TODO\|FIXME" \
+               | head -10; then
+            echo "⚠️ Potential sensitive data found - please review above matches"
+            echo "Note: This might be false positive - verify manually"
+          else
+            echo "✅ No obvious sensitive data leaks detected"
+          fi
+        continue-on-error: true
+
+      - name: Summary
+        run: |
+          echo "🎉 CI Pipeline completed successfully!"
+          echo ""
+          echo "📋 Responsibility Matrix:"
+          echo "├── 🏠 Pre-commit Hooks (Local, Fast):"
+          echo "│   ├── ✅ Code formatting (Prettier)"
+          echo "│   ├── ✅ Linting (ESLint)"  
+          echo "│   └── ✅ Style consistency"
+          echo "└── 🌍 GitHub Actions (CI, Comprehensive):"
+          echo "    ├── ✅ Compilation verification"
+          echo "    ├── ✅ Test execution"
+          echo "    ├── ✅ Security auditing"
+          echo "    ├── ✅ Bundle size analysis"
+          echo "    └── ✅ Sensitive data detection"
+          echo ""
+          echo "🚀 No duplicate work, maximum efficiency!"

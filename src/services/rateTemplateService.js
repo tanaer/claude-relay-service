@@ -1,427 +1,279 @@
 const { v4: uuidv4 } = require('uuid')
-const redis = require('../models/redis')
 const logger = require('../utils/logger')
+const redis = require('../models/redis')
 
 class RateTemplateService {
   constructor() {
-    this.defaultModels = [
-      // Claude 系列
-      'claude-3-5-sonnet-20241022',
-      'claude-3-5-haiku-20241022',
-      'claude-3-opus-20240229',
-      'claude-3-sonnet-20240229',
-      'claude-3-haiku-20240307',
-      'claude-2.1',
-      'claude-2.0',
-      'claude-instant-1.2',
-      // GPT 系列
-      'gpt-4o',
-      'gpt-4o-mini',
-      'gpt-4-turbo',
-      'gpt-4-turbo-preview',
-      'gpt-4',
-      'gpt-3.5-turbo',
-      'gpt-3.5-turbo-16k',
-      // Gemini 系列
-      'gemini-1.5-pro',
-      'gemini-1.5-flash',
-      'gemini-1.0-pro',
-      'gemini-2.0-flash-exp',
-      // 其他模型
-      'llama-3.1-405b',
-      'llama-3.1-70b',
-      'llama-3.1-8b',
-      'mistral-large',
-      'mistral-medium',
-      'mistral-small'
-    ]
+    this.TEMPLATES_KEY = 'rate_templates'
+    this.TEMPLATE_PREFIX = 'rate_template:'
   }
 
-  // 创建新的倍率模板
-  async createTemplate(data) {
+  // 创建倍率模板
+  async createTemplate(templateData) {
     try {
-      const { name, description = '', rates = {}, customModels = [], isDefault = false } = data
+      const { name, description = '', rates = {}, isDefault = false } = templateData
 
+      if (!name) {
+        throw new Error('模板名称为必填项')
+      }
+
+      const client = redis.getClientSafe()
       const templateId = uuidv4()
       const now = new Date().toISOString()
 
-      // 初始化所有模型的倍率（默认为1）
-      const allModels = [...this.defaultModels, ...customModels]
-      const fullRates = {}
-
-      for (const model of allModels) {
-        fullRates[model] = rates[model] || {
-          input: 1,
-          output: 1,
-          cacheCreate: 1,
-          cacheRead: 1
-        }
+      // 如果设置为默认模板，先取消其他默认模板
+      if (isDefault) {
+        await this.clearDefaultTemplate()
       }
 
-      const templateData = {
+      const template = {
         id: templateId,
         name,
         description,
-        rates: JSON.stringify(fullRates),
-        customModels: JSON.stringify(customModels),
-        isDefault: String(isDefault),
+        rates: JSON.stringify(rates),
+        isDefault: isDefault ? '1' : '0',
         createdAt: now,
         updatedAt: now
       }
 
-      const client = redis.getClientSafe()
-
-      // 如果设置为默认，先取消其他默认模板
-      if (isDefault) {
-        await this.clearDefaultTemplate()
-      }
-
       // 保存模板
-      await client.hset(`rate_template:${templateId}`, templateData)
-
-      // 如果是默认模板，设置标记
-      if (isDefault) {
-        await client.set('default_rate_template', templateId)
-      }
+      await client.hmset(`${this.TEMPLATE_PREFIX}${templateId}`, template)
+      await client.sadd(this.TEMPLATES_KEY, templateId)
 
       logger.success(`✅ Created rate template: ${name} (${templateId})`)
 
       return {
-        success: true,
-        data: {
-          ...templateData,
-          rates: fullRates,
-          customModels,
-          isDefault
-        }
+        ...template,
+        rates: typeof template.rates === 'string' ? JSON.parse(template.rates) : template.rates,
+        isDefault: template.isDefault === '1'
       }
     } catch (error) {
       logger.error('❌ Failed to create rate template:', error)
-      return { success: false, error: '创建倍率模板失败' }
+      throw error
     }
   }
 
-  // 更新倍率模板
-  async updateTemplate(templateId, updates) {
+  // 获取模板列表
+  async getTemplates() {
     try {
       const client = redis.getClientSafe()
-      const existingData = await client.hgetall(`rate_template:${templateId}`)
+      const templateIds = await client.smembers(this.TEMPLATES_KEY)
 
-      if (!existingData || Object.keys(existingData).length === 0) {
-        return { success: false, error: '倍率模板不存在' }
-      }
-
-      const {
-        name = existingData.name,
-        description = existingData.description,
-        rates,
-        customModels,
-        isDefault = existingData.isDefault === 'true'
-      } = updates
-
-      // 合并倍率数据
-      const fullRates = JSON.parse(existingData.rates || '{}')
-      if (rates) {
-        // 如果有新的自定义模型，添加到倍率中
-        if (customModels) {
-          for (const model of customModels) {
-            if (!fullRates[model]) {
-              fullRates[model] = {
-                input: 1,
-                output: 1,
-                cacheCreate: 1,
-                cacheRead: 1
-              }
-            }
-          }
-        }
-        // 更新倍率
-        Object.assign(fullRates, rates)
-      }
-
-      const updatedData = {
-        ...existingData,
-        name,
-        description,
-        rates: JSON.stringify(fullRates),
-        customModels: JSON.stringify(customModels || JSON.parse(existingData.customModels || '[]')),
-        isDefault: String(isDefault),
-        updatedAt: new Date().toISOString()
-      }
-
-      // 如果设置为默认，先取消其他默认模板
-      if (isDefault && existingData.isDefault !== 'true') {
-        await this.clearDefaultTemplate()
-        await client.set('default_rate_template', templateId)
-      }
-
-      // 更新模板
-      await client.hset(`rate_template:${templateId}`, updatedData)
-
-      logger.success(`✅ Updated rate template: ${name} (${templateId})`)
-
-      return {
-        success: true,
-        data: {
-          ...updatedData,
-          rates: fullRates,
-          customModels: customModels || JSON.parse(existingData.customModels || '[]'),
-          isDefault
-        }
-      }
-    } catch (error) {
-      logger.error('❌ Failed to update rate template:', error)
-      return { success: false, error: '更新倍率模板失败' }
-    }
-  }
-
-  // 批量设置某一列的倍率
-  async batchSetColumnRate(templateId, column, rate) {
-    try {
-      const client = redis.getClientSafe()
-      const existingData = await client.hgetall(`rate_template:${templateId}`)
-
-      if (!existingData || Object.keys(existingData).length === 0) {
-        return { success: false, error: '倍率模板不存在' }
-      }
-
-      const validColumns = ['input', 'output', 'cacheCreate', 'cacheRead']
-      if (!validColumns.includes(column)) {
-        return { success: false, error: '无效的列名' }
-      }
-
-      const rates = JSON.parse(existingData.rates || '{}')
-
-      // 批量设置所有模型的指定列倍率
-      for (const model in rates) {
-        rates[model][column] = parseFloat(rate) || 1
-      }
-
-      existingData.rates = JSON.stringify(rates)
-      existingData.updatedAt = new Date().toISOString()
-
-      await client.hset(`rate_template:${templateId}`, existingData)
-
-      logger.success(`✅ Batch set ${column} rate to ${rate} for template ${templateId}`)
-
-      return {
-        success: true,
-        data: {
-          ...existingData,
-          rates,
-          customModels: JSON.parse(existingData.customModels || '[]'),
-          isDefault: existingData.isDefault === 'true'
-        }
-      }
-    } catch (error) {
-      logger.error('❌ Failed to batch set column rate:', error)
-      return { success: false, error: '批量设置倍率失败' }
-    }
-  }
-
-  // 获取所有倍率模板
-  async getAllTemplates() {
-    try {
-      const client = redis.getClientSafe()
-      const keys = await client.keys('rate_template:*')
       const templates = []
-      const defaultTemplateId = await client.get('default_rate_template')
-
-      for (const key of keys) {
-        const data = await client.hgetall(key)
-        if (data && Object.keys(data).length > 0) {
+      for (const templateId of templateIds) {
+        const templateData = await client.hgetall(`${this.TEMPLATE_PREFIX}${templateId}`)
+        if (templateData && templateData.id) {
           templates.push({
-            ...data,
-            rates: JSON.parse(data.rates || '{}'),
-            customModels: JSON.parse(data.customModels || '[]'),
-            isDefault: data.id === defaultTemplateId || data.isDefault === 'true'
+            ...templateData,
+            rates: templateData.rates ? JSON.parse(templateData.rates) : {},
+            isDefault: templateData.isDefault === '1'
           })
         }
       }
 
-      // 按创建时间倒序排列
-      templates.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-
-      return templates
+      // 按创建时间排序，默认模板排在前面
+      return templates.sort((a, b) => {
+        if (a.isDefault && !b.isDefault) {
+          return -1
+        }
+        if (!a.isDefault && b.isDefault) {
+          return 1
+        }
+        return new Date(b.createdAt) - new Date(a.createdAt)
+      })
     } catch (error) {
-      logger.error('❌ Failed to get rate templates:', error)
+      logger.error('❌ Failed to get templates:', error)
       return []
     }
   }
 
-  // 获取单个倍率模板
+  // 获取单个模板
   async getTemplate(templateId) {
     try {
       const client = redis.getClientSafe()
-      const data = await client.hgetall(`rate_template:${templateId}`)
+      const templateData = await client.hgetall(`${this.TEMPLATE_PREFIX}${templateId}`)
 
-      if (!data || Object.keys(data).length === 0) {
+      if (!templateData || !templateData.id) {
         return null
       }
 
-      const defaultTemplateId = await client.get('default_rate_template')
-
       return {
-        ...data,
-        rates: JSON.parse(data.rates || '{}'),
-        customModels: JSON.parse(data.customModels || '[]'),
-        isDefault: data.id === defaultTemplateId || data.isDefault === 'true'
+        ...templateData,
+        rates: templateData.rates ? JSON.parse(templateData.rates) : {},
+        isDefault: templateData.isDefault === '1'
       }
     } catch (error) {
-      logger.error('❌ Failed to get rate template:', error)
+      logger.error('❌ Failed to get template:', error)
       return null
     }
   }
 
-  // 删除倍率模板
+  // 更新模板
+  async updateTemplate(templateId, updates) {
+    try {
+      const client = redis.getClientSafe()
+      const templateKey = `${this.TEMPLATE_PREFIX}${templateId}`
+
+      // 检查模板是否存在
+      const exists = await client.exists(templateKey)
+      if (!exists) {
+        throw new Error('模板不存在')
+      }
+
+      // 如果设置为默认模板，先取消其他默认模板
+      if (updates.isDefault) {
+        await this.clearDefaultTemplate()
+      }
+
+      const updateData = {
+        ...updates,
+        updatedAt: new Date().toISOString()
+      }
+
+      // 处理 rates 字段
+      if (updateData.rates) {
+        updateData.rates = JSON.stringify(updateData.rates)
+      }
+
+      // 处理 isDefault 字段
+      if (typeof updateData.isDefault === 'boolean') {
+        updateData.isDefault = updateData.isDefault ? '1' : '0'
+      }
+
+      // 移除不允许修改的字段
+      delete updateData.id
+      delete updateData.createdAt
+
+      // 更新模板
+      await client.hmset(templateKey, updateData)
+
+      const updatedTemplate = await this.getTemplate(templateId)
+      logger.success(`✅ Updated rate template: ${updatedTemplate.name}`)
+
+      return updatedTemplate
+    } catch (error) {
+      logger.error('❌ Failed to update template:', error)
+      throw error
+    }
+  }
+
+  // 删除模板
   async deleteTemplate(templateId) {
     try {
       const client = redis.getClientSafe()
-      const data = await client.hgetall(`rate_template:${templateId}`)
+      const template = await this.getTemplate(templateId)
 
-      if (!data || Object.keys(data).length === 0) {
-        return { success: false, error: '倍率模板不存在' }
+      if (!template) {
+        throw new Error('模板不存在')
       }
 
-      // 检查是否为默认模板
-      const defaultTemplateId = await client.get('default_rate_template')
-      if (templateId === defaultTemplateId) {
-        return { success: false, error: '不能删除默认倍率模板' }
+      if (template.isDefault) {
+        throw new Error('不能删除默认模板')
       }
 
-      // 检查是否有分组或账户在使用此模板
-      const inUse = await this.checkTemplateInUse(templateId)
-      if (inUse) {
-        return { success: false, error: '该倍率模板正在被使用，无法删除' }
-      }
+      // 删除模板
+      await client.del(`${this.TEMPLATE_PREFIX}${templateId}`)
+      await client.srem(this.TEMPLATES_KEY, templateId)
 
-      await client.del(`rate_template:${templateId}`)
-
-      logger.success(`✅ Deleted rate template: ${templateId}`)
-
-      return { success: true }
+      logger.success(`✅ Deleted rate template: ${template.name}`)
+      return true
     } catch (error) {
-      logger.error('❌ Failed to delete rate template:', error)
-      return { success: false, error: '删除倍率模板失败' }
+      logger.error('❌ Failed to delete template:', error)
+      throw error
     }
   }
 
-  // 设置默认倍率模板
+  // 设置默认模板
   async setDefaultTemplate(templateId) {
     try {
-      const client = redis.getClientSafe()
-      const data = await client.hgetall(`rate_template:${templateId}`)
-
-      if (!data || Object.keys(data).length === 0) {
-        return { success: false, error: '倍率模板不存在' }
+      const template = await this.getTemplate(templateId)
+      if (!template) {
+        throw new Error('模板不存在')
       }
 
-      // 清除其他默认模板标记
+      // 先取消其他默认模板
       await this.clearDefaultTemplate()
 
       // 设置新的默认模板
-      await client.set('default_rate_template', templateId)
-      data.isDefault = 'true'
-      await client.hset(`rate_template:${templateId}`, data)
+      await this.updateTemplate(templateId, { isDefault: true })
 
-      logger.success(`✅ Set default rate template: ${templateId}`)
-
-      return { success: true }
+      logger.success(`✅ Set default template: ${template.name}`)
+      return true
     } catch (error) {
       logger.error('❌ Failed to set default template:', error)
-      return { success: false, error: '设置默认模板失败' }
+      throw error
     }
   }
 
-  // 清除默认模板标记
+  // 清除默认模板设置
   async clearDefaultTemplate() {
     try {
       const client = redis.getClientSafe()
-      const currentDefault = await client.get('default_rate_template')
+      const templateIds = await client.smembers(this.TEMPLATES_KEY)
 
-      if (currentDefault) {
-        const data = await client.hgetall(`rate_template:${currentDefault}`)
-        if (data) {
-          data.isDefault = 'false'
-          await client.hset(`rate_template:${currentDefault}`, data)
+      for (const templateId of templateIds) {
+        const templateData = await client.hgetall(`${this.TEMPLATE_PREFIX}${templateId}`)
+        if (templateData.isDefault === '1') {
+          await client.hset(`${this.TEMPLATE_PREFIX}${templateId}`, 'isDefault', '0')
         }
       }
-
-      await client.del('default_rate_template')
     } catch (error) {
       logger.error('❌ Failed to clear default template:', error)
     }
   }
 
-  // 检查模板是否被使用
-  async checkTemplateInUse(templateId) {
-    try {
-      const client = redis.getClientSafe()
-
-      // 检查API Keys是否使用此模板
-      const apiKeys = await client.keys('apikey:*')
-      for (const key of apiKeys) {
-        const data = await client.hgetall(key)
-        if (data && data.rateTemplateId === templateId) {
-          return true
-        }
-      }
-
-      // 检查Claude账户是否使用此模板
-      const claudeAccounts = await client.keys('claude_account:*')
-      for (const key of claudeAccounts) {
-        const data = await client.hgetall(key)
-        if (data && data.rateTemplateId === templateId) {
-          return true
-        }
-      }
-
-      // 检查Gemini账户是否使用此模板
-      const geminiAccounts = await client.keys('gemini_account:*')
-      for (const key of geminiAccounts) {
-        const data = await client.hgetall(key)
-        if (data && data.rateTemplateId === templateId) {
-          return true
-        }
-      }
-
-      // 检查账户分组是否使用此模板
-      const accountGroups = await client.keys('account_group:*')
-      for (const key of accountGroups) {
-        const data = await client.hgetall(key)
-        if (data && data.rateTemplateId === templateId) {
-          return true
-        }
-      }
-
-      return false
-    } catch (error) {
-      logger.error('❌ Failed to check template usage:', error)
-      return true // 安全起见，返回true
-    }
-  }
-
-  // 获取默认倍率模板
+  // 获取默认模板
   async getDefaultTemplate() {
     try {
-      const client = redis.getClientSafe()
-      const defaultTemplateId = await client.get('default_rate_template')
+      const templates = await this.getTemplates()
+      const defaultTemplate = templates.find((t) => t.isDefault)
 
-      if (!defaultTemplateId) {
-        // 如果没有默认模板，创建一个
-        const result = await this.createTemplate({
-          name: '默认倍率模板',
-          description: '系统默认倍率模板',
-          rates: {},
-          isDefault: true
-        })
-        return result.data
+      if (!defaultTemplate) {
+        logger.warn('⚠️ No default rate template found')
+        return null
       }
+
+      const defaultTemplateId = defaultTemplate.id
 
       return await this.getTemplate(defaultTemplateId)
     } catch (error) {
       logger.error('❌ Failed to get default template:', error)
       return null
+    }
+  }
+
+  // 获取系统分组的倍率模板ID（从localStorage配置）
+  async getSystemGroupRateTemplate(accountType) {
+    try {
+      // 在服务端，我们可以使用一个简单的配置存储
+      const client = redis.getClientSafe()
+      const systemGroupKey = `system_group_rate:${accountType}`
+      const templateId = await client.get(systemGroupKey)
+      return templateId || null
+    } catch (error) {
+      logger.warn(`⚠️ Failed to get system group rate template for ${accountType}:`, error)
+      return null
+    }
+  }
+
+  // 设置系统分组的倍率模板
+  async setSystemGroupRateTemplate(accountType, templateId) {
+    try {
+      const client = redis.getClientSafe()
+      const systemGroupKey = `system_group_rate:${accountType}`
+
+      if (templateId) {
+        await client.set(systemGroupKey, templateId)
+        logger.info(`✅ Set system group rate template: ${accountType} -> ${templateId}`)
+      } else {
+        await client.del(systemGroupKey)
+        logger.info(`✅ Cleared system group rate template: ${accountType}`)
+      }
+
+      return true
+    } catch (error) {
+      logger.error(`❌ Failed to set system group rate template for ${accountType}:`, error)
+      throw error
     }
   }
 
@@ -442,13 +294,18 @@ class RateTemplateService {
             const accountData = await client.hgetall(`claude_account:${apiKeyData.claudeAccountId}`)
             templateId = accountData?.rateTemplateId
 
-            // 如果账户也没有倍率模板，且账户属于分组类型，检查分组的倍率模板
-            if (!templateId && accountData?.accountType === 'group') {
-              // 查找账户所属的分组
-              const accountGroupService = require('./accountGroupService')
-              const group = await accountGroupService.getAccountGroup(apiKeyData.claudeAccountId)
-              if (group) {
-                templateId = group.rateTemplateId
+            // 如果账户也没有倍率模板，根据账户类型获取系统分组模板
+            if (!templateId && accountData?.accountType) {
+              if (accountData.accountType === 'group') {
+                // 查找账户所属的分组
+                const accountGroupService = require('./accountGroupService')
+                const group = await accountGroupService.getAccountGroup(apiKeyData.claudeAccountId)
+                if (group) {
+                  templateId = group.rateTemplateId
+                }
+              } else if (['shared', 'dedicated'].includes(accountData.accountType)) {
+                // 检查系统分组（共享账户池、专属账户池）的倍率模板
+                templateId = await this.getSystemGroupRateTemplate(accountData.accountType)
               }
             }
           }
@@ -458,13 +315,18 @@ class RateTemplateService {
             const accountData = await client.hgetall(`gemini_account:${apiKeyData.geminiAccountId}`)
             templateId = accountData?.rateTemplateId
 
-            // 如果账户也没有倍率模板，且账户属于分组类型，检查分组的倍率模板
-            if (!templateId && accountData?.accountType === 'group') {
-              // 查找账户所属的分组
-              const accountGroupService = require('./accountGroupService')
-              const group = await accountGroupService.getAccountGroup(apiKeyData.geminiAccountId)
-              if (group) {
-                templateId = group.rateTemplateId
+            // 如果账户也没有倍率模板，根据账户类型获取系统分组模板
+            if (!templateId && accountData?.accountType) {
+              if (accountData.accountType === 'group') {
+                // 查找账户所属的分组
+                const accountGroupService = require('./accountGroupService')
+                const group = await accountGroupService.getAccountGroup(apiKeyData.geminiAccountId)
+                if (group) {
+                  templateId = group.rateTemplateId
+                }
+              } else if (['shared', 'dedicated'].includes(accountData.accountType)) {
+                // 检查系统分组（共享账户池、专属账户池）的倍率模板
+                templateId = await this.getSystemGroupRateTemplate(accountData.accountType)
               }
             }
           }
@@ -473,29 +335,40 @@ class RateTemplateService {
         const accountData = await client.hgetall(`claude_account:${entityId}`)
         templateId = accountData?.rateTemplateId
 
-        // 如果账户没有倍率模板，且属于分组类型，检查分组的倍率模板
-        if (!templateId && accountData?.accountType === 'group') {
-          const accountGroupService = require('./accountGroupService')
-          const group = await accountGroupService.getAccountGroup(entityId)
-          if (group) {
-            templateId = group.rateTemplateId
+        // 如果账户没有倍率模板，根据账户类型获取模板
+        if (!templateId && accountData?.accountType) {
+          if (accountData.accountType === 'group') {
+            const accountGroupService = require('./accountGroupService')
+            const group = await accountGroupService.getAccountGroup(entityId)
+            if (group) {
+              templateId = group.rateTemplateId
+            }
+          } else if (['shared', 'dedicated'].includes(accountData.accountType)) {
+            templateId = await this.getSystemGroupRateTemplate(accountData.accountType)
           }
         }
       } else if (entityType === 'gemini_account') {
         const accountData = await client.hgetall(`gemini_account:${entityId}`)
         templateId = accountData?.rateTemplateId
 
-        // 如果账户没有倍率模板，且属于分组类型，检查分组的倍率模板
-        if (!templateId && accountData?.accountType === 'group') {
-          const accountGroupService = require('./accountGroupService')
-          const group = await accountGroupService.getAccountGroup(entityId)
-          if (group) {
-            templateId = group.rateTemplateId
+        // 如果账户没有倍率模板，根据账户类型获取模板
+        if (!templateId && accountData?.accountType) {
+          if (accountData.accountType === 'group') {
+            const accountGroupService = require('./accountGroupService')
+            const group = await accountGroupService.getAccountGroup(entityId)
+            if (group) {
+              templateId = group.rateTemplateId
+            }
+          } else if (['shared', 'dedicated'].includes(accountData.accountType)) {
+            templateId = await this.getSystemGroupRateTemplate(accountData.accountType)
           }
         }
       } else if (entityType === 'account_group') {
         const groupData = await client.hgetall(`account_group:${entityId}`)
         templateId = groupData?.rateTemplateId
+      } else if (entityType === 'system_group') {
+        // 直接获取系统分组的倍率模板
+        templateId = await this.getSystemGroupRateTemplate(entityId)
       }
 
       // 如果没有指定模板，使用默认模板
@@ -518,20 +391,62 @@ class RateTemplateService {
       return originalCost
     }
 
-    const modelRates = rates[modelName]
+    const multiplier = parseFloat(rates[modelName]) || 1.0
+    const newCost = originalCost * multiplier
 
-    return {
-      inputCost: originalCost.inputCost * (modelRates.input || 1),
-      outputCost: originalCost.outputCost * (modelRates.output || 1),
-      cacheCreateCost: originalCost.cacheCreateCost * (modelRates.cacheCreate || 1),
-      cacheReadCost: originalCost.cacheReadCost * (modelRates.cacheRead || 1),
-      totalCost:
-        originalCost.inputCost * (modelRates.input || 1) +
-        originalCost.outputCost * (modelRates.output || 1) +
-        originalCost.cacheCreateCost * (modelRates.cacheCreate || 1) +
-        originalCost.cacheReadCost * (modelRates.cacheRead || 1),
-      originalCost,
-      appliedRates: modelRates
+    logger.debug(
+      `💰 Applied rate multiplier: ${originalCost} * ${multiplier} = ${newCost} for model ${modelName}`
+    )
+
+    return newCost
+  }
+
+  // 获取所有相关实体的概览统计
+  async getUsageStats() {
+    try {
+      const client = redis.getClientSafe()
+
+      // 统计模板数量
+      const templateCount = await client.scard(this.TEMPLATES_KEY)
+
+      // 统计使用模板的API Keys数量
+      const apiKeys = await client.keys('api_key:*')
+      let apiKeysWithTemplates = 0
+
+      for (const keyPath of apiKeys) {
+        const data = await client.hgetall(keyPath)
+        if (data.rateTemplateId) {
+          apiKeysWithTemplates++
+        }
+      }
+
+      // 统计使用模板的账户分组数量
+      const accountGroups = await client.keys('account_group:*')
+      let groupsWithTemplates = 0
+
+      for (const groupPath of accountGroups) {
+        const data = await client.hgetall(groupPath)
+        if (data.rateTemplateId) {
+          groupsWithTemplates++
+        }
+      }
+
+      return {
+        templateCount,
+        apiKeysWithTemplates,
+        groupsWithTemplates,
+        totalApiKeys: apiKeys.length,
+        totalGroups: accountGroups.length
+      }
+    } catch (error) {
+      logger.error('❌ Failed to get usage stats:', error)
+      return {
+        templateCount: 0,
+        apiKeysWithTemplates: 0,
+        groupsWithTemplates: 0,
+        totalApiKeys: 0,
+        totalGroups: 0
+      }
     }
   }
 }

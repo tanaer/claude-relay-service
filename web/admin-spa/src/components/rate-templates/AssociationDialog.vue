@@ -25,7 +25,7 @@
           </div>
           <div class="mt-2">
             <p class="text-sm text-gray-500">
-              {{ getEntityTypeText(entityType) }} / ID: {{ entity?.id?.slice(0, 8) || 'N/A' }}...
+              {{ getEntityTypeText(entityType) }} / {{ getEntityDescription(entity) }}
             </p>
             <p v-if="entity?.platform" class="mt-1 text-xs text-gray-400">
               平台: {{ entity.platform }}
@@ -163,11 +163,23 @@ onMounted(() => {
 // 获取实体类型文本
 const getEntityTypeText = (entityType) => {
   const typeMap = {
+    'account-group': '账户分组',
     groups: '账户分组',
     shared: '共享账户',
     dedicated: '专属账户'
   }
   return typeMap[entityType] || entityType
+}
+
+// 获取实体描述
+const getEntityDescription = (entity) => {
+  if (!entity) return 'N/A'
+
+  if (entity.isSystemGroup) {
+    return `系统分组 (${entity.accountType === 'shared' ? '共享账户池' : '专属账户池'})`
+  }
+
+  return entity.id ? `ID: ${entity.id.slice(0, 8)}...` : '用户分组'
 }
 
 // 获取当前模板名称

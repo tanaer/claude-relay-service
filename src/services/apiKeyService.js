@@ -403,23 +403,26 @@ class ApiKeyService {
 
       let costInfo = originalCostInfo
       if (rates && rates[model]) {
-        const modelRates = rates[model]
+        const multiplier = parseFloat(rates[model]) || 1.0
         // 应用倍率到各个费用组成部分
         costInfo = {
           ...originalCostInfo,
           costs: {
-            input: originalCostInfo.costs.input * (modelRates.input || 1),
-            output: originalCostInfo.costs.output * (modelRates.output || 1),
-            cacheWrite: originalCostInfo.costs.cacheWrite * (modelRates.cacheCreate || 1),
-            cacheRead: originalCostInfo.costs.cacheRead * (modelRates.cacheRead || 1),
-            total:
-              originalCostInfo.costs.input * (modelRates.input || 1) +
-              originalCostInfo.costs.output * (modelRates.output || 1) +
-              originalCostInfo.costs.cacheWrite * (modelRates.cacheCreate || 1) +
-              originalCostInfo.costs.cacheRead * (modelRates.cacheRead || 1)
+            input: originalCostInfo.costs.input * multiplier,
+            output: originalCostInfo.costs.output * multiplier,
+            cacheWrite: originalCostInfo.costs.cacheWrite * multiplier,
+            cacheRead: originalCostInfo.costs.cacheRead * multiplier,
+            total: originalCostInfo.costs.total * multiplier
           },
-          appliedRates: modelRates
+          appliedMultiplier: multiplier
         }
+
+        logger.info(
+          `💰 Applied rate multiplier ${multiplier}x for model ${model}: ` +
+            `$${originalCostInfo.costs.total.toFixed(6)} -> $${costInfo.costs.total.toFixed(6)} (API Key: ${keyId})`
+        )
+      } else {
+        logger.debug(`💰 No rate multiplier found for model ${model} (API Key: ${keyId})`)
       }
 
       // 记录API Key级别的使用统计

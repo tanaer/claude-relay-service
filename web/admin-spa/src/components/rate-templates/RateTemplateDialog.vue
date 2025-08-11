@@ -364,8 +364,10 @@ const filteredModels = computed(() => {
 
 // 初始化表单数据
 const initFormData = () => {
+  console.log('initFormData called, props.template:', props.template)
   if (props.template) {
     // 编辑模式
+    console.log('Edit mode - initializing with template data')
     formData.value = {
       name: props.template.name,
       description: props.template.description || '',
@@ -373,8 +375,10 @@ const initFormData = () => {
       rates: { ...props.template.rates },
       customModels: props.template.customModels || []
     }
+    console.log('Form data initialized:', formData.value)
   } else {
     // 创建模式 - 初始化所有模型的默认倍率
+    console.log('Create mode - initializing with default data')
     const rates = {}
     for (const model of defaultModels.value) {
       rates[model] = {
@@ -391,6 +395,7 @@ const initFormData = () => {
       rates,
       customModels: []
     }
+    console.log('Form data initialized with defaults:', formData.value)
   }
 }
 

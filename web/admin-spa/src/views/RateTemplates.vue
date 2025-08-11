@@ -143,7 +143,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import RateTemplateDialog from '@/components/rate-templates/RateTemplateDialog.vue'
@@ -159,8 +159,10 @@ const fetchTemplates = async () => {
   loading.value = true
   try {
     const response = await apiClient.get('/admin/rate-templates')
+    console.log('fetchTemplates response:', response)
     if (response.success) {
       templates.value = response.data
+      console.log('Templates loaded:', templates.value)
     } else {
       showToast('获取倍率模板失败', 'error')
     }
@@ -180,7 +182,10 @@ const refreshTemplates = () => {
 
 // 编辑模板
 const editTemplate = (template) => {
+  console.log('editTemplate called with:', template)
   editingTemplate.value = template
+  showCreateDialog.value = false  // 确保创建对话框关闭
+  console.log('editingTemplate.value:', editingTemplate.value)
 }
 
 // 设为默认模板
@@ -227,6 +232,7 @@ const deleteTemplate = async (template) => {
 const closeDialog = () => {
   showCreateDialog.value = false
   editingTemplate.value = null
+  console.log('Dialog closed, editingTemplate reset to:', editingTemplate.value)
 }
 
 // 保存模板
@@ -274,5 +280,17 @@ const formatDate = (dateString) => {
 // 生命周期
 onMounted(() => {
   fetchTemplates()
+})
+
+// 监听 editingTemplate 变化
+watch(editingTemplate, (newValue) => {
+  console.log('editingTemplate changed:', newValue)
+  console.log('Should show dialog:', !!(showCreateDialog.value || editingTemplate.value))
+})
+
+// 监听 showCreateDialog 变化
+watch(showCreateDialog, (newValue) => {
+  console.log('showCreateDialog changed:', newValue)
+  console.log('Should show dialog:', !!(showCreateDialog.value || editingTemplate.value))
 })
 </script>

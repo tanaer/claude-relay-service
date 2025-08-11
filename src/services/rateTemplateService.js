@@ -388,13 +388,23 @@ class RateTemplateService {
 
         // 输出API Key的详细信息用于调试
         logger.info(
-          `🔍 API Key ${entityId} data: claudeAccountId=${apiKeyData?.claudeAccountId || 'null'}, geminiAccountId=${apiKeyData?.geminiAccountId || 'null'}`
+          `🔍 API Key ${entityId} data: claudeAccountId=${apiKeyData?.claudeAccountId || 'null'}, geminiAccountId=${apiKeyData?.geminiAccountId || 'null'}, groupId=${apiKeyData?.groupId || 'null'}`
         )
 
-        // 如果API Key没有设置倍率模板，尝试从绑定的账户获取
+        // 如果API Key没有设置倍率模板，尝试从绑定的账户或分组获取
         if (!templateId) {
+          // 检查API Key是否绑定到分组
+          if (apiKeyData?.groupId) {
+            const groupData = await client.hgetall(`account_group:${apiKeyData.groupId}`)
+            templateId = groupData?.rateTemplateId
+            searchPath.push(`API Key group ${apiKeyData.groupId}: ${templateId || 'null'}`)
+            logger.info(
+              `🔍 API Key bound to group ${apiKeyData.groupId}: rateTemplateId=${templateId || 'null'}`
+            )
+          }
+
           // 检查Claude账户绑定
-          if (apiKeyData?.claudeAccountId) {
+          if (!templateId && apiKeyData?.claudeAccountId) {
             const accountData = await client.hgetall(`claude_account:${apiKeyData.claudeAccountId}`)
             templateId = accountData?.rateTemplateId
             searchPath.push(`Claude account ${apiKeyData.claudeAccountId}: ${templateId || 'null'}`)

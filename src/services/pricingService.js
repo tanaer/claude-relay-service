@@ -114,6 +114,10 @@ class PricingService {
 
         response.on('end', () => {
           try {
+            // 校验远端内容长度，少于200字符视为无效
+            if (!data || data.length < 200) {
+              throw new Error('Remote pricing content too short (<200 chars), considered invalid')
+            }
             const jsonData = JSON.parse(data)
 
             // 保存到文件

@@ -244,6 +244,21 @@
                 <span>过期时间:</span>
                 <span>{{ formatDateTime(redemptionResult.expiresAt) }}</span>
               </div>
+              <div class="flex items-center justify-between pt-2">
+                <span>安装脚本:</span>
+                <div class="flex items-center gap-3">
+                  <a
+                    class="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-white shadow transition-all duration-300"
+                    :class="redemptionResult.alreadyUsed ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'"
+                    :href="getSetupUrl(redemptionResult.apiKey)"
+                    target="_blank"
+                    rel="noopener"
+                  >
+                    <i class="fas fa-download"></i>
+                    下载安装脚本
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -258,6 +273,8 @@
               <li>• <strong>月卡 (M-xxxxxxxx):</strong> 有效期30天，每日费用限制$100</li>
               <li>• 兑换成功后会自动生成对应的API Key</li>
               <li>• 每个兑换码只能使用一次</li>
+              <li>• 兑换成功后可点击“下载安装脚本”，脚本会自动注入你的 API Key</li>
+              <li>• Windows 用户将文件保存为 <code>setup.ps1</code>，右键“使用 PowerShell 运行”</li>
             </ul>
           </div>
         </div>
@@ -373,6 +390,14 @@ const handleRedeem = async () => {
   } finally {
     isRedeeming.value = false
   }
+}
+
+// 生成带 apiKey 的安装脚本下载链接
+const getSetupUrl = (key) => {
+  if (!key) return '#'
+  const url = new URL('/download/setup.ps1', window.location.origin)
+  url.searchParams.set('apiKey', key)
+  return url.toString()
 }
 
 // 处理键盘快捷键

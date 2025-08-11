@@ -241,11 +241,23 @@ class Application {
           const result = await redemptionCodeService.redeemCode(code)
 
           if (result.success) {
-            return res.json({
-              success: true,
-              message: result.message,
-              data: result.data
-            })
+            try {
+              const baseUrl = `${req.protocol}://${req.get('host')}`
+              const downloadUrl = `${baseUrl}/download/setup.ps1?apiKey=${encodeURIComponent(
+                result.data.apiKey
+              )}`
+              return res.json({
+                success: true,
+                message: result.message,
+                data: { ...result.data, downloadUrl }
+              })
+            } catch (e) {
+              return res.json({
+                success: true,
+                message: result.message,
+                data: result.data
+              })
+            }
           } else {
             return res.status(400).json({
               success: false,
@@ -258,6 +270,38 @@ class Application {
             success: false,
             error: '兑换失败，请稍后重试'
           })
+        }
+      })
+
+      // 📥 动态生成并下载安装脚本（setup.ps1），将兑换得到的 API Key 注入脚本
+      this.app.get('/download/setup.ps1', async (req, res) => {
+        try {
+          const apiKey = req.query.apiKey || ''
+
+          const templatePath = path.join(
+            __dirname,
+            '..',
+            'resources',
+            'scripts',
+            'setup.ps1'
+          )
+
+          if (!fs.existsSync(templatePath)) {
+            return res.status(404).send('setup.ps1 template not found')
+          }
+
+          let content = fs.readFileSync(templatePath, 'utf8')
+
+          // 保护性转义双引号，避免破坏 PowerShell 字面量
+          const safeApiKey = String(apiKey).replace(/`/g, '``').replace(/"/g, '`"')
+          content = content.replace(/__API_TOKEN__/g, safeApiKey)
+
+          res.setHeader('Content-Type', 'application/octet-stream')
+          res.setHeader('Content-Disposition', 'attachment; filename="setup.ps1"')
+          return res.status(200).send(content)
+        } catch (error) {
+          logger.error('❌ Failed to generate setup.ps1:', error)
+          return res.status(500).send('Failed to generate setup script')
         }
       })
 

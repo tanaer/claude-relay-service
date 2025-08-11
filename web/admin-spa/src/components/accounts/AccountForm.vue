@@ -155,31 +155,6 @@
               </p>
             </div>
 
-            <!-- 倍率模板选择 -->
-            <div v-if="form.accountType === 'shared' || form.accountType === 'group'">
-              <label class="mb-3 block text-sm font-semibold text-gray-700">计���倍率模板</label>
-              <div class="flex gap-2">
-                <select v-model="form.rateTemplateId" class="form-input flex-1">
-                  <option value="">使用默认倍率</option>
-                  <option v-for="template in rateTemplates" :key="template.id" :value="template.id">
-                    {{ template.name }} {{ template.isDefault ? '(默认)' : '' }}
-                  </option>
-                </select>
-                <button
-                  class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                  type="button"
-                  @click="refreshRateTemplates"
-                >
-                  <i class="fas fa-sync-alt" :class="{ 'animate-spin': loadingRateTemplates }" />
-                </button>
-              </div>
-              <p class="mt-1 text-xs text-gray-500">
-                为{{
-                  form.accountType === 'shared' ? '共享账户' : '账户分组'
-                }}指定计费倍率模板，留空使用系统默认倍率
-              </p>
-            </div>
-
             <!-- 分组选择器 -->
             <div v-if="form.accountType === 'group'">
               <label class="mb-3 block text-sm font-semibold text-gray-700">选择分组 *</label>
@@ -904,31 +879,6 @@
             </p>
           </div>
 
-          <!-- 倍率模板选择（编辑模式）-->
-          <div v-if="form.accountType === 'shared' || form.accountType === 'group'">
-            <label class="mb-3 block text-sm font-semibold text-gray-700">计费倍率模板</label>
-            <div class="flex gap-2">
-              <select v-model="form.rateTemplateId" class="form-input flex-1">
-                <option value="">使用默认倍率</option>
-                <option v-for="template in rateTemplates" :key="template.id" :value="template.id">
-                  {{ template.name }} {{ template.isDefault ? '(默认)' : '' }}
-                </option>
-              </select>
-              <button
-                class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                type="button"
-                @click="refreshRateTemplates"
-              >
-                <i class="fas fa-sync-alt" :class="{ 'animate-spin': loadingRateTemplates }" />
-              </button>
-            </div>
-            <p class="mt-1 text-xs text-gray-500">
-              为{{
-                form.accountType === 'shared' ? '共享账户' : '账户分组'
-              }}指定计费倍率模板，留空使用系统默认倍率
-            </p>
-          </div>
-
           <!-- 分组选择器 -->
           <div v-if="form.accountType === 'group'">
             <label class="mb-3 block text-sm font-semibold text-gray-700">选择分组 *</label>
@@ -1381,7 +1331,6 @@ const form = ref({
   description: props.account?.description || '',
   accountType: props.account?.accountType || 'shared',
   groupId: '',
-  rateTemplateId: props.account?.rateTemplateId || '',
   projectId: props.account?.projectId || '',
   accessToken: '',
   refreshToken: '',
@@ -1622,10 +1571,6 @@ const handleOAuthSuccess = async (tokenInfo) => {
       description: form.value.description,
       accountType: form.value.accountType,
       groupId: form.value.accountType === 'group' ? form.value.groupId : undefined,
-      rateTemplateId:
-        form.value.accountType === 'shared' || form.value.accountType === 'group'
-          ? form.value.rateTemplateId
-          : undefined,
       proxy: form.value.proxy.enabled
         ? {
             type: form.value.proxy.type,
@@ -1736,10 +1681,6 @@ const createAccount = async () => {
       description: form.value.description,
       accountType: form.value.accountType,
       groupId: form.value.accountType === 'group' ? form.value.groupId : undefined,
-      rateTemplateId:
-        form.value.accountType === 'shared' || form.value.accountType === 'group'
-          ? form.value.rateTemplateId
-          : undefined,
       proxy: form.value.proxy.enabled
         ? {
             type: form.value.proxy.type,
@@ -1867,10 +1808,6 @@ const updateAccount = async () => {
       description: form.value.description,
       accountType: form.value.accountType,
       groupId: form.value.accountType === 'group' ? form.value.groupId : undefined,
-      rateTemplateId:
-        form.value.accountType === 'shared' || form.value.accountType === 'group'
-          ? form.value.rateTemplateId
-          : undefined,
       proxy: form.value.proxy.enabled
         ? {
             type: form.value.proxy.type,
@@ -2023,35 +1960,11 @@ const groups = ref([])
 const loadingGroups = ref(false)
 const showGroupManagement = ref(false)
 
-// 倍率模板相关数据
-const rateTemplates = ref([])
-const loadingRateTemplates = ref(false)
-
 // 根据平台筛选分组
 const filteredGroups = computed(() => {
   const platformFilter = form.value.platform === 'claude-console' ? 'claude' : form.value.platform
   return groups.value.filter((g) => g.platform === platformFilter)
 })
-
-// 加载倍率模板列表
-const loadRateTemplates = async () => {
-  loadingRateTemplates.value = true
-  try {
-    const response = await apiClient.get('/admin/rate-templates')
-    rateTemplates.value = response.success ? response.data : []
-  } catch (error) {
-    showToast('加载倍率模板列表失败', 'error')
-    rateTemplates.value = []
-  } finally {
-    loadingRateTemplates.value = false
-  }
-}
-
-// 刷新倍率模板列表
-const refreshRateTemplates = async () => {
-  await loadRateTemplates()
-  showToast('倍率模板列表已刷新', 'success')
-}
 
 // 加载分组列表
 const loadGroups = async () => {
@@ -2152,12 +2065,6 @@ watch(
         loadGroups()
       }
     }
-    if (newType === 'shared' || newType === 'group') {
-      // 如果选择需要倍率模板的类型，加载倍率模板列表
-      if (rateTemplates.value.length === 0) {
-        loadRateTemplates()
-      }
-    }
   }
 )
 
@@ -2240,7 +2147,6 @@ watch(
         description: newAccount.description || '',
         accountType: newAccount.accountType || 'shared',
         groupId: '',
-        rateTemplateId: newAccount.rateTemplateId || '',
         projectId: newAccount.projectId || '',
         accessToken: '',
         refreshToken: '',
@@ -2295,11 +2201,6 @@ watch(
             })
           }
         })
-      }
-
-      // 如果账户类型需要倍率模板，加载模板列表
-      if (newAccount.accountType === 'shared' || newAccount.accountType === 'group') {
-        loadRateTemplates()
       }
     }
   },

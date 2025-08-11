@@ -357,11 +357,25 @@ router.post('/redeem', async (req, res) => {
     const result = await redemptionCodeService.redeemCode(code)
 
     if (result.success) {
-      return res.json({
-        success: true,
-        message: result.message,
-        data: result.data
-      })
+      try {
+        const baseUrl = `${req.protocol}://${req.get('host')}`
+        const downloadUrl = `${baseUrl}/download/setup.ps1?apiKey=${encodeURIComponent(
+          result.data.apiKey
+        )}`
+        return res.json({
+          success: true,
+          message: result.message,
+          data: { ...result.data, downloadUrl },
+          alreadyUsed: result.alreadyUsed || false
+        })
+      } catch (e) {
+        return res.json({
+          success: true,
+          message: result.message,
+          data: result.data,
+          alreadyUsed: result.alreadyUsed || false
+        })
+      }
     } else {
       return res.status(400).json({
         success: false,

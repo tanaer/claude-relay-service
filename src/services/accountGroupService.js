@@ -15,11 +15,12 @@ class AccountGroupService {
    * @param {string} groupData.name - 分组名称
    * @param {string} groupData.platform - 平台类型 (claude/gemini)
    * @param {string} groupData.description - 分组描述
+   * @param {string} groupData.rateTemplateId - 倍率模板ID
    * @returns {Object} 创建的分组
    */
   async createGroup(groupData) {
     try {
-      const { name, platform, description = '' } = groupData
+      const { name, platform, description = '', rateTemplateId = null } = groupData
 
       // 验证必填字段
       if (!name || !platform) {
@@ -40,6 +41,7 @@ class AccountGroupService {
         name,
         platform,
         description,
+        rateTemplateId: rateTemplateId || null,
         createdAt: now,
         updatedAt: now
       }

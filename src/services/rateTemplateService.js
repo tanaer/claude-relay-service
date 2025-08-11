@@ -376,6 +376,24 @@ class RateTemplateService {
         }
       }
 
+      // 检查Gemini账户是否使用此模板
+      const geminiAccounts = await client.keys('gemini_account:*')
+      for (const key of geminiAccounts) {
+        const data = await client.hgetall(key)
+        if (data && data.rateTemplateId === templateId) {
+          return true
+        }
+      }
+
+      // 检查账户分组是否使用此模板
+      const accountGroups = await client.keys('account_group:*')
+      for (const key of accountGroups) {
+        const data = await client.hgetall(key)
+        if (data && data.rateTemplateId === templateId) {
+          return true
+        }
+      }
+
       return false
     } catch (error) {
       logger.error('❌ Failed to check template usage:', error)
@@ -414,11 +432,70 @@ class RateTemplateService {
       let templateId = null
 
       if (entityType === 'apikey') {
-        const apiKeyData = await client.hgetall(`apikey:${entityId}`)
+        const apiKeyData = await client.hgetall(`api_key:${entityId}`)
         templateId = apiKeyData?.rateTemplateId
+        
+        // 如果API Key没有设置倍率模板，尝试从绑定的账户获取
+        if (!templateId) {
+          // 检查Claude账户绑定
+          if (apiKeyData?.claudeAccountId) {
+            const accountData = await client.hgetall(`claude_account:${apiKeyData.claudeAccountId}`)
+            templateId = accountData?.rateTemplateId
+            
+            // 如果账户也没有倍率模板，且账户属于分组类型，检查分组的倍率模板
+            if (!templateId && accountData?.accountType === 'group') {
+              // 查找账户所属的分组
+              const accountGroupService = require('./accountGroupService')
+              const group = await accountGroupService.getAccountGroup(apiKeyData.claudeAccountId)
+              if (group) {
+                templateId = group.rateTemplateId
+              }
+            }
+          }
+          
+          // 检查Gemini账户绑定
+          if (!templateId && apiKeyData?.geminiAccountId) {
+            const accountData = await client.hgetall(`gemini_account:${apiKeyData.geminiAccountId}`)
+            templateId = accountData?.rateTemplateId
+            
+            // 如果账户也没有倍率模板，且账户属于分组类型，检查分组的倍率模板
+            if (!templateId && accountData?.accountType === 'group') {
+              // 查找账户所属的分组
+              const accountGroupService = require('./accountGroupService')
+              const group = await accountGroupService.getAccountGroup(apiKeyData.geminiAccountId)
+              if (group) {
+                templateId = group.rateTemplateId
+              }
+            }
+          }
+        }
       } else if (entityType === 'claude_account') {
         const accountData = await client.hgetall(`claude_account:${entityId}`)
         templateId = accountData?.rateTemplateId
+        
+        // 如果账户没有倍率模板，且属于分组类型，检查分组的倍率模板
+        if (!templateId && accountData?.accountType === 'group') {
+          const accountGroupService = require('./accountGroupService')
+          const group = await accountGroupService.getAccountGroup(entityId)
+          if (group) {
+            templateId = group.rateTemplateId
+          }
+        }
+      } else if (entityType === 'gemini_account') {
+        const accountData = await client.hgetall(`gemini_account:${entityId}`)
+        templateId = accountData?.rateTemplateId
+        
+        // 如果账户没有倍率模板，且属于分组类型，检查分组的倍率模板
+        if (!templateId && accountData?.accountType === 'group') {
+          const accountGroupService = require('./accountGroupService')
+          const group = await accountGroupService.getAccountGroup(entityId)
+          if (group) {
+            templateId = group.rateTemplateId
+          }
+        }
+      } else if (entityType === 'account_group') {
+        const groupData = await client.hgetall(`account_group:${entityId}`)
+        templateId = groupData?.rateTemplateId
       }
 
       // 如果没有指定模板，使用默认模板

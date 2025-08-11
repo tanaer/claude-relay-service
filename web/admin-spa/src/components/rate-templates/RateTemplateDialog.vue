@@ -185,38 +185,42 @@
                     </td>
                     <td class="px-3 py-2">
                       <input
-                        v-model.number="formData.rates[model].input"
+                        :value="getModelRate(model, 'input')"
                         class="block w-full rounded-md border-gray-300 text-center text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
                         min="0"
                         step="0.1"
                         type="number"
+                        @input="updateModelRate(model, 'input', $event.target.value)"
                       />
                     </td>
                     <td class="px-3 py-2">
                       <input
-                        v-model.number="formData.rates[model].output"
+                        :value="getModelRate(model, 'output')"
                         class="block w-full rounded-md border-gray-300 text-center text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
                         min="0"
                         step="0.1"
                         type="number"
+                        @input="updateModelRate(model, 'output', $event.target.value)"
                       />
                     </td>
                     <td class="px-3 py-2">
                       <input
-                        v-model.number="formData.rates[model].cacheCreate"
+                        :value="getModelRate(model, 'cacheCreate')"
                         class="block w-full rounded-md border-gray-300 text-center text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
                         min="0"
                         step="0.1"
                         type="number"
+                        @input="updateModelRate(model, 'cacheCreate', $event.target.value)"
                       />
                     </td>
                     <td class="px-3 py-2">
                       <input
-                        v-model.number="formData.rates[model].cacheRead"
+                        :value="getModelRate(model, 'cacheRead')"
                         class="block w-full rounded-md border-gray-300 text-center text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
                         min="0"
                         step="0.1"
                         type="number"
+                        @input="updateModelRate(model, 'cacheRead', $event.target.value)"
                       />
                     </td>
                   </tr>
@@ -404,6 +408,36 @@ const initFormData = () => {
       customModels: []
     }
   }
+}
+
+// 安全获取模型倍率
+const getModelRate = (model, column) => {
+  if (!formData.value.rates[model]) {
+    // 如果模型倍率不存在，初始化它
+    formData.value.rates[model] = {
+      input: 1,
+      output: 1,
+      cacheCreate: 1,
+      cacheRead: 1
+    }
+  }
+  return formData.value.rates[model][column] || 1
+}
+
+// 更新模型倍率
+const updateModelRate = (model, column, value) => {
+  // 确保模型的倍率对象存在
+  if (!formData.value.rates[model]) {
+    formData.value.rates[model] = {
+      input: 1,
+      output: 1,
+      cacheCreate: 1,
+      cacheRead: 1
+    }
+  }
+
+  // 更新指定列的倍率
+  formData.value.rates[model][column] = parseFloat(value) || 1
 }
 
 // 批量应用倍率

@@ -39,7 +39,8 @@ class ClaudeAccountService {
       isActive = true,
       accountType = 'shared', // 'dedicated' or 'shared'
       priority = 50, // 调度优先级 (1-100，数字越小优先级越高)
-      schedulable = true // 是否可被调度
+      schedulable = true, // 是否可被调度
+      rateTemplateId = null // 倍率模板ID
     } = options
 
     const accountId = uuidv4()
@@ -63,6 +64,7 @@ class ClaudeAccountService {
         isActive: isActive.toString(),
         accountType, // 账号类型：'dedicated' 或 'shared'
         priority: priority.toString(), // 调度优先级
+        rateTemplateId: rateTemplateId || null, // 倍率模板ID
         createdAt: new Date().toISOString(),
         lastUsedAt: '',
         lastRefreshAt: '',
@@ -86,6 +88,7 @@ class ClaudeAccountService {
         isActive: isActive.toString(),
         accountType, // 账号类型：'dedicated' 或 'shared'
         priority: priority.toString(), // 调度优先级
+        rateTemplateId: rateTemplateId || null, // 倍率模板ID
         createdAt: new Date().toISOString(),
         lastUsedAt: '',
         lastRefreshAt: '',
@@ -393,7 +396,8 @@ class ClaudeAccountService {
         'claudeAiOauth',
         'accountType',
         'priority',
-        'schedulable'
+        'schedulable',
+        'rateTemplateId'
       ]
       const updatedData = { ...accountData }
 

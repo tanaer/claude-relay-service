@@ -359,7 +359,7 @@ router.post('/redeem', async (req, res) => {
     if (result.success) {
       try {
         const baseUrl = `${req.protocol}://${req.get('host')}`
-        const downloadUrl = `${baseUrl}/download/setup.ps1?apiKey=${encodeURIComponent(
+        const downloadUrl = `${baseUrl}/download/muskapi_com_setup.ps1?apiKey=${encodeURIComponent(
           result.data.apiKey
         )}`
         return res.json({

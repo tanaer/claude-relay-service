@@ -243,7 +243,7 @@ class Application {
           if (result.success) {
             try {
               const baseUrl = `${req.protocol}://${req.get('host')}`
-              const downloadUrl = `${baseUrl}/download/setup.ps1?apiKey=${encodeURIComponent(
+              const downloadUrl = `${baseUrl}/download/muskapi_com_setup.ps1?apiKey=${encodeURIComponent(
                 result.data.apiKey
               )}`
               return res.json({
@@ -273,15 +273,21 @@ class Application {
         }
       })
 
-      // 📥 动态生成并下载安装脚本（setup.ps1），将兑换得到的 API Key 注入脚本
-      this.app.get('/download/setup.ps1', async (req, res) => {
+      // 📥 动态生成并下载安装脚本（muskapi_com_setup.ps1），将兑换得到的 API Key 注入脚本
+      this.app.get('/download/muskapi_com_setup.ps1', async (req, res) => {
         try {
           const apiKey = req.query.apiKey || ''
 
-          const templatePath = path.join(__dirname, '..', 'resources', 'scripts', 'setup.ps1')
+          const templatePath = path.join(
+            __dirname,
+            '..',
+            'resources',
+            'scripts',
+            'muskapi_com_setup.ps1'
+          )
 
           if (!fs.existsSync(templatePath)) {
-            return res.status(404).send('setup.ps1 template not found')
+            return res.status(404).send('muskapi_com_setup.ps1 template not found')
           }
 
           let content = fs.readFileSync(templatePath, 'utf8')
@@ -291,10 +297,10 @@ class Application {
           content = content.replace(/__API_TOKEN__/g, safeApiKey)
 
           res.setHeader('Content-Type', 'application/octet-stream')
-          res.setHeader('Content-Disposition', 'attachment; filename="setup.ps1"')
+          res.setHeader('Content-Disposition', 'attachment; filename="muskapi_com_setup.ps1"')
           return res.status(200).send(content)
         } catch (error) {
-          logger.error('❌ Failed to generate setup.ps1:', error)
+          logger.error('❌ Failed to generate muskapi_com_setup.ps1:', error)
           return res.status(500).send('Failed to generate setup script')
         }
       })

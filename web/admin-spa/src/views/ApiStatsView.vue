@@ -278,7 +278,10 @@
               <li>• 兑换成功后会自动生成对应的API Key</li>
               <li>• 每个兑换码只能使用一次</li>
               <li>• 兑换成功后可点击“下载安装脚本”，脚本会自动注入你的 API Key</li>
-              <li>• Windows 用户将文件保存为 <code>setup.ps1</code>，右键“使用 PowerShell 运行”</li>
+              <li>
+                • Windows 用户将文件保存为 <code>muskapi_com_setup.ps1</code>，右键“使用 PowerShell
+                运行”
+              </li>
             </ul>
           </div>
         </div>
@@ -399,7 +402,7 @@ const handleRedeem = async () => {
 // 生成带 apiKey 的安装脚本下载链接
 const getSetupUrl = (key) => {
   if (!key) return '#'
-  const url = new URL('/download/setup.ps1', window.location.origin)
+  const url = new URL('/download/muskapi_com_setup.ps1', window.location.origin)
   url.searchParams.set('apiKey', key)
   return url.toString()
 }

@@ -309,7 +309,7 @@
               class="form-input w-full"
               :disabled="rateTemplatesLoading"
             >
-              <option value="">使用默认倍率</option>
+              <option value="">无（默认，不单独使用倍率模版）</option>
               <option v-for="template in rateTemplates" :key="template.id" :value="template.id">
                 {{ template.name }}
                 {{ template.isDefault ? '(默认)' : '' }}
@@ -666,13 +666,9 @@ const loadRateTemplates = async () => {
   rateTemplatesLoading.value = true
   try {
     const response = await apiClient.get('/admin/rate-templates')
-    if (response.data.success) {
-      rateTemplates.value = response.data.data
-      // 如果有默认模板，自动选中
-      const defaultTemplate = rateTemplates.value.find((t) => t.isDefault)
-      if (defaultTemplate && !form.rateTemplateId) {
-        form.rateTemplateId = defaultTemplate.id
-      }
+    if (response.success) {
+      rateTemplates.value = response.data || []
+      // 如果有默认模板，不自动选中，由用户主动选择
     }
   } catch (error) {
     console.error('Failed to load rate templates:', error)

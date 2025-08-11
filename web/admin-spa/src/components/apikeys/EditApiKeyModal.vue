@@ -233,7 +233,7 @@
               class="form-input w-full"
               :disabled="rateTemplatesLoading"
             >
-              <option value="">使用默认倍率</option>
+              <option value="">无（默认，不单独使用倍率模版）</option>
               <option v-for="template in rateTemplates" :key="template.id" :value="template.id">
                 {{ template.name }}
                 {{ template.isDefault ? '(默认)' : '' }}
@@ -751,8 +751,8 @@ const loadRateTemplates = async () => {
   rateTemplatesLoading.value = true
   try {
     const response = await apiClient.get('/admin/rate-templates')
-    if (response.data.success) {
-      rateTemplates.value = response.data.data
+    if (response.success) {
+      rateTemplates.value = response.data || []
     }
   } catch (error) {
     console.error('Failed to load rate templates:', error)

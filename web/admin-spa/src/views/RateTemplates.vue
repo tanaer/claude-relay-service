@@ -7,128 +7,169 @@
         <p class="mt-2 text-sm text-gray-600">管理不同模型的计费倍率模板，用于灵活定价</p>
       </div>
 
-      <!-- 操作栏 -->
-      <div class="mb-6 flex items-center justify-between">
-        <div class="flex gap-3">
+      <!-- 选项卡 -->
+      <div class="mb-6">
+        <nav aria-label="Tabs" class="flex space-x-8">
           <button
-            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-            @click="showCreateDialog = true"
+            :class="[
+              'whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium',
+              activeTab === 'templates'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+            ]"
+            @click="activeTab = 'templates'"
           >
-            <i class="fas fa-plus mr-2"></i>
-            创建模板
+            倍率模板
           </button>
           <button
-            class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
-            @click="refreshTemplates"
+            :class="[
+              'whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium',
+              activeTab === 'associations'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+            ]"
+            @click="activeTab = 'associations'"
           >
-            <i class="fas fa-sync-alt mr-2"></i>
-            刷新
+            实体关联
           </button>
+        </nav>
+      </div>
+
+      <!-- 模板管理区域 -->
+      <div v-if="activeTab === 'templates'">
+        <!-- 操作栏 -->
+        <div class="mb-6 flex items-center justify-between">
+          <div class="flex gap-3">
+            <button
+              class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+              @click="showCreateDialog = true"
+            >
+              <i class="fas fa-plus mr-2"></i>
+              创建模板
+            </button>
+            <button
+              class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              @click="refreshTemplates"
+            >
+              <i class="fas fa-sync-alt mr-2"></i>
+              刷新
+            </button>
+          </div>
+        </div>
+
+        <!-- 模板列表 -->
+        <div class="rounded-lg bg-white shadow">
+          <div v-if="loading" class="p-12 text-center">
+            <i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i>
+            <p class="mt-4 text-gray-500">加载中...</p>
+          </div>
+
+          <div v-else-if="templates.length === 0" class="p-12 text-center">
+            <i class="fas fa-file-invoice text-4xl text-gray-300"></i>
+            <p class="mt-4 text-gray-500">暂无倍率模板</p>
+            <button
+              class="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              @click="showCreateDialog = true"
+            >
+              创建第一个模板
+            </button>
+          </div>
+
+          <div v-else class="overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th
+                    class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  >
+                    模板名称
+                  </th>
+                  <th
+                    class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  >
+                    描述
+                  </th>
+                  <th
+                    class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  >
+                    状态
+                  </th>
+                  <th
+                    class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  >
+                    创建时间
+                  </th>
+                  <th
+                    class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  >
+                    操作
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-200 bg-white">
+                <tr v-for="template in templates" :key="template.id">
+                  <td class="whitespace-nowrap px-6 py-4">
+                    <div class="flex items-center">
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">{{ template.name }}</div>
+                        <div class="text-xs text-gray-500">
+                          ID: {{ template.id.slice(0, 8) }}...
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4">
+                    <div class="text-sm text-gray-900">{{ template.description || '-' }}</div>
+                  </td>
+                  <td class="whitespace-nowrap px-6 py-4">
+                    <span
+                      v-if="template.isDefault"
+                      class="inline-flex rounded-full bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800"
+                    >
+                      默认模板
+                    </span>
+                    <span
+                      v-else
+                      class="inline-flex rounded-full bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-800"
+                    >
+                      普通模板
+                    </span>
+                  </td>
+                  <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                    {{ formatDate(template.createdAt) }}
+                  </td>
+                  <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
+                    <button
+                      class="text-blue-600 hover:text-blue-900"
+                      @click="editTemplate(template)"
+                    >
+                      编辑
+                    </button>
+                    <button
+                      v-if="!template.isDefault"
+                      class="ml-3 text-green-600 hover:text-green-900"
+                      @click="setAsDefault(template)"
+                    >
+                      设为默认
+                    </button>
+                    <button
+                      v-if="!template.isDefault"
+                      class="ml-3 text-red-600 hover:text-red-900"
+                      @click="deleteTemplate(template)"
+                    >
+                      删除
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      <!-- 模板列表 -->
-      <div class="rounded-lg bg-white shadow">
-        <div v-if="loading" class="p-12 text-center">
-          <i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i>
-          <p class="mt-4 text-gray-500">加载中...</p>
-        </div>
-
-        <div v-else-if="templates.length === 0" class="p-12 text-center">
-          <i class="fas fa-file-invoice text-4xl text-gray-300"></i>
-          <p class="mt-4 text-gray-500">暂无倍率模板</p>
-          <button
-            class="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-            @click="showCreateDialog = true"
-          >
-            创建第一个模板
-          </button>
-        </div>
-
-        <div v-else class="overflow-hidden">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th
-                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                >
-                  模板名称
-                </th>
-                <th
-                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                >
-                  描述
-                </th>
-                <th
-                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                >
-                  状态
-                </th>
-                <th
-                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                >
-                  创建时间
-                </th>
-                <th
-                  class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-                >
-                  操作
-                </th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200 bg-white">
-              <tr v-for="template in templates" :key="template.id">
-                <td class="whitespace-nowrap px-6 py-4">
-                  <div class="flex items-center">
-                    <div>
-                      <div class="text-sm font-medium text-gray-900">{{ template.name }}</div>
-                      <div class="text-xs text-gray-500">ID: {{ template.id.slice(0, 8) }}...</div>
-                    </div>
-                  </div>
-                </td>
-                <td class="px-6 py-4">
-                  <div class="text-sm text-gray-900">{{ template.description || '-' }}</div>
-                </td>
-                <td class="whitespace-nowrap px-6 py-4">
-                  <span
-                    v-if="template.isDefault"
-                    class="inline-flex rounded-full bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800"
-                  >
-                    默认模板
-                  </span>
-                  <span
-                    v-else
-                    class="inline-flex rounded-full bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-800"
-                  >
-                    普通模板
-                  </span>
-                </td>
-                <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                  {{ formatDate(template.createdAt) }}
-                </td>
-                <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                  <button class="text-blue-600 hover:text-blue-900" @click="editTemplate(template)">
-                    编辑
-                  </button>
-                  <button
-                    v-if="!template.isDefault"
-                    class="ml-3 text-green-600 hover:text-green-900"
-                    @click="setAsDefault(template)"
-                  >
-                    设为默认
-                  </button>
-                  <button
-                    v-if="!template.isDefault"
-                    class="ml-3 text-red-600 hover:text-red-900"
-                    @click="deleteTemplate(template)"
-                  >
-                    删除
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <!-- 实体关联管理区域 -->
+      <div v-if="activeTab === 'associations'">
+        <EntityAssociations />
       </div>
     </div>
 
@@ -147,8 +188,10 @@ import { ref, onMounted } from 'vue'
 import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import RateTemplateDialog from '@/components/rate-templates/RateTemplateDialog.vue'
+import EntityAssociations from '@/components/rate-templates/EntityAssociations.vue'
 
 // 响应式数据
+const activeTab = ref('templates')
 const loading = ref(false)
 const templates = ref([])
 const showCreateDialog = ref(false)

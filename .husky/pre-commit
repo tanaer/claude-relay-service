@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-echo "Running pre-commit auto-format and checks..."
+echo "Running pre-commit checks on staged files..."
 
 # 确保在正确的目录
 if [ ! -f "package.json" ]; then
@@ -8,25 +8,55 @@ if [ ! -f "package.json" ]; then
     exit 1
 fi
 
-# 格式化和修复所有文件
-echo "Formatting and fixing code..."
-npm run fix:all
+# 获取已暂存的文件列表
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
 
-# 检查格式化后是否还有问题
-echo "Running final validation..."
-npm run lint:check
-if [ $? -ne 0 ]; then
-    echo "Backend lint issues detected!"
-    exit 1
+if [ -z "$STAGED_FILES" ]; then
+    echo "No staged files to check."
+    exit 0
 fi
 
-# 检查前端
-cd web/admin-spa
-npm run lint:check
-if [ $? -ne 0 ]; then
-    echo "Frontend lint issues detected!"
-    exit 1
+echo "Checking staged files: $(echo $STAGED_FILES | wc -w) files"
+
+# 分离后端和前端文件
+BACKEND_FILES=$(echo "$STAGED_FILES" | grep -E '\.(js)$' | grep -v 'web/admin-spa/' | tr '\n' ' ')
+FRONTEND_FILES=$(echo "$STAGED_FILES" | grep 'web/admin-spa/' | grep -E '\.(vue|js|ts|css|scss)$' | tr '\n' ' ')
+
+# 检查后端文件
+if [ -n "$BACKEND_FILES" ]; then
+    echo "Formatting backend files..."
+    npx prettier --write $BACKEND_FILES
+    
+    echo "Checking backend files..."
+    npx eslint $BACKEND_FILES --fix
+    if [ $? -ne 0 ]; then
+        echo "Backend lint issues detected!"
+        exit 1
+    fi
+    
+    # 重新添加格式化后的文件到暂存区
+    git add $BACKEND_FILES
 fi
 
-cd ../..
+# 检查前端文件
+if [ -n "$FRONTEND_FILES" ]; then
+    echo "Formatting frontend files..."
+    cd web/admin-spa
+    
+    # 转换为相对于 web/admin-spa 的路径
+    FRONTEND_REL_FILES=$(echo "$FRONTEND_FILES" | sed 's|web/admin-spa/||g')
+    
+    npx prettier --write $FRONTEND_REL_FILES
+    npx eslint $FRONTEND_REL_FILES --fix
+    if [ $? -ne 0 ]; then
+        echo "Frontend lint issues detected!"
+        cd ../..
+        exit 1
+    fi
+    
+    cd ../..
+    # 重新添加格式化后的文件到暂存区
+    git add $FRONTEND_FILES
+fi
+
 echo "All pre-commit checks passed!"

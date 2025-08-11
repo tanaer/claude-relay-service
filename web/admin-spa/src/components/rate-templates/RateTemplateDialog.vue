@@ -1,11 +1,18 @@
 <template>
   <div class="fixed inset-0 z-50 overflow-y-auto">
-    <div class="flex min-h-screen items-center justify-center px-4 pb-20 pt-4 text-center sm:block sm:p-0">
+    <div
+      class="flex min-h-screen items-center justify-center px-4 pb-20 pt-4 text-center sm:block sm:p-0"
+    >
       <!-- 背景遮罩 -->
-      <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="handleClose"></div>
+      <div
+        class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+        @click="handleClose"
+      ></div>
 
       <!-- 对话框 -->
-      <div class="inline-block transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl sm:align-middle">
+      <div
+        class="inline-block transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl sm:align-middle"
+      >
         <!-- 标题栏 -->
         <div class="border-b border-gray-200 bg-white px-6 py-4">
           <h3 class="text-lg font-medium leading-6 text-gray-900">
@@ -128,7 +135,7 @@
           <!-- 模型倍率设置 -->
           <div class="mb-6">
             <h4 class="mb-4 text-sm font-medium text-gray-900">模型倍率设置</h4>
-            
+
             <!-- 搜索框 -->
             <div class="mb-4">
               <input
@@ -144,19 +151,29 @@
               <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                   <tr>
-                    <th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    <th
+                      class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                    >
                       模型名称
                     </th>
-                    <th class="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
+                    <th
+                      class="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-gray-500"
+                    >
                       输入倍率
                     </th>
-                    <th class="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
+                    <th
+                      class="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-gray-500"
+                    >
                       输出倍率
                     </th>
-                    <th class="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
+                    <th
+                      class="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-gray-500"
+                    >
                       缓存创建
                     </th>
-                    <th class="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
+                    <th
+                      class="px-3 py-2 text-center text-xs font-medium uppercase tracking-wider text-gray-500"
+                    >
                       缓存读取
                     </th>
                   </tr>
@@ -344,9 +361,7 @@ const filteredModels = computed(() => {
   if (!searchQuery.value) {
     return allModels
   }
-  return allModels.filter(model => 
-    model.toLowerCase().includes(searchQuery.value.toLowerCase())
-  )
+  return allModels.filter((model) => model.toLowerCase().includes(searchQuery.value.toLowerCase()))
 })
 
 // 初始化表单数据
@@ -453,9 +468,13 @@ const handleClose = () => {
 }
 
 // 监听属性变化
-watch(() => props.template, () => {
-  initFormData()
-}, { immediate: true })
+watch(
+  () => props.template,
+  () => {
+    initFormData()
+  },
+  { immediate: true }
+)
 
 // 生命周期
 onMounted(() => {

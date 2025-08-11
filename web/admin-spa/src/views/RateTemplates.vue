@@ -184,7 +184,7 @@ const refreshTemplates = () => {
 const editTemplate = (template) => {
   console.log('editTemplate called with:', template)
   editingTemplate.value = template
-  showCreateDialog.value = false  // 确保创建对话框关闭
+  showCreateDialog.value = false // 确保创建对话框关闭
   console.log('editingTemplate.value:', editingTemplate.value)
 }
 

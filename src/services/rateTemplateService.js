@@ -572,20 +572,77 @@ class RateTemplateService {
     }
   }
 
-  // 应用倍率到费用计算
+  // 应用倍率到费用计算（兼容数字与对象四项倍率）
   applyRatesToCost(originalCost, modelName, rates) {
     if (!rates || !rates[modelName]) {
       return originalCost
     }
 
-    const multiplier = parseFloat(rates[modelName]) || 1.0
-    const newCost = originalCost * multiplier
+    const modelRate = rates[modelName]
 
-    logger.debug(
-      `💰 Applied rate multiplier: ${originalCost} * ${multiplier} = ${newCost} for model ${modelName}`
-    )
+    // 情况1：传入是单个数字成本
+    if (typeof originalCost === 'number') {
+      const multiplier = typeof modelRate === 'number' ? parseFloat(modelRate) || 1.0 : 1.0
+      const newCost = originalCost * multiplier
+      logger.debug(
+        `💰 Applied rate multiplier: ${originalCost} * ${multiplier} = ${newCost} for model ${modelName}`
+      )
+      return newCost
+    }
 
-    return newCost
+    // 情况2：传入是包含 costs 的对象（{ costs: { input, output, cacheWrite, cacheRead, total }, ... }）
+    if (
+      originalCost &&
+      typeof originalCost === 'object' &&
+      originalCost.costs &&
+      typeof originalCost.costs === 'object'
+    ) {
+      const multipliers = {
+        input: 1.0,
+        output: 1.0,
+        cacheWrite: 1.0,
+        cacheRead: 1.0
+      }
+
+      if (typeof modelRate === 'number') {
+        const m = parseFloat(modelRate) || 1.0
+        multipliers.input = multipliers.output = multipliers.cacheWrite = multipliers.cacheRead = m
+      } else if (typeof modelRate === 'object' && modelRate !== null) {
+        multipliers.input = parseFloat(modelRate.input) || 1.0
+        multipliers.output = parseFloat(modelRate.output) || 1.0
+        multipliers.cacheWrite =
+          parseFloat(
+            modelRate.cacheWrite !== undefined ? modelRate.cacheWrite : modelRate.cacheCreate
+          ) || 1.0
+        multipliers.cacheRead = parseFloat(modelRate.cacheRead) || 1.0
+      }
+
+      const multipliedCosts = {
+        input: (originalCost.costs.input || 0) * multipliers.input,
+        output: (originalCost.costs.output || 0) * multipliers.output,
+        cacheWrite: (originalCost.costs.cacheWrite || 0) * multipliers.cacheWrite,
+        cacheRead: (originalCost.costs.cacheRead || 0) * multipliers.cacheRead
+      }
+      const multipliedTotal =
+        multipliedCosts.input +
+        multipliedCosts.output +
+        multipliedCosts.cacheWrite +
+        multipliedCosts.cacheRead
+
+      const result = {
+        ...originalCost,
+        costs: { ...multipliedCosts, total: multipliedTotal },
+        appliedMultipliers: multipliers
+      }
+
+      logger.debug(
+        `💰 Applied rate multipliers for model ${modelName}: [input:${multipliers.input}x, output:${multipliers.output}x, cacheCreate/cacheWrite:${multipliers.cacheWrite}x, cacheRead:${multipliers.cacheRead}x] ${originalCost.costs.total?.toFixed ? originalCost.costs.total.toFixed(6) : originalCost.costs.total} -> ${result.costs.total.toFixed(6)}`
+      )
+      return result
+    }
+
+    // 兜底：无法识别的结构，原样返回
+    return originalCost
   }
 
   // 获取所有相关实体的概览统计

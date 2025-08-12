@@ -156,11 +156,14 @@
         </div>
       </div>
     </div>
+  </Teleport>
 
-    <!-- 编辑分组模态框 -->
+  <!-- 编辑分组模态框 -->
+  <Teleport to="body">
     <div
       v-if="showEditForm"
       class="modal z-60 fixed inset-0 flex items-center justify-center p-3 sm:p-4"
+      @click.self="cancelEdit"
     >
       <div class="modal-content w-full max-w-lg p-4 sm:p-6">
         <div class="mb-4 flex items-center justify-between">

@@ -120,9 +120,6 @@ class ApiKeyService {
       // 通过哈希值直接查找API Key（性能优化）
       const keyData = await redis.findApiKeyByHash(hashedKey)
 
-      // 临时调试：输出原始API Key数据
-      logger.info(`🔍 [DEBUG] Raw API Key data from Redis: ${JSON.stringify(keyData)}`)
-
       if (!keyData) {
         return { valid: false, error: 'API key not found' }
       }
@@ -411,22 +408,62 @@ class ApiKeyService {
 
       let costInfo = originalCostInfo
       if (rates && rates[model]) {
-        const multiplier = parseFloat(rates[model]) || 1.0
-        // 应用倍率到各个费用组成部分
+        // 支持两种倍率格式：
+        // 1. 简单数字格式：{ "model": 1.2 }（四项统一倍率）
+        // 2. 详细对象格式：{ "model": { input, output, cacheCreate, cacheRead } }
+        const modelRate = rates[model]
+
+        let multipliers = {
+          input: 1.0,
+          output: 1.0,
+          cacheWrite: 1.0, // 前端为 cacheCreate
+          cacheRead: 1.0
+        }
+
+        if (typeof modelRate === 'number') {
+          const m = parseFloat(modelRate) || 1.0
+          multipliers = { input: m, output: m, cacheWrite: m, cacheRead: m }
+        } else if (typeof modelRate === 'object' && modelRate !== null) {
+          multipliers = {
+            input: parseFloat(modelRate.input) || 1.0,
+            output: parseFloat(modelRate.output) || 1.0,
+            // 兼容字段名：cacheCreate(前端) / cacheWrite(后端成本字段)
+            cacheWrite:
+              parseFloat(
+                modelRate.cacheWrite !== undefined ? modelRate.cacheWrite : modelRate.cacheCreate
+              ) || 1.0,
+            cacheRead: parseFloat(modelRate.cacheRead) || 1.0
+          }
+        } else {
+          const m = parseFloat(modelRate) || 1.0
+          multipliers = { input: m, output: m, cacheWrite: m, cacheRead: m }
+        }
+
+        // 分别应用倍率，total 为四项求和
+        const multipliedCosts = {
+          input: originalCostInfo.costs.input * multipliers.input,
+          output: originalCostInfo.costs.output * multipliers.output,
+          cacheWrite: originalCostInfo.costs.cacheWrite * multipliers.cacheWrite,
+          cacheRead: originalCostInfo.costs.cacheRead * multipliers.cacheRead
+        }
+        const multipliedTotal =
+          multipliedCosts.input +
+          multipliedCosts.output +
+          multipliedCosts.cacheWrite +
+          multipliedCosts.cacheRead
+
         costInfo = {
           ...originalCostInfo,
           costs: {
-            input: originalCostInfo.costs.input * multiplier,
-            output: originalCostInfo.costs.output * multiplier,
-            cacheWrite: originalCostInfo.costs.cacheWrite * multiplier,
-            cacheRead: originalCostInfo.costs.cacheRead * multiplier,
-            total: originalCostInfo.costs.total * multiplier
+            ...multipliedCosts,
+            total: multipliedTotal
           },
-          appliedMultiplier: multiplier
+          appliedMultipliers: multipliers
         }
 
         logger.info(
-          `💰 Applied rate multiplier ${multiplier}x for model ${model}: ` +
+          `💰 Applied rate multipliers for model ${model}: ` +
+            `[input:${multipliers.input}x, output:${multipliers.output}x, cacheCreate/cacheWrite:${multipliers.cacheWrite}x, cacheRead:${multipliers.cacheRead}x] ` +
             `$${originalCostInfo.costs.total.toFixed(6)} -> $${costInfo.costs.total.toFixed(6)} (API Key: ${keyId})`
         )
       } else {

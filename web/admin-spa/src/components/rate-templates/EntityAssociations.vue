@@ -265,34 +265,30 @@ const fetchAllData = async () => {
 // 加载系统分组配置
 const loadSystemGroupsConfig = async () => {
   try {
-    // 尝试从服务端获取系统分组的倍率模板配置
-    // 如果服务端不支持，则从localStorage获取
-    const savedConfig = localStorage.getItem('systemGroupsRateConfig')
-    if (savedConfig) {
-      const config = JSON.parse(savedConfig)
-      systemGroups.value.forEach((group) => {
-        if (config[group.id]) {
-          group.rateTemplateId = config[group.id]
+    // 从服务端获取系统分组的倍率模板配置
+    for (const group of systemGroups.value) {
+      try {
+        const response = await apiClient.get(
+          `/admin/system-groups/${group.accountType}/rate-template`
+        )
+        if (response.success && response.data.templateId) {
+          group.rateTemplateId = response.data.templateId
         }
-      })
+      } catch (error) {
+        console.warn(`Failed to load rate template for ${group.accountType}:`, error)
+
+        // 如果服务端获取失败，尝试从localStorage获取（兼容旧数据）
+        const savedConfig = localStorage.getItem('systemGroupsRateConfig')
+        if (savedConfig) {
+          const config = JSON.parse(savedConfig)
+          if (config[group.id]) {
+            group.rateTemplateId = config[group.id]
+          }
+        }
+      }
     }
   } catch (error) {
     console.warn('Failed to load system groups config:', error)
-  }
-}
-
-// 保存系统分组配置
-const saveSystemGroupsConfig = () => {
-  try {
-    const config = {}
-    systemGroups.value.forEach((group) => {
-      if (group.rateTemplateId) {
-        config[group.id] = group.rateTemplateId
-      }
-    })
-    localStorage.setItem('systemGroupsRateConfig', JSON.stringify(config))
-  } catch (error) {
-    console.warn('Failed to save system groups config:', error)
   }
 }
 
@@ -321,12 +317,22 @@ const handleAssociationSave = async (data) => {
     const group = editingEntity.value
 
     if (group.isSystemGroup) {
-      // 系统分组：保存到本地存储
-      const targetGroup = systemGroups.value.find((g) => g.id === group.id)
-      if (targetGroup) {
-        targetGroup.rateTemplateId = templateId || null
-        saveSystemGroupsConfig()
+      // 系统分组：调用API保存到服务器
+      const endpoint = `/admin/system-groups/${group.accountType}/rate-template`
+      const payload = { templateId: templateId || null }
+
+      const response = await apiClient.put(endpoint, payload)
+
+      if (response.success) {
         showToast('系统分组倍率模板配置成功', 'success')
+        // 更新本地数据
+        const targetGroup = systemGroups.value.find((g) => g.id === group.id)
+        if (targetGroup) {
+          targetGroup.rateTemplateId = templateId || null
+        }
+      } else {
+        showToast(response.error || '配置失败', 'error')
+        return
       }
     } else {
       // 用户分组：调用API保存

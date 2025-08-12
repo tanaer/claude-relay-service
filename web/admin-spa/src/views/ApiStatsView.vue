@@ -85,26 +85,6 @@
                 <i class="fas fa-clock text-base text-blue-500 md:text-lg" />
                 <span class="text-base font-medium text-gray-700 md:text-lg">统计时间范围</span>
               </div>
-              <div class="flex w-full gap-2 md:w-auto">
-                <button
-                  class="flex flex-1 items-center justify-center gap-1 px-4 py-2 text-xs font-medium md:flex-none md:gap-2 md:px-6 md:text-sm"
-                  :class="['period-btn', { active: statsPeriod === 'daily' }]"
-                  :disabled="loading || modelStatsLoading"
-                  @click="switchPeriod('daily')"
-                >
-                  <i class="fas fa-calendar-day text-xs md:text-sm" />
-                  今日
-                </button>
-                <button
-                  class="flex flex-1 items-center justify-center gap-1 px-4 py-2 text-xs font-medium md:flex-none md:gap-2 md:px-6 md:text-sm"
-                  :class="['period-btn', { active: statsPeriod === 'monthly' }]"
-                  :disabled="loading || modelStatsLoading"
-                  @click="switchPeriod('monthly')"
-                >
-                  <i class="fas fa-calendar-alt text-xs md:text-sm" />
-                  本月
-                </button>
-              </div>
             </div>
           </div>
 
@@ -112,13 +92,13 @@
           <StatsOverview />
 
           <!-- Token 分布和限制配置 -->
-          <!-- <div class="mb-6 grid grid-cols-1 gap-4 md:mb-8 md:gap-6 lg:grid-cols-2">
+          <div class="mb-6 grid grid-cols-1 gap-4 md:mb-8 md:gap-6 lg:grid-cols-2">
             <TokenDistribution />
-            <LimitConfig />
-          </div> -->
+            <!-- <LimitConfig /> -->
+          </div>
 
           <!-- 模型使用统计 -->
-          <!-- <ModelUsageStats /> -->
+          <ModelUsageStats />
         </div>
       </div>
     </div>
@@ -334,19 +314,10 @@ const redeemCode = ref('')
 const isRedeeming = ref(false)
 const redemptionResult = ref(null)
 
-const {
-  apiKey,
-  apiId,
-  loading,
-  modelStatsLoading,
-  oemLoading,
-  error,
-  statsPeriod,
-  statsData,
-  oemSettings
-} = storeToRefs(apiStatsStore)
+const { apiKey, apiId, loading, oemLoading, error, statsData, oemSettings } =
+  storeToRefs(apiStatsStore)
 
-const { queryStats, switchPeriod, loadStatsWithApiId, loadOemSettings, reset } = apiStatsStore
+const { queryStats, loadStatsWithApiId, loadOemSettings, reset } = apiStatsStore
 
 // 计算属性
 const canRedeem = computed(() => {

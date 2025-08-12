@@ -400,11 +400,68 @@ class ApiKeyService {
 
       // 应用倍率模板 - 优先使用传入的 apiKeyData，避免重复查询
       const rateTemplateService = require('./rateTemplateService')
-      const rates = await rateTemplateService.getRatesForEntity(
+      let rates = await rateTemplateService.getRatesForEntity(
         keyId,
         'apikey',
         apiKeyData // 传递 apiKeyData 以避免重复查询
       )
+
+      // 如果 API Key 未配置倍率模板，且使用了实际账户，则基于“实际账户”回退查找倍率
+      // 覆盖共享/专属池（system_group_rate:shared/dedicated）与账户自身绑定模板
+      if ((!rates || Object.keys(rates).length === 0 || !rates[model]) && accountId) {
+        try {
+          const client = redis.getClientSafe()
+          let fallbackRates = null
+          let fallbackEntityType = null
+
+          // 1) Claude Console 账户
+          const consoleAccount = await client.hgetall(`claude_console_account:${accountId}`)
+          if (consoleAccount && consoleAccount.id) {
+            fallbackEntityType = 'claude_console_account'
+            fallbackRates = await rateTemplateService.getRatesForEntity(
+              accountId,
+              'claude_console_account'
+            )
+          }
+
+          // 2) 官方 Claude OAuth 账户（若未命中 Console）
+          if (!fallbackRates || Object.keys(fallbackRates).length === 0) {
+            const oauthAccount = await client.hgetall(`claude_account:${accountId}`)
+            if (oauthAccount && Object.keys(oauthAccount).length > 0) {
+              fallbackEntityType = 'claude_account'
+              fallbackRates = await rateTemplateService.getRatesForEntity(
+                accountId,
+                'claude_account'
+              )
+            }
+          }
+
+          // 3) Gemini 账户（若仍未命中）
+          if (!fallbackRates || Object.keys(fallbackRates).length === 0) {
+            const geminiAccount = await client.hgetall(`gemini_account:${accountId}`)
+            if (geminiAccount && Object.keys(geminiAccount).length > 0) {
+              fallbackEntityType = 'gemini_account'
+              fallbackRates = await rateTemplateService.getRatesForEntity(
+                accountId,
+                'gemini_account'
+              )
+            }
+          }
+
+          if (fallbackRates && Object.keys(fallbackRates).length > 0) {
+            rates = fallbackRates
+            logger.info(
+              `🔍 Using fallback rates from ${fallbackEntityType} ${accountId} for API Key ${keyId}`
+            )
+          } else {
+            logger.debug(
+              `🔍 No fallback rates found for account ${accountId}; using default or no multipliers`
+            )
+          }
+        } catch (e) {
+          logger.warn('⚠️ Failed to resolve fallback rates by accountId:', e)
+        }
+      }
 
       let costInfo = originalCostInfo
       if (rates && rates[model]) {

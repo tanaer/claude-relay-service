@@ -1,7 +1,7 @@
 <template>
-  <div class="mb-6 space-y-4 md:mb-8 md:space-y-6">
+  <div class="mb-6 grid grid-cols-1 items-stretch gap-4 md:mb-8 md:grid-cols-2 md:gap-6">
     <!-- API Key 基本信息 -->
-    <div class="card p-4 md:p-6">
+    <div class="card h-full p-4 md:p-6">
       <h3 class="mb-3 flex items-center text-lg font-bold text-gray-900 md:mb-4 md:text-xl">
         <i class="fas fa-info-circle mr-2 text-sm text-blue-500 md:mr-3 md:text-base" />
         API Key 信息
@@ -31,12 +31,6 @@
           <span class="text-sm font-medium text-gray-900 md:text-base">{{
             formatPermissions(statsData.permissions)
           }}</span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-sm text-gray-600 md:text-base">每日费用限制</span>
-          <span class="text-sm font-medium text-gray-900 md:text-base">
-            ${{ statsData.dailyCostLimit || '无限制' }}
-          </span>
         </div>
         <div class="flex items-start justify-between">
           <span class="mt-1 flex-shrink-0 text-sm text-gray-600 md:text-base">过期时间</span>
@@ -68,7 +62,7 @@
     </div>
 
     <!-- Token 使用进度 -->
-    <div class="card p-4 md:p-6">
+    <div class="card h-full p-4 md:p-6">
       <h3 class="mb-3 flex items-center text-lg font-bold text-gray-900 md:mb-4 md:text-xl">
         <i class="fas fa-chart-bar mr-2 text-sm text-green-500 md:mr-3 md:text-base" />
         Token 使用情况
@@ -99,38 +93,6 @@
             <span>0</span>
             <span>{{ tokenProgress.toFixed(1) }}%</span>
             <span>{{ formatNumber(maxTokens) }}</span>
-          </div>
-        </div>
-
-        <!-- 详细信息 -->
-        <div class="grid grid-cols-2 gap-4">
-          <div class="text-center">
-            <div class="text-lg font-bold text-blue-600 md:text-2xl">
-              {{ formatNumber(currentPeriodData.inputTokens) }}
-            </div>
-            <div class="text-xs text-gray-600 md:text-sm">输入Token</div>
-          </div>
-          <div class="text-center">
-            <div class="text-lg font-bold text-purple-600 md:text-2xl">
-              {{ formatNumber(currentPeriodData.outputTokens) }}
-            </div>
-            <div class="text-xs text-gray-600 md:text-sm">输出Token</div>
-          </div>
-        </div>
-
-        <!-- 费用信息 -->
-        <div class="rounded-lg bg-gray-50 p-3">
-          <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-600"
-              >{{ statsPeriod === 'daily' ? '今日' : '本月' }}费用</span
-            >
-            <span class="text-lg font-bold text-green-600">
-              {{ currentPeriodData.formattedCost || '$0.000000' }}
-            </span>
-          </div>
-          <div v-if="statsData.dailyCostLimit" class="mt-1 flex items-center justify-between">
-            <span class="text-xs text-gray-500">每日限制</span>
-            <span class="text-xs text-gray-500">${{ statsData.dailyCostLimit }}</span>
           </div>
         </div>
       </div>

@@ -392,12 +392,14 @@ class RateTemplateService {
           `🔍 API Key ${entityId} data: claudeAccountId=${apiKeyData?.claudeAccountId || 'null'}, geminiAccountId=${apiKeyData?.geminiAccountId || 'null'}, groupId=${apiKeyData?.groupId || 'null'}`
         )
 
-        // 如果API Key没有设置倍率模板，尝试从绑定的账户或分组获取
+        // 如果API Key没有设置倍率模板，尝试从绑定的账户或分组获取（Claude OAuth / Claude Console / Gemini）
         if (!templateId) {
           // 检查API Key是否绑定到分组（通过 claudeAccountId 或 geminiAccountId 的 group: 前缀）
           let boundGroupId = null
           if (apiKeyData?.claudeAccountId?.startsWith('group:')) {
             boundGroupId = apiKeyData.claudeAccountId.replace('group:', '')
+          } else if (apiKeyData?.claudeConsoleAccountId?.startsWith('group:')) {
+            boundGroupId = apiKeyData.claudeConsoleAccountId.replace('group:', '')
           } else if (apiKeyData?.geminiAccountId?.startsWith('group:')) {
             boundGroupId = apiKeyData.geminiAccountId.replace('group:', '')
           } else if (apiKeyData?.groupId) {
@@ -414,7 +416,7 @@ class RateTemplateService {
             )
           }
 
-          // 检查Claude账户绑定（只有在不是分组绑定时）
+          // 检查Claude OAuth账户绑定（只有在不是分组绑定时）
           if (
             !templateId &&
             apiKeyData?.claudeAccountId &&
@@ -445,6 +447,56 @@ class RateTemplateService {
                   searchPath.push(`Account group: not found`)
                   logger.warn(
                     `🔍 No account group found for Claude account ${apiKeyData.claudeAccountId}`
+                  )
+                }
+              } else if (['shared', 'dedicated'].includes(accountData.accountType)) {
+                // 检查系统分组（共享账户池、专属账户池）的倍率模板
+                templateId = await this.getSystemGroupRateTemplate(accountData.accountType)
+                searchPath.push(`System group ${accountData.accountType}: ${templateId || 'null'}`)
+                logger.info(
+                  `🔍 System group ${accountData.accountType}: templateId=${templateId || 'null'}`
+                )
+              }
+            }
+          }
+
+          // 检查 Claude Console 账户绑定（只有在不是分组绑定时）
+          if (
+            !templateId &&
+            apiKeyData?.claudeConsoleAccountId &&
+            !apiKeyData.claudeConsoleAccountId.startsWith('group:')
+          ) {
+            const accountData = await client.hgetall(
+              `claude_console_account:${apiKeyData.claudeConsoleAccountId}`
+            )
+            templateId = accountData?.rateTemplateId
+            searchPath.push(
+              `Claude Console account ${apiKeyData.claudeConsoleAccountId}: ${templateId || 'null'}`
+            )
+
+            // 输出Console账户的详细信息用于调试
+            logger.info(
+              `🔍 Claude Console account ${apiKeyData.claudeConsoleAccountId} data: accountType=${accountData?.accountType || 'null'}, rateTemplateId=${accountData?.rateTemplateId || 'null'}`
+            )
+
+            // 如果账户也没有倍率模板，根据账户类型获取系统分组模板
+            if (!templateId && accountData?.accountType) {
+              if (accountData.accountType === 'group') {
+                // 查找账户所属的分组
+                const accountGroupService = require('./accountGroupService')
+                const group = await accountGroupService.getAccountGroup(
+                  apiKeyData.claudeConsoleAccountId
+                )
+                if (group) {
+                  templateId = group.rateTemplateId
+                  searchPath.push(`Account group ${group.id}: ${templateId || 'null'}`)
+                  logger.info(
+                    `🔍 Found account group ${group.id}: rateTemplateId=${templateId || 'null'}`
+                  )
+                } else {
+                  searchPath.push(`Account group: not found`)
+                  logger.warn(
+                    `🔍 No account group found for Claude Console account ${apiKeyData.claudeConsoleAccountId}`
                   )
                 }
               } else if (['shared', 'dedicated'].includes(accountData.accountType)) {
@@ -536,6 +588,29 @@ class RateTemplateService {
               searchPath.push(`Account group ${group.id}: ${templateId || 'null'}`)
             }
           } else if (['shared', 'dedicated'].includes(accountData.accountType)) {
+            templateId = await this.getSystemGroupRateTemplate(accountData.accountType)
+            searchPath.push(`System group ${accountData.accountType}: ${templateId || 'null'}`)
+          }
+        }
+      } else if (entityType === 'claude_console_account') {
+        // 支持 Claude Console 账户倍率查找（与官方/Gemini 账户一致的逻辑）
+        const accountData = await client.hgetall(`claude_console_account:${entityId}`)
+        templateId = accountData?.rateTemplateId
+        searchPath.push(`Claude Console account ${entityId}: ${templateId || 'null'}`)
+
+        // 如果账户没有倍率模板，根据账户类型获取模板
+        if (!templateId && accountData?.accountType) {
+          if (accountData.accountType === 'group') {
+            const accountGroupService = require('./accountGroupService')
+            const group = await accountGroupService.getAccountGroup(entityId)
+            if (group) {
+              templateId = group.rateTemplateId
+              searchPath.push(`Account group ${group.id}: ${templateId || 'null'}`)
+            } else {
+              searchPath.push('Account group: not found')
+            }
+          } else if (['shared', 'dedicated'].includes(accountData.accountType)) {
+            // 共享/专属池对应系统分组倍率
             templateId = await this.getSystemGroupRateTemplate(accountData.accountType)
             searchPath.push(`System group ${accountData.accountType}: ${templateId || 'null'}`)
           }

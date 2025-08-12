@@ -406,9 +406,10 @@ class ApiKeyService {
         apiKeyData // 传递 apiKeyData 以避免重复查询
       )
 
-      // 如果 API Key 未配置倍率模板，且使用了实际账户，则基于“实际账户”回退查找倍率
-      // 覆盖共享/专属池（system_group_rate:shared/dedicated）与账户自身绑定模板
-      if ((!rates || Object.keys(rates).length === 0 || !rates[model]) && accountId) {
+      // 如果 API Key 没有绑定倍率模板（rateTemplateId 为空），优先根据“实际使用的账户”回退查找倍率
+      // 这样可覆盖共享/专属池（system_group_rate:shared/dedicated），避免默认模板误用
+      const apiKeyHasTemplate = !!(apiKeyData && apiKeyData.rateTemplateId)
+      if (accountId && !apiKeyHasTemplate) {
         try {
           const client = redis.getClientSafe()
           let fallbackRates = null

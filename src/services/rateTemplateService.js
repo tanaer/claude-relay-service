@@ -383,7 +383,7 @@ class RateTemplateService {
 
       if (entityType === 'apikey') {
         // 优先使用传入的 apiKeyData，避免重复查询
-        const apiKeyData = providedApiKeyData || (await client.hgetall(`api_key:${entityId}`))
+        const apiKeyData = providedApiKeyData || (await client.hgetall(`apikey:${entityId}`))
         templateId = apiKeyData?.rateTemplateId
         searchPath.push(`API Key direct: ${templateId || 'null'}`)
 
@@ -632,8 +632,12 @@ class RateTemplateService {
       // 如果没有指定模板，使用默认模板
       if (!templateId) {
         const defaultTemplate = await this.getDefaultTemplate()
-        logger.info(`🔍 Using default template: ${defaultTemplate?.id || 'none'}`)
-        return defaultTemplate?.rates || {}
+        if (defaultTemplate) {
+          logger.info(`🔍 Using default template: ${defaultTemplate.id}`)
+          return defaultTemplate.rates || {}
+        }
+        logger.info('🔍 No default template configured; returning empty rates')
+        return {}
       }
 
       const template = await this.getTemplate(templateId)

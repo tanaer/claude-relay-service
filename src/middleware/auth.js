@@ -303,6 +303,7 @@ const authenticateApiKey = async (req, res, next) => {
       name: validation.keyData.name,
       tokenLimit: validation.keyData.tokenLimit,
       claudeAccountId: validation.keyData.claudeAccountId,
+      claudeConsoleAccountId: validation.keyData.claudeConsoleAccountId,
       geminiAccountId: validation.keyData.geminiAccountId,
       permissions: validation.keyData.permissions,
       concurrencyLimit: validation.keyData.concurrencyLimit,

@@ -66,18 +66,16 @@
       <h3 class="mb-3 flex items-center text-lg font-bold text-gray-900 md:mb-4 md:text-xl">
         <i class="fas fa-chart-bar mr-2 text-sm text-green-500 md:mr-3 md:text-base" />
         Token 使用情况
-        <span class="ml-2 text-xs font-normal text-gray-600 md:text-sm"
-          >({{ statsPeriod === 'daily' ? '今日' : '本月' }})</span
-        >
       </h3>
 
       <div class="space-y-4">
         <!-- 进度条 -->
         <div class="relative">
           <div class="mb-2 flex items-center justify-between">
-            <span class="text-sm text-gray-600">总Token使用量</span>
+            <span class="text-sm text-gray-600">Token用量 </span>
             <span class="text-sm font-medium text-gray-900">
-              {{ formatNumber(currentPeriodData.allTokens) }} / {{ formatNumber(maxTokens) }}
+              {{ formatTokenDisplay(calculateTokensFromCost(getCurrentDayCost())) }} /
+              {{ formatTokenDisplay(maxTokens) }}
             </span>
           </div>
 
@@ -90,9 +88,9 @@
           </div>
 
           <div class="mt-2 flex items-center justify-between text-xs text-gray-500">
-            <span>0</span>
-            <span>{{ tokenProgress.toFixed(1) }}%</span>
-            <span>{{ formatNumber(maxTokens) }}</span>
+            <span>$0</span>
+            <span>{{ tokenProgress.toFixed(1) }}% (${getCurrentDayCost().toFixed(2)})</span>
+            <span>${{ getApiKeyType() === 'monthly' ? '100' : '20' }}</span>
           </div>
         </div>
       </div>
@@ -106,28 +104,53 @@ import { useApiStatsStore } from '@/stores/apistats'
 import { computed } from 'vue'
 
 const apiStatsStore = useApiStatsStore()
-const { statsData, statsPeriod, currentPeriodData } = storeToRefs(apiStatsStore)
+const { statsData } = storeToRefs(apiStatsStore)
 
-// 计算最大Token数（基于每日费用限制）
+// 检查API Key类型（日卡或月卡）
+const getApiKeyType = () => {
+  if (!statsData.value?.dailyCostLimit) return 'daily'
+  const limit = parseFloat(statsData.value.dailyCostLimit)
+  // 根据费用限额判断类型：$20为日卡，$100为月卡
+  return limit >= 80 ? 'monthly' : 'daily'
+}
+
+// 获取API Key的最大Token数
+const getApiKeyMaxTokens = () => {
+  const keyType = getApiKeyType()
+  return keyType === 'monthly' ? 70000000 : 10000000 // 月卡7000万，日卡1000万
+}
+
+// 根据费用计算Token使用量
+const calculateTokensFromCost = (cost) => {
+  if (!cost || cost === 0) return 0
+
+  const keyType = getApiKeyType()
+  const maxTokens = getApiKeyMaxTokens()
+  const maxCost = keyType === 'monthly' ? 100 : 20
+
+  // 根据费用比例计算Token使用量
+  return Math.round((cost / maxCost) * maxTokens)
+}
+
+// 计算最大Token数
 const maxTokens = computed(() => {
-  if (!statsData.value?.dailyCostLimit) return 1000000 // 默认值，如果没有限制
-
-  // 使用Claude平均价格估算：输入约$0.003/1K tokens，输出约$0.015/1K tokens
-  // 假设输入输出比例为1:1，平均价格为$0.009/1K tokens
-  const avgCostPer1KTokens = 0.009
-  const dailyCostLimit = parseFloat(statsData.value.dailyCostLimit)
-
-  return Math.round((dailyCostLimit / avgCostPer1KTokens) * 1000)
+  return getApiKeyMaxTokens()
 })
 
-// 计算Token使用进度百分比
+// 获取API Key的今日费用
+const getCurrentDayCost = () => {
+  return parseFloat(statsData.value?.dailyCost || 0)
+}
+
+// 计算Token使用进度百分比（基于费用）
 const tokenProgress = computed(() => {
-  const currentTokens = currentPeriodData.value?.allTokens || 0
+  const todayCost = getCurrentDayCost()
+  const tokensFromCost = calculateTokensFromCost(todayCost)
   const maxTokenValue = maxTokens.value
 
   if (maxTokenValue === 0) return 0
 
-  const progress = (currentTokens / maxTokenValue) * 100
+  const progress = (tokensFromCost / maxTokenValue) * 100
   return Math.min(progress, 100) // 限制最大100%
 })
 
@@ -172,21 +195,21 @@ const isApiKeyExpiringSoon = (expiresAt) => {
   return daysUntilExpire > 0 && daysUntilExpire <= 7
 }
 
-// 格式化数字
-const formatNumber = (num) => {
-  if (typeof num !== 'number') {
-    num = parseInt(num) || 0
+// 格式化Token显示
+const formatTokenDisplay = (tokens) => {
+  if (typeof tokens !== 'number') {
+    tokens = parseInt(tokens) || 0
   }
 
-  if (num === 0) return '0'
+  if (tokens === 0) return '0'
 
   // 大数字使用简化格式
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M'
-  } else if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'K'
+  if (tokens >= 1000000) {
+    return (tokens / 1000000).toFixed(1) + 'M'
+  } else if (tokens >= 1000) {
+    return (tokens / 1000).toFixed(1) + 'K'
   } else {
-    return num.toLocaleString()
+    return tokens.toLocaleString()
   }
 }
 

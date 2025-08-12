@@ -93,14 +93,14 @@
             <!-- 提取按钮 -->
             <button class="btn btn-success flex items-center gap-2" @click="extractCodes('daily')">
               <i class="fas fa-download"></i>
-              提取日卡 (20个)
+              提取日卡 (默认20个)
             </button>
             <button
               class="btn btn-success flex items-center gap-2"
               @click="extractCodes('monthly')"
             >
               <i class="fas fa-download"></i>
-              提取月卡 (20个)
+              提取月卡 (默认20个)
             </button>
 
             <!-- 刷新按钮 -->
@@ -340,7 +340,17 @@ const generateCodes = async (type) => {
 // 提取可用兑换码
 const extractCodes = async (type) => {
   try {
-    const response = await fetch(`/admin/redemption-codes/extract/${type}?count=20`, {
+    const defaultCount = 20
+    const input = window.prompt('请输入要提取的数量（默认20，最多100）', String(defaultCount))
+    if (input === null) return
+    const parsed = parseInt(input, 10)
+    let count = Number.isFinite(parsed) && parsed > 0 ? parsed : defaultCount
+    if (count > 100) {
+      count = 100
+      showToast('最多一次提取 100 个，已自动调整为 100', 'info')
+    }
+
+    const response = await fetch(`/admin/redemption-codes/extract/${type}?count=${count}`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem('authToken')}`
       }

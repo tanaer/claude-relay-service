@@ -83,14 +83,25 @@
             </div>
           </div>
 
-          <!-- 添加账户按钮 -->
-          <button
-            class="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-green-500 to-green-600 px-5 py-2.5 text-sm font-medium text-white shadow-md transition-all duration-200 hover:from-green-600 hover:to-green-700 hover:shadow-lg sm:w-auto"
-            @click.stop="openCreateAccountModal"
-          >
-            <i class="fas fa-plus"></i>
-            <span>添加账户</span>
-          </button>
+          <!-- 操作按钮组 -->
+          <div class="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+            <!-- 分组管理按钮 -->
+            <button
+              class="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-purple-500 to-purple-600 px-5 py-2.5 text-sm font-medium text-white shadow-md transition-all duration-200 hover:from-purple-600 hover:to-purple-700 hover:shadow-lg sm:w-auto"
+              @click.stop="openGroupManagementModal"
+            >
+              <i class="fas fa-layer-group"></i>
+              <span>分组管理</span>
+            </button>
+            <!-- 添加账户按钮 -->
+            <button
+              class="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-green-500 to-green-600 px-5 py-2.5 text-sm font-medium text-white shadow-md transition-all duration-200 hover:from-green-600 hover:to-green-700 hover:shadow-lg sm:w-auto"
+              @click.stop="openCreateAccountModal"
+            >
+              <i class="fas fa-plus"></i>
+              <span>添加账户</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -765,6 +776,14 @@
       @success="handleEditSuccess"
     />
 
+    <!-- 分组管理模态框 -->
+    <GroupManagementModal
+      v-if="showGroupManagementModal"
+      :show="showGroupManagementModal"
+      @close="handleGroupManagementClose"
+      @success="handleGroupManagementSuccess"
+    />
+
     <!-- 确认弹窗 -->
     <ConfirmModal
       :cancel-text="confirmOptions.cancelText"
@@ -784,6 +803,7 @@ import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import { useConfirm } from '@/composables/useConfirm'
 import AccountForm from '@/components/accounts/AccountForm.vue'
+import GroupManagementModal from '@/components/accounts/GroupManagementModal.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import CustomDropdown from '@/components/common/CustomDropdown.vue'
 
@@ -844,6 +864,7 @@ const groupOptions = computed(() => {
 // 模态框状态
 const showCreateAccountModal = ref(false)
 const showEditAccountModal = ref(false)
+const showGroupManagementModal = ref(false)
 const editingAccount = ref(null)
 
 // 计算排序后的账户列表
@@ -1195,6 +1216,11 @@ const openCreateAccountModal = () => {
   showCreateAccountModal.value = true
 }
 
+// 打开分组管理模态框
+const openGroupManagementModal = () => {
+  showGroupManagementModal.value = true
+}
+
 // 编辑账户
 const editAccount = (account) => {
   editingAccount.value = account
@@ -1360,6 +1386,21 @@ const handleEditSuccess = () => {
   showEditAccountModal.value = false
   showToast('账户更新成功', 'success')
   // 清空分组成员缓存，因为账户类型和分组可能发生变化
+  groupMembersLoaded.value = false
+  loadAccounts()
+}
+
+// 处理分组管理模态框关闭
+const handleGroupManagementClose = () => {
+  showGroupManagementModal.value = false
+}
+
+// 处理分组管理成功
+const handleGroupManagementSuccess = () => {
+  showGroupManagementModal.value = false
+  showToast('分组操作成功', 'success')
+  // 重新加载分组数据和账户数据
+  groupsLoaded.value = false
   groupMembersLoaded.value = false
   loadAccounts()
 }

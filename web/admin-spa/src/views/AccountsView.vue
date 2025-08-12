@@ -141,7 +141,7 @@
                 <i v-else class="fas fa-sort ml-1 text-gray-400" />
               </th>
               <th
-                class="w-[15%] min-w-[120px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100"
+                class="w-[14%] min-w-[120px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100"
                 @click="sortAccounts('platform')"
               >
                 平台/类型
@@ -156,7 +156,7 @@
                 <i v-else class="fas fa-sort ml-1 text-gray-400" />
               </th>
               <th
-                class="w-[12%] min-w-[100px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100"
+                class="w-[10%] min-w-[100px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100"
                 @click="sortAccounts('status')"
               >
                 状态
@@ -171,7 +171,7 @@
                 <i v-else class="fas fa-sort ml-1 text-gray-400" />
               </th>
               <th
-                class="w-[8%] min-w-[80px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100"
+                class="w-[7%] min-w-[80px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100"
                 @click="sortAccounts('priority')"
               >
                 优先级
@@ -186,27 +186,32 @@
                 <i v-else class="fas fa-sort ml-1 text-gray-400" />
               </th>
               <th
-                class="w-[10%] min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700"
+                class="w-[12%] min-w-[110px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700"
+              >
+                计费模板
+              </th>
+              <th
+                class="w-[8%] min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700"
               >
                 代理
               </th>
               <th
-                class="w-[10%] min-w-[90px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700"
+                class="w-[8%] min-w-[90px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700"
               >
                 今日使用
               </th>
               <th
-                class="w-[10%] min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700"
+                class="w-[8%] min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700"
               >
                 会话窗口
               </th>
               <th
-                class="w-[8%] min-w-[80px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700"
+                class="w-[6%] min-w-[80px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700"
               >
                 最后使用
               </th>
               <th
-                class="w-[15%] min-w-[180px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700"
+                class="w-[13%] min-w-[180px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700"
               >
                 操作
               </th>
@@ -409,6 +414,25 @@
                 </div>
                 <div v-else class="text-sm text-gray-400">
                   <span class="text-xs">N/A</span>
+                </div>
+              </td>
+              <!-- 计费模板列 -->
+              <td class="px-3 py-4 text-sm text-gray-600">
+                <div v-if="getRateTemplateName(account)" class="flex items-center gap-1">
+                  <span
+                    class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800"
+                  >
+                    <i class="fas fa-calculator mr-1"></i>
+                    {{ getRateTemplateName(account) }}
+                  </span>
+                </div>
+                <div v-else class="flex items-center gap-1">
+                  <span
+                    class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500"
+                  >
+                    <i class="fas fa-minus-circle mr-1"></i>
+                    继承系统
+                  </span>
                 </div>
               </td>
               <td class="px-3 py-4 text-sm text-gray-600">
@@ -819,6 +843,8 @@ const accountsSortOrder = ref('asc')
 const apiKeys = ref([])
 const refreshingTokens = ref({})
 const accountGroups = ref([])
+const rateTemplates = ref([])
+const systemGroupRates = ref({}) // 存储系统分组的倍率模板映射
 const groupFilter = ref('all')
 const platformFilter = ref('all')
 
@@ -826,6 +852,7 @@ const platformFilter = ref('all')
 const apiKeysLoaded = ref(false)
 const groupsLoaded = ref(false)
 const groupMembersLoaded = ref(false)
+const rateTemplatesLoaded = ref(false)
 const accountGroupMap = ref(new Map())
 
 // 下拉选项数据
@@ -971,8 +998,13 @@ const loadAccounts = async (forceReload = false) => {
       }
     }
 
-    // 使用缓存机制加载 API Keys 和分组数据
-    await Promise.all([loadApiKeys(forceReload), loadAccountGroups(forceReload)])
+    // 使用缓存机制加载 API Keys、分组数据和倍率模板
+    await Promise.all([
+      loadApiKeys(forceReload),
+      loadAccountGroups(forceReload),
+      loadRateTemplates(forceReload),
+      loadSystemGroupRates() // 系统分组的倍率模板，不需要缓存
+    ])
 
     // 加载分组成员关系（需要在分组数据加载完成后）
     await loadGroupMembers(forceReload)
@@ -1112,6 +1144,42 @@ const loadAccountGroups = async (forceReload = false) => {
   }
 }
 
+// 加载倍率模板列表（缓存版本）
+const loadRateTemplates = async (forceReload = false) => {
+  if (!forceReload && rateTemplatesLoaded.value) {
+    return // 使用缓存数据
+  }
+
+  try {
+    const response = await apiClient.get('/admin/rate-templates')
+    if (response.success) {
+      rateTemplates.value = response.data || []
+      rateTemplatesLoaded.value = true
+    }
+  } catch (error) {
+    console.error('Failed to load rate templates:', error)
+  }
+}
+
+// 加载系统分组倍率模板映射
+const loadSystemGroupRates = async () => {
+  try {
+    // 获取共享账户池的倍率模板
+    const sharedResponse = await apiClient.get('/admin/system-groups/shared/rate-template')
+    if (sharedResponse.success && sharedResponse.data.templateId) {
+      systemGroupRates.value.shared = sharedResponse.data.templateId
+    }
+
+    // 获取专属账户池的倍率模板
+    const dedicatedResponse = await apiClient.get('/admin/system-groups/dedicated/rate-template')
+    if (dedicatedResponse.success && dedicatedResponse.data.templateId) {
+      systemGroupRates.value.dedicated = dedicatedResponse.data.templateId
+    }
+  } catch (error) {
+    console.error('Failed to load system group rates:', error)
+  }
+}
+
 // 加载分组成员关系（缓存版本）
 const loadGroupMembers = async (forceReload = false) => {
   if (!forceReload && groupMembersLoaded.value) {
@@ -1147,6 +1215,7 @@ const clearCache = () => {
   apiKeysLoaded.value = false
   groupsLoaded.value = false
   groupMembersLoaded.value = false
+  rateTemplatesLoaded.value = false
   accountGroupMap.value.clear()
 }
 
@@ -1509,6 +1578,38 @@ const refreshAccountToken = async (account) => {
   } finally {
     refreshingTokens.value[account.id] = false
   }
+}
+
+// 获取账户的计费模板名称（根据优先级）
+const getRateTemplateName = (account) => {
+  if (!account) return null
+
+  // 优先级计算：
+  // 1. 账户直接绑定的模板（最高优先级）
+  if (account.rateTemplateId) {
+    const template = rateTemplates.value.find((t) => t.id === account.rateTemplateId)
+    return template ? template.name : null
+  }
+
+  // 2. 账户分组的模板
+  if (account.groupInfo && account.groupInfo.rateTemplateId) {
+    const template = rateTemplates.value.find((t) => t.id === account.groupInfo.rateTemplateId)
+    return template ? template.name : null
+  }
+
+  // 3. 系统分组模板（共享/专属账户池）
+  if (account.accountType === 'shared' && systemGroupRates.value.shared) {
+    const template = rateTemplates.value.find((t) => t.id === systemGroupRates.value.shared)
+    return template ? template.name : null
+  }
+
+  if (account.accountType === 'dedicated' && systemGroupRates.value.dedicated) {
+    const template = rateTemplates.value.find((t) => t.id === systemGroupRates.value.dedicated)
+    return template ? template.name : null
+  }
+
+  // 4. 默认模板（最低优先级，但不在这里显示，显示为"继承系统"）
+  return null
 }
 
 // 切换调度状态

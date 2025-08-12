@@ -92,13 +92,13 @@
           <StatsOverview />
 
           <!-- Token 分布和限制配置 -->
-          <div class="mb-6 grid grid-cols-1 gap-4 md:mb-8 md:gap-6 lg:grid-cols-2">
-            <TokenDistribution />
-            <!-- <LimitConfig /> -->
-          </div>
+          <!-- <div class="mb-6 grid grid-cols-1 gap-4 md:mb-8 md:gap-6 lg:grid-cols-2">
+            <TokenDistribution /> -->
+          <!-- <LimitConfig /> -->
+          <!-- </div> -->
 
           <!-- 模型使用统计 -->
-          <ModelUsageStats />
+          <!-- <ModelUsageStats /> -->
         </div>
       </div>
     </div>

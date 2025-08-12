@@ -72,7 +72,7 @@
         <!-- 进度条 -->
         <div class="relative">
           <div class="mb-2 flex items-center justify-between">
-            <span class="text-sm text-gray-600">Token用量 </span>
+            <span class="text-sm text-gray-600">Token使用量</span>
             <span class="text-sm font-medium text-gray-900">
               {{ formatTokenDisplay(calculateTokensFromCost(getCurrentDayCost())) }} /
               {{ formatTokenDisplay(maxTokens) }}
@@ -88,7 +88,7 @@
           </div>
 
           <div class="mt-2 flex items-center justify-between text-xs text-gray-500">
-            <span>{{ tokenProgress.toFixed(1) }}% (${{ getCurrentDayCost().toFixed(2) }})</span>
+            <span>{{ tokenProgress.toFixed(1) }}%</span>
           </div>
         </div>
       </div>
@@ -102,12 +102,12 @@ import { useApiStatsStore } from '@/stores/apistats'
 import { computed } from 'vue'
 
 const apiStatsStore = useApiStatsStore()
-const { statsData } = storeToRefs(apiStatsStore)
+const { statsData, currentPeriodData } = storeToRefs(apiStatsStore)
 
 // 检查API Key类型（日卡或月卡）
 const getApiKeyType = () => {
-  if (!statsData.value?.dailyCostLimit) return 'daily'
-  const limit = parseFloat(statsData.value.dailyCostLimit)
+  if (!statsData.value?.limits?.dailyCostLimit) return 'daily'
+  const limit = parseFloat(statsData.value.limits.dailyCostLimit)
   // 根据费用限额判断类型：$20为日卡，$100为月卡
   return limit >= 80 ? 'monthly' : 'daily'
 }
@@ -137,7 +137,8 @@ const maxTokens = computed(() => {
 
 // 获取API Key的今日费用
 const getCurrentDayCost = () => {
-  return parseFloat(statsData.value?.dailyCost || 0)
+  // 使用当前时间段的费用数据
+  return parseFloat(currentPeriodData.value?.cost || 0)
 }
 
 // 计算Token使用进度百分比（基于费用）

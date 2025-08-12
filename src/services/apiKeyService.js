@@ -120,6 +120,9 @@ class ApiKeyService {
       // 通过哈希值直接查找API Key（性能优化）
       const keyData = await redis.findApiKeyByHash(hashedKey)
 
+      // 临时调试：输出原始API Key数据
+      logger.info(`🔍 [DEBUG] Raw API Key data from Redis: ${JSON.stringify(keyData)}`)
+
       if (!keyData) {
         return { valid: false, error: 'API key not found' }
       }

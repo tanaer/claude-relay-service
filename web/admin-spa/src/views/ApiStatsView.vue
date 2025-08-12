@@ -230,8 +230,18 @@
                 <span>{{ redemptionResult.duration }}天</span>
               </div>
               <div class="flex justify-between">
-                <span>每日费用限制:</span>
-                <span>${{ redemptionResult.dailyCostLimit }}</span>
+                <span>每日用量限制:</span>
+                <span>
+                  <template v-if="redemptionResult.name && redemptionResult.name.includes('月卡')">
+                    7000万 TOKENS
+                  </template>
+                  <template
+                    v-else-if="redemptionResult.name && redemptionResult.name.includes('日卡')"
+                  >
+                    1000万 TOKENS
+                  </template>
+                  <template v-else> {{ redemptionResult.dailyCostLimit }}W TOKENS </template>
+                </span>
               </div>
               <div
                 v-if="redemptionResult.alreadyUsed && redemptionResult.usedAt"

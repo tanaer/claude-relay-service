@@ -284,7 +284,7 @@ const authenticateApiKey = async (req, res, next) => {
 
         return res.status(429).json({
           error: 'Daily cost limit exceeded',
-          message: `已达到每日费用限制 ($${dailyCostLimit})`,
+          message: `已达到每日用量限制`, //($${dailyCostLimit})
           currentCost: dailyCost,
           costLimit: dailyCostLimit,
           resetAt: new Date(new Date().setHours(24, 0, 0, 0)).toISOString() // 明天0点重置

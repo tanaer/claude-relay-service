@@ -553,6 +553,21 @@ class RateTemplateService {
               }
             }
           }
+
+          // 如果API Key没有绑定任何账户，默认使用共享账户池的倍率模板
+          if (
+            !templateId &&
+            !apiKeyData?.claudeAccountId &&
+            !apiKeyData?.claudeConsoleAccountId &&
+            !apiKeyData?.geminiAccountId
+          ) {
+            // API Key未绑定账户，使用共享账户池的系统分组倍率模板
+            templateId = await this.getSystemGroupRateTemplate('shared')
+            searchPath.push(`System group shared (no binding): ${templateId || 'null'}`)
+            logger.info(
+              `🔍 API Key has no account binding, using shared pool rate template: ${templateId || 'null'}`
+            )
+          }
         }
       } else if (entityType === 'claude_account') {
         const accountData = await client.hgetall(`claude_account:${entityId}`)

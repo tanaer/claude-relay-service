@@ -66,7 +66,7 @@
       <!-- 错误提示 -->
       <div v-if="error" class="mb-6 md:mb-8">
         <div
-          class="rounded-xl border border-red-500/30 bg-red-500/20 p-3 text-sm text-red-800 backdrop-blur-sm md:p-4 md:text-base"
+          class="rounded-xl border border-red-500 bg-white/95 p-3 text-sm text-red-700 shadow-md backdrop-blur-sm md:p-4 md:text-base"
         >
           <i class="fas fa-exclamation-triangle mr-2" />
           {{ error }}

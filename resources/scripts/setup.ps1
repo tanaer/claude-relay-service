@@ -26,23 +26,26 @@ try {
             Write-Host "[成功] 已找到 Git Bash：$bashPath" -ForegroundColor Green
             [System.Environment]::SetEnvironmentVariable("CLAUDE_CODE_GIT_BASH_PATH", $bashPath, "User")
         }
-    } else {
+    }
+    else {
         throw "未找到 Git"
     }
-} catch {
+}
+catch {
     Write-Host "[警告] 未安装 Git" -ForegroundColor Yellow
     Write-Host "[安装] 正在安装 Git..." -ForegroundColor Cyan
     $wingetInstalled = Get-Command winget -ErrorAction SilentlyContinue
     if ($wingetInstalled) {
         Write-Host "[信息] 通过 winget 安装 Git..." -ForegroundColor Yellow
         winget install Git.Git --accept-source-agreements --accept-package-agreements
-        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
         $gitDefaultPath = "C:\\Program Files\\Git\\bin\\bash.exe"
         if (Test-Path $gitDefaultPath) {
             [System.Environment]::SetEnvironmentVariable("CLAUDE_CODE_GIT_BASH_PATH", $gitDefaultPath, "User")
             Write-Host "[成功] Git 已安装并完成配置！" -ForegroundColor Green
         }
-    } else {
+    }
+    else {
         Write-Host "[信息] 正在下载 Git 安装程序..." -ForegroundColor Yellow
         $gitUrl = "https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.1/Git-2.47.1-64-bit.exe"
         $installerPath = "$env:TEMP\git-installer.exe"
@@ -51,13 +54,14 @@ try {
             Write-Host "[信息] 正在安装 Git..." -ForegroundColor Yellow
             Start-Process $installerPath -ArgumentList "/VERYSILENT", "/NORESTART", "/NOCANCEL", "/SP-", "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS" -Wait
             Remove-Item $installerPath -Force
-            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
             $gitDefaultPath = "C:\\Program Files\\Git\\bin\\bash.exe"
             if (Test-Path $gitDefaultPath) {
                 [System.Environment]::SetEnvironmentVariable("CLAUDE_CODE_GIT_BASH_PATH", $gitDefaultPath, "User")
                 Write-Host "[成功] Git 已安装并完成配置！" -ForegroundColor Green
             }
-        } catch {
+        }
+        catch {
             Write-Host "[错误] 自动安装 Git 失败" -ForegroundColor Red
             Write-Host "[信息] 请从此处手动安装：https://git-scm.com/downloads/win" -ForegroundColor Cyan
             Write-Host "[信息] 安装完成后，请设置环境变量 CLAUDE_CODE_GIT_BASH_PATH" -ForegroundColor Yellow
@@ -71,18 +75,21 @@ try {
     $nodeVersion = node --version 2>$null
     if ($nodeVersion) {
         Write-Host "[成功] 已安装 Node.js：$nodeVersion" -ForegroundColor Green
-    } else {
+    }
+    else {
         throw "未找到 Node.js"
     }
-} catch {
+}
+catch {
     Write-Host "[警告] 未安装 Node.js" -ForegroundColor Yellow
     Write-Host "[安装] 正在安装 Node.js..." -ForegroundColor Cyan
     $wingetInstalled = Get-Command winget -ErrorAction SilentlyContinue
     if ($wingetInstalled) {
         Write-Host "[信息] 通过 winget 安装 Node.js..." -ForegroundColor Yellow
         winget install OpenJS.NodeJS --accept-source-agreements --accept-package-agreements
-        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-    } else {
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+    }
+    else {
         Write-Host "[信息] 正在下载 Node.js 安装程序..." -ForegroundColor Yellow
         $nodeUrl = "https://nodejs.org/dist/v20.18.1/node-v20.18.1-x64.msi"
         $installerPath = "$env:TEMP\nodejs-installer.msi"
@@ -104,10 +111,11 @@ try {
                 }
             }
             if (Test-Path $installerPath) { Remove-Item $installerPath -Force -ErrorAction SilentlyContinue }
-            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
             Write-Host "[信息] 正在等待 Node.js 生效..." -ForegroundColor Yellow
             Start-Sleep -Seconds 3
-        } catch {
+        }
+        catch {
             Write-Host "[错误] 自动安装 Node.js 失败：$_" -ForegroundColor Red
             Write-Host "[信息] 请从此处手动安装：https://nodejs.org/" -ForegroundColor Cyan
             if (Test-Path $installerPath) {
@@ -123,10 +131,12 @@ try {
         $nodeVersion = node --version 2>$null
         if ($nodeVersion) {
             Write-Host "[成功] Node.js 安装完成：$nodeVersion" -ForegroundColor Green
-        } else {
+        }
+        else {
             throw "Node.js 安装校验失败"
         }
-    } catch {
+    }
+    catch {
         Write-Host "[错误] Node.js 安装失败" -ForegroundColor Red
         Write-Host "[信息] 请重启 PowerShell 后重新运行本脚本" -ForegroundColor Yellow
         Read-Host "按回车退出"
@@ -147,11 +157,12 @@ if ([string]::IsNullOrWhiteSpace($apiToken) -or $apiToken -eq '__API_TOKEN__') {
         Write-Host "请输入 API Token：" -ForegroundColor White
         $apiToken = Read-Host
     }
-} else {
+}
+else {
     Write-Host "[信息] 检测到已注入的 API Token，将跳过交互输入" -ForegroundColor Cyan
 }
 
-$apiUrl = "https://ccapi.muskapi.com"
+$apiUrl = "https://ccapi.muskapi.com/api/"
 
 Write-Host "" 
 Write-Host "[配置] 正在保存配置..." -ForegroundColor Yellow
@@ -166,10 +177,12 @@ try {
     & cmd /c "npm install -g @anthropic-ai/claude-code 2>&1"
     if ($LASTEXITCODE -eq 0) {
         Write-Host "[成功] Claude Code 安装完成！" -ForegroundColor Green
-    } else {
+    }
+    else {
         throw "npm 安装失败"
     }
-} catch {
+}
+catch {
     Write-Host "[错误] 安装失败：$_" -ForegroundColor Red
 }
 
@@ -178,7 +191,8 @@ Write-Host "[配置] 正在设置 PowerShell 执行策略..." -ForegroundColor Y
 try {
     Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
     Write-Host "[成功] 执行策略设置完成！" -ForegroundColor Green
-} catch {
+}
+catch {
     Write-Host "[警告] 未能自动设置执行策略" -ForegroundColor Yellow
     Write-Host "[信息] 你可能需要手动运行：" -ForegroundColor Cyan
     Write-Host "Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned" -ForegroundColor White

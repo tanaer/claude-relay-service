@@ -110,7 +110,8 @@ async function handleMessagesRequest(req, res) {
                   cacheCreateTokens,
                   cacheReadTokens,
                   model,
-                  usageAccountId
+                  usageAccountId,
+                  req.apiKey // 传递 req.apiKey 数据，避免重复查询
                 )
                 .catch((error) => {
                   logger.error('❌ Failed to record stream usage:', error)
@@ -175,7 +176,8 @@ async function handleMessagesRequest(req, res) {
                   cacheCreateTokens,
                   cacheReadTokens,
                   model,
-                  usageAccountId
+                  usageAccountId,
+                  req.apiKey // 传递 req.apiKey 数据，避免重复查询
                 )
                 .catch((error) => {
                   logger.error('❌ Failed to record stream usage:', error)

@@ -380,7 +380,8 @@ class ApiKeyService {
     cacheCreateTokens = 0,
     cacheReadTokens = 0,
     model = 'unknown',
-    accountId = null
+    accountId = null,
+    apiKeyData = null // 新增参数：可选的API Key数据，避免重复查询
   ) {
     try {
       const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
@@ -397,9 +398,13 @@ class ApiKeyService {
         model
       )
 
-      // 应用倍率模板
+      // 应用倍率模板 - 优先使用传入的 apiKeyData，避免重复查询
       const rateTemplateService = require('./rateTemplateService')
-      const rates = await rateTemplateService.getRatesForEntity(keyId, 'apikey')
+      const rates = await rateTemplateService.getRatesForEntity(
+        keyId,
+        'apikey',
+        apiKeyData // 传递 apiKeyData 以避免重复查询
+      )
 
       let costInfo = originalCostInfo
       if (rates && rates[model]) {

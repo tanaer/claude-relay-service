@@ -375,14 +375,15 @@ class RateTemplateService {
   }
 
   // 获取API Key或账户的倍率
-  async getRatesForEntity(entityId, entityType = 'apikey') {
+  async getRatesForEntity(entityId, entityType = 'apikey', providedApiKeyData = null) {
     try {
       const client = redis.getClientSafe()
       let templateId = null
       const searchPath = []
 
       if (entityType === 'apikey') {
-        const apiKeyData = await client.hgetall(`api_key:${entityId}`)
+        // 优先使用传入的 apiKeyData，避免重复查询
+        const apiKeyData = providedApiKeyData || (await client.hgetall(`api_key:${entityId}`))
         templateId = apiKeyData?.rateTemplateId
         searchPath.push(`API Key direct: ${templateId || 'null'}`)
 

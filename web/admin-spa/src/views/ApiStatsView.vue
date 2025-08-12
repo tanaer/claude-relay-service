@@ -199,7 +199,7 @@
               ]"
             >
               <div class="flex justify-between">
-                <span>API Key:</span>
+                <span>API Key（密钥）:</span>
                 <div class="flex items-center gap-2">
                   <code
                     :class="[
@@ -273,15 +273,20 @@
               兑换说明
             </h4>
             <ul class="space-y-1 text-xs text-blue-800 md:text-sm">
-              <li>• <strong>日卡 (D-xxxxxxxx):</strong> 有效期1天，每日费用限制$20</li>
-              <li>• <strong>月卡 (M-xxxxxxxx):</strong> 有效期30天，每日费用限制$100</li>
-              <li>• 兑换成功后会自动生成对应的API Key</li>
-              <li>• 每个兑换码只能使用一次</li>
-              <li>• 兑换成功后可点击“下载安装脚本”，脚本会自动注入你的 API Key</li>
+              <li>• <strong>日卡 (D-xxxxxxxx):</strong> 有效期1天，每日用量限制1000W TOKENS</li>
               <li>
-                • Windows 用户将文件保存为 <code>muskapi_com_setup.ps1</code>，右键“使用 PowerShell
-                运行”
+                • <strong>月卡 (M-xxxxxxxx):</strong> 有效期30天，每日用量限制7000W TOKENS, 北京时间
+                00:00:00 重置用量
               </li>
+              <li>• 兑换成功后会自动生成对应的API Key</li>
+              <li>
+                •
+                <span style="color: red"
+                  >如果您忘记API Key（密钥），可以使用兑换码重新兑换查看</span
+                >
+              </li>
+              <li>• 兑换成功后可点击“下载安装脚本”，脚本会自动注入你的 API Key</li>
+              <li>• 安装脚本为 Windows 系统专用，下载后右键点击文件，“使用 PowerShell 运行”</li>
             </ul>
           </div>
         </div>

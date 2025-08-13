@@ -155,6 +155,7 @@ export const useApiStatsStore = defineStore('apistats', () => {
           summary.cacheCreateTokens += model.cacheCreateTokens || 0
           summary.cacheReadTokens += model.cacheReadTokens || 0
           summary.allTokens += model.allTokens || 0
+          // 优先使用actualCost（已应用倍率），回退到costs.total（原始计算）
           summary.cost += model.costs?.total || 0
         })
 

@@ -276,7 +276,7 @@ class Application {
       // 📥 动态生成并下载安装脚本（muskapi_com_setup.ps1），将兑换得到的 API Key 注入脚本
       this.app.get('/download/muskapi_com_setup.ps1', async (req, res) => {
         try {
-          const apiKey = req.query.apiKey || ''
+          const { apiKey = '' } = req.query
 
           const templatePath = path.join(
             __dirname,

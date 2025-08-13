@@ -88,7 +88,9 @@
           </div>
 
           <div class="mt-2 flex items-center justify-between text-xs text-gray-500">
-            <span>{{ tokenProgress.toFixed(1) }}%</span>
+            <span>$0</span>
+            <span>{{ tokenProgress.toFixed(1) }}% (${{ getCurrentDayCost().toFixed(2) }})</span>
+            <span>${{ (statsData?.limits?.dailyCostLimit || 20).toFixed(2) }}</span>
           </div>
         </div>
       </div>
@@ -136,8 +138,9 @@ const maxTokens = computed(() => {
 
 // 获取API Key的今日费用
 const getCurrentDayCost = () => {
-  // 使用当前时间段的费用数据
-  return parseFloat(currentPeriodData.value?.cost || 0)
+  // 优先使用statsData中的currentDailyCost（来自getDailyCost，已应用倍率）
+  // 如果没有，回退到从模型数据聚合的费用
+  return parseFloat(statsData.value?.limits?.currentDailyCost || currentPeriodData.value?.cost || 0)
 }
 
 // 计算Token使用进度百分比（基于费用）

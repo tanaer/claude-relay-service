@@ -19,6 +19,9 @@ const fs = require('fs')
 const path = require('path')
 const config = require('../../config/config')
 const { v4: uuidv4 } = require('uuid')
+const claudeRelayService = require('../services/claudeRelayService')
+const { HttpsProxyAgent } = require('https-proxy-agent')
+const { SocksProxyAgent } = require('socks-proxy-agent')
 
 const router = express.Router()
 
@@ -4859,5 +4862,120 @@ router.put(
     }
   }
 )
+
+// 测试 Claude OAuth 账户连通性（仅做网络与鉴权可达性检查，不发起计费请求）
+router.post('/claude-accounts/:accountId/test', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+    const account = await claudeAccountService.getAccount(accountId)
+    if (!account) {
+      return res.status(404).json({ error: 'Account not found' })
+    }
+
+    const accessToken = await claudeAccountService.getValidAccessToken(accountId)
+    const httpsAgent = await claudeRelayService._getProxyAgent(accountId)
+
+    // 以 GET 请求测试端点连通（允许任意状态码，网络可达即视为连通）
+    const response = await axios({
+      method: 'GET',
+      url: config.claude.apiUrl,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'anthropic-version': config.claude.apiVersion
+      },
+      httpsAgent,
+      timeout: config.proxy.timeout || 30000,
+      validateStatus: () => true
+    })
+
+    logger.success(`🧪 Admin tested Claude OAuth account: ${accountId} - status ${response.status}`)
+    return res.json({ success: true, data: { status: response.status, reachable: true } })
+  } catch (error) {
+    logger.error('❌ Failed to test Claude OAuth account:', error)
+    return res.status(500).json({ error: 'Failed to test Claude account', message: error.message })
+  }
+})
+
+// 测试 Claude Console 账户连通性（仅做网络与鉴权可达性检查，不发起计费请求）
+router.post('/claude-console-accounts/:accountId/test', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+    const account = await claudeConsoleAccountService.getAccount(accountId)
+    if (!account) {
+      return res.status(404).json({ error: 'Account not found' })
+    }
+
+    const proxyAgent = claudeConsoleAccountService._createProxyAgent(account.proxy)
+    const cleanUrl = (account.apiUrl || '').replace(/\/$/, '')
+    const apiEndpoint = cleanUrl.endsWith('/v1/messages') ? cleanUrl : `${cleanUrl}/v1/messages`
+
+    const headers = {
+      'anthropic-version': '2023-06-01',
+      'User-Agent': account.userAgent || 'claude-cli/1.0.69 (external, cli)'
+    }
+    if (account.apiKey && account.apiKey.startsWith('sk-ant-')) {
+      headers['x-api-key'] = account.apiKey
+    } else if (account.apiKey) {
+      headers['Authorization'] = `Bearer ${account.apiKey}`
+    }
+
+    const response = await axios({
+      method: 'GET',
+      url: apiEndpoint,
+      headers,
+      httpsAgent: proxyAgent,
+      timeout: config.proxy.timeout || 30000,
+      validateStatus: () => true
+    })
+
+    logger.success(`🧪 Admin tested Claude Console account: ${accountId} - status ${response.status}`)
+    return res.json({ success: true, data: { status: response.status, reachable: true } })
+  } catch (error) {
+    logger.error('❌ Failed to test Claude Console account:', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to test Claude Console account', message: error.message })
+  }
+})
+
+// 测试 Gemini 账户连通性（仅做网络与鉴权可达性检查，不发起计费请求）
+router.post('/gemini-accounts/:accountId/test', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+    const account = await geminiAccountService.getAccount(accountId)
+    if (!account) {
+      return res.status(404).json({ error: 'Account not found' })
+    }
+
+    let httpsAgent = null
+    if (account.proxy && account.proxy.type && account.proxy.host && account.proxy.port) {
+      const proxy = account.proxy
+      const auth = proxy.username && proxy.password ? `${proxy.username}:${proxy.password}@` : ''
+      const proxyUrl = `${proxy.type}://${auth}${proxy.host}:${proxy.port}`
+      if (proxy.type === 'socks5') {
+        httpsAgent = new SocksProxyAgent(proxyUrl)
+      } else if (proxy.type === 'http' || proxy.type === 'https') {
+        httpsAgent = new HttpsProxyAgent(proxyUrl)
+      }
+    }
+
+    const response = await axios({
+      method: 'GET',
+      url: 'https://cloudcode.googleapis.com/v1',
+      headers: account.accessToken
+        ? { Authorization: `Bearer ${account.accessToken}` }
+        : {},
+      httpsAgent,
+      timeout: config.proxy.timeout || 30000,
+      validateStatus: () => true
+    })
+
+    logger.success(`🧪 Admin tested Gemini account: ${accountId} - status ${response.status}`)
+    return res.json({ success: true, data: { status: response.status, reachable: true } })
+  } catch (error) {
+    logger.error('❌ Failed to test Gemini account:', error)
+    return res.status(500).json({ error: 'Failed to test Gemini account', message: error.message })
+  }
+})
 
 module.exports = router

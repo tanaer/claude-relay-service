@@ -211,7 +211,15 @@
               </div>
               <div class="flex justify-between">
                 <span>每日用量限制:</span>
-                <span>{{ getDailyLimitText(redemptionResult) }}</span>
+                <span>
+                  {{
+                    redemptionResult.name && redemptionResult.name.includes('日卡')
+                      ? '1000W Tokens'
+                      : redemptionResult.name && redemptionResult.name.includes('月卡')
+                        ? '7000W Tokens'
+                        : ''
+                  }}
+                </span>
               </div>
               <div
                 v-if="redemptionResult.alreadyUsed && redemptionResult.usedAt"

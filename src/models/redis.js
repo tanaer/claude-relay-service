@@ -191,7 +191,8 @@ class RedisClient {
     outputTokens = 0,
     cacheCreateTokens = 0,
     cacheReadTokens = 0,
-    model = 'unknown'
+    model = 'unknown',
+    modelCost = 0 // 新增：该模型的实际费用（已应用倍率）
   ) {
     const key = `usage:${keyId}`
     const now = new Date()
@@ -349,6 +350,23 @@ class RedisClient {
 
     // 执行Pipeline
     await pipeline.exec()
+
+    // 单独处理模型费用更新（在pipeline外，避免async问题）
+    if (modelCost > 0) {
+      try {
+        // 更新每日模型费用
+        const currentDailyCost = await this.client.hget(keyModelDaily, 'actualCost')
+        const newDailyCost = (parseFloat(currentDailyCost || '0') + modelCost).toString()
+        await this.client.hset(keyModelDaily, 'actualCost', newDailyCost)
+
+        // 更新每月模型费用
+        const currentMonthlyCost = await this.client.hget(keyModelMonthly, 'actualCost')
+        const newMonthlyCost = (parseFloat(currentMonthlyCost || '0') + modelCost).toString()
+        await this.client.hset(keyModelMonthly, 'actualCost', newMonthlyCost)
+      } catch (error) {
+        console.error('Failed to update model cost:', error)
+      }
+    }
   }
 
   // 📊 记录账户级别的使用统计

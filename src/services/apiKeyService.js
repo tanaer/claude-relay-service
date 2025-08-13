@@ -536,7 +536,8 @@ class ApiKeyService {
         outputTokens,
         cacheCreateTokens,
         cacheReadTokens,
-        model
+        model,
+        costInfo.costs.total // 传递应用倍率后的实际费用
       )
 
       // 记录费用统计

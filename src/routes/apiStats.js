@@ -485,7 +485,16 @@ router.post('/api/user-model-stats', async (req, res) => {
           cache_read_input_tokens: parseInt(data.cacheReadTokens) || 0
         }
 
-        const costData = CostCalculator.calculateCost(usage, model)
+        // 优先使用已记录的实际费用（已应用计费倍率）
+        const actualCost = parseFloat(data.actualCost) || 0
+        const costData =
+          actualCost > 0
+            ? {
+                costs: { total: actualCost },
+                formatted: { total: `$${actualCost.toFixed(6)}` },
+                pricing: null
+              }
+            : CostCalculator.calculateCost(usage, model)
 
         modelStats.push({
           model,

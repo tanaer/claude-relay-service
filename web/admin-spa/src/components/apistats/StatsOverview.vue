@@ -88,9 +88,7 @@
           </div>
 
           <div class="mt-2 flex items-center justify-between text-xs text-gray-500">
-            <span>$0</span>
-            <span>{{ tokenProgress.toFixed(1) }}% (${{ getCurrentDayCost().toFixed(2) }})</span>
-            <span>${{ (statsData?.limits?.dailyCostLimit || 20).toFixed(2) }}</span>
+            <span>{{ tokenProgress.toFixed(1) }}%</span>
           </div>
         </div>
       </div>

@@ -499,8 +499,8 @@
                   </button>
                   <button
                     class="rounded bg-indigo-100 px-2.5 py-1 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-200"
-                    :title="'测试连通性'"
                     :disabled="account.isTesting"
+                    :title="'测试连通性'"
                     @click="testAccount(account)"
                   >
                     <i :class="['fas fa-vial', account.isTesting ? 'animate-spin' : '']" />

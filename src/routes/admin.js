@@ -18,7 +18,6 @@ const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
 const config = require('../../config/config')
-const { v4: uuidv4 } = require('uuid')
 const claudeRelayService = require('../services/claudeRelayService')
 const { HttpsProxyAgent } = require('https-proxy-agent')
 const { SocksProxyAgent } = require('socks-proxy-agent')
@@ -1551,7 +1550,8 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
       priority: priority || 50,
       supportedModels: supportedModels || [],
       userAgent,
-      rateLimitDuration: (rateLimitDuration !== undefined && rateLimitDuration !== null) ? rateLimitDuration : 60,
+      rateLimitDuration:
+        rateLimitDuration !== undefined && rateLimitDuration !== null ? rateLimitDuration : 60,
       proxy,
       accountType: accountType || 'shared'
     })
@@ -4614,7 +4614,6 @@ router.post('/openai-accounts', authenticateAdmin, async (req, res) => {
       proxy,
       accountType,
       groupId,
-      dedicatedApiKeys,
       rateLimitDuration,
       priority
     } = req.body
@@ -4631,7 +4630,8 @@ router.post('/openai-accounts', authenticateAdmin, async (req, res) => {
       description: description || '',
       accountType: accountType || 'shared',
       priority: priority || 50,
-      rateLimitDuration: (rateLimitDuration !== undefined && rateLimitDuration !== null) ? rateLimitDuration : 60,
+      rateLimitDuration:
+        rateLimitDuration !== undefined && rateLimitDuration !== null ? rateLimitDuration : 60,
       openaiOauth: openaiOauth || {},
       accountInfo: accountInfo || {},
       proxy: proxy?.enabled
@@ -4928,7 +4928,9 @@ router.post('/claude-console-accounts/:accountId/test', authenticateAdmin, async
       validateStatus: () => true
     })
 
-    logger.success(`🧪 Admin tested Claude Console account: ${accountId} - status ${response.status}`)
+    logger.success(
+      `🧪 Admin tested Claude Console account: ${accountId} - status ${response.status}`
+    )
     return res.json({ success: true, data: { status: response.status, reachable: true } })
   } catch (error) {
     logger.error('❌ Failed to test Claude Console account:', error)
@@ -4949,7 +4951,7 @@ router.post('/gemini-accounts/:accountId/test', authenticateAdmin, async (req, r
 
     let httpsAgent = null
     if (account.proxy && account.proxy.type && account.proxy.host && account.proxy.port) {
-      const proxy = account.proxy
+      const { proxy } = account
       const auth = proxy.username && proxy.password ? `${proxy.username}:${proxy.password}@` : ''
       const proxyUrl = `${proxy.type}://${auth}${proxy.host}:${proxy.port}`
       if (proxy.type === 'socks5') {
@@ -4962,9 +4964,7 @@ router.post('/gemini-accounts/:accountId/test', authenticateAdmin, async (req, r
     const response = await axios({
       method: 'GET',
       url: 'https://cloudcode.googleapis.com/v1',
-      headers: account.accessToken
-        ? { Authorization: `Bearer ${account.accessToken}` }
-        : {},
+      headers: account.accessToken ? { Authorization: `Bearer ${account.accessToken}` } : {},
       httpsAgent,
       timeout: config.proxy.timeout || 30000,
       validateStatus: () => true

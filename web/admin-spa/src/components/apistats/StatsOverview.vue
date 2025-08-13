@@ -78,6 +78,13 @@
               {{ formatTokenDisplay(maxTokens) }}
             </span>
           </div>
+          <!-- 调试信息 -->
+          <div class="mb-2 text-xs text-red-500">
+            调试: 费用=${{ getCurrentDayCost().toFixed(2) }}, 限额=${{
+              (statsData?.limits?.dailyCostLimit || 20).toFixed(2)
+            }}, 类型={{ getApiKeyType() }}, 最大Token={{ formatTokenDisplay(maxTokens) }},
+            计算Token={{ formatTokenDisplay(calculateTokensFromCost(getCurrentDayCost())) }}
+          </div>
 
           <div class="h-3 w-full overflow-hidden rounded-full bg-gray-200">
             <div
@@ -88,7 +95,9 @@
           </div>
 
           <div class="mt-2 flex items-center justify-between text-xs text-gray-500">
-            <span>{{ tokenProgress.toFixed(1) }}%</span>
+            <span>$0</span>
+            <span>{{ tokenProgress.toFixed(1) }}% (${{ getCurrentDayCost().toFixed(2) }})</span>
+            <span>${{ (statsData?.limits?.dailyCostLimit || 20).toFixed(2) }}</span>
           </div>
         </div>
       </div>
@@ -122,12 +131,11 @@ const getApiKeyMaxTokens = () => {
 const calculateTokensFromCost = (cost) => {
   if (!cost || cost === 0) return 0
 
-  const keyType = getApiKeyType()
   const maxTokens = getApiKeyMaxTokens()
-  const maxCost = keyType === 'monthly' ? 100 : 20
+  const actualCostLimit = parseFloat(statsData.value?.limits?.dailyCostLimit || 20)
 
   // 根据费用比例计算Token使用量
-  return Math.round((cost / maxCost) * maxTokens)
+  return Math.round((cost / actualCostLimit) * maxTokens)
 }
 
 // 计算最大Token数

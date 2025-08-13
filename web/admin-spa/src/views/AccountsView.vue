@@ -498,6 +498,15 @@
                     <span class="ml-1">刷新</span>
                   </button>
                   <button
+                    class="rounded bg-indigo-100 px-2.5 py-1 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-200"
+                    :disabled="account.isTesting"
+                    :title="'测试连通性'"
+                    @click="testAccount(account)"
+                  >
+                    <i :class="['fas fa-vial', account.isTesting ? 'animate-spin' : '']" />
+                    <span class="ml-1">测试</span>
+                  </button>
+                  <button
                     v-if="
                       account.platform === 'claude' &&
                       (account.status === 'unauthorized' ||
@@ -1208,6 +1217,41 @@ const openCreateAccountModal = () => {
 const editAccount = (account) => {
   editingAccount.value = account
   showEditAccountModal.value = true
+}
+
+// 测试账户连通性
+const testAccount = async (account) => {
+  if (account.isTesting) return
+  try {
+    account.isTesting = true
+    let endpoint
+    if (account.platform === 'claude' || account.platform === 'claude-oauth') {
+      endpoint = `/admin/claude-accounts/${account.id}/test`
+    } else if (account.platform === 'claude-console') {
+      endpoint = `/admin/claude-console-accounts/${account.id}/test`
+    } else if (account.platform === 'gemini') {
+      endpoint = `/admin/gemini-accounts/${account.id}/test`
+    } else if (account.platform === 'bedrock') {
+      endpoint = `/admin/bedrock-accounts/${account.id}/test`
+    } else if (account.platform === 'openai') {
+      showToast('OpenAI 账户暂未提供测试接口', 'warning')
+      return
+    } else {
+      showToast('该账户类型不支持测试', 'warning')
+      return
+    }
+
+    const data = await apiClient.post(endpoint)
+    if (data.success) {
+      showToast(`连通性正常 (HTTP ${data.data?.status || 200})`, 'success')
+    } else {
+      showToast(data.message || '测试失败', 'error')
+    }
+  } catch (error) {
+    showToast('测试失败', 'error')
+  } finally {
+    account.isTesting = false
+  }
 }
 
 // 删除账户

@@ -85,6 +85,21 @@
 
           <!-- 操作按钮组 -->
           <div class="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+            <!-- 智能限流管理下拉按钮组 -->
+            <div class="group relative min-w-[140px]">
+              <div
+                class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+              ></div>
+              <CustomDropdown
+                v-model="intelligentRateLimitAction"
+                icon="fa-brain"
+                icon-color="text-orange-500"
+                :options="intelligentRateLimitOptions"
+                placeholder="智能限流"
+                @change="handleIntelligentRateLimitAction"
+              />
+            </div>
+
             <!-- 分组管理按钮 -->
             <button
               class="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-purple-500 to-purple-600 px-5 py-2.5 text-sm font-medium text-white shadow-md transition-all duration-200 hover:from-purple-600 hover:to-purple-700 hover:shadow-lg sm:w-auto"
@@ -93,6 +108,7 @@
               <i class="fas fa-layer-group"></i>
               <span>分组管理</span>
             </button>
+
             <!-- 添加账户按钮 -->
             <button
               class="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-green-500 to-green-600 px-5 py-2.5 text-sm font-medium text-white shadow-md transition-all duration-200 hover:from-green-600 hover:to-green-700 hover:shadow-lg sm:w-auto"
@@ -823,6 +839,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import { useConfirm } from '@/composables/useConfirm'
@@ -847,6 +864,7 @@ const rateTemplates = ref([])
 const systemGroupRates = ref({}) // 存储系统分组的倍率模板映射
 const groupFilter = ref('all')
 const platformFilter = ref('all')
+const intelligentRateLimitAction = ref('') // 智能限流操作选择
 
 // 缓存状态标志
 const apiKeysLoaded = ref(false)
@@ -871,6 +889,14 @@ const platformOptions = ref([
   { value: 'gemini', label: 'Gemini', icon: 'fa-robot' },
   { value: 'openai', label: 'OpenAi', icon: 'fa-robot' },
   { value: 'bedrock', label: 'Bedrock', icon: 'fab fa-aws' }
+])
+
+// 智能限流选项
+const intelligentRateLimitOptions = ref([
+  { value: 'stats', label: '限流统计', icon: 'fa-chart-bar' },
+  { value: 'faultLogs', label: '故障日志', icon: 'fa-exclamation-triangle' },
+  { value: 'config', label: '配置信息', icon: 'fa-cog' },
+  { value: 'testRecovery', label: '测试恢复', icon: 'fa-heartbeat' }
 ])
 
 const groupOptions = computed(() => {
@@ -1288,6 +1314,215 @@ const openCreateAccountModal = () => {
 // 打开分组管理模态框
 const openGroupManagementModal = () => {
   showGroupManagementModal.value = true
+}
+
+// 处理智能限流操作
+const handleIntelligentRateLimitAction = async (action) => {
+  try {
+    switch (action) {
+      case 'stats':
+        await showIntelligentRateLimitStats()
+        break
+      case 'faultLogs':
+        await showFaultLogs()
+        break
+      case 'config':
+        await showIntelligentRateLimitConfig()
+        break
+      case 'testRecovery':
+        await showTestRecoveryDialog()
+        break
+      default:
+        break
+    }
+  } catch (error) {
+    console.error('智能限流操作失败:', error)
+    ElMessage.error(error.message || '操作失败')
+  } finally {
+    // 重置选择
+    intelligentRateLimitAction.value = ''
+  }
+}
+
+// 显示智能限流统计
+const showIntelligentRateLimitStats = async () => {
+  try {
+    const response = await apiClient.get('/admin/intelligent-rate-limit/stats')
+    const stats = response.data
+
+    let message = `📊 智能限流统计信息\n\n`
+    message += `当前受限账户: ${stats.totalRateLimited} 个\n`
+    message += `平均恢复尝试次数: ${stats.avgRecoveryAttempts} 次\n\n`
+
+    if (Object.keys(stats.byAccountType).length > 0) {
+      message += `按账户类型分布:\n`
+      for (const [type, count] of Object.entries(stats.byAccountType)) {
+        const typeName =
+          type === 'claude-official'
+            ? 'Claude OAuth'
+            : type === 'claude-console'
+              ? 'Claude Console'
+              : type === 'gemini'
+                ? 'Gemini'
+                : type
+        message += `  • ${typeName}: ${count} 个\n`
+      }
+      message += '\n'
+    }
+
+    if (Object.keys(stats.byErrorType).length > 0) {
+      message += `按错误类型分布:\n`
+      for (const [errorType, count] of Object.entries(stats.byErrorType)) {
+        const errorTypeName =
+          errorType === 'rate_limit'
+            ? '限流错误'
+            : errorType === 'authentication'
+              ? '认证错误'
+              : errorType === 'server_error'
+                ? '服务器错误'
+                : errorType === 'network_error'
+                  ? '网络错误'
+                  : errorType
+        message += `  • ${errorTypeName}: ${count} 个\n`
+      }
+    }
+
+    ElMessageBox.alert(message, '智能限流统计', {
+      confirmButtonText: '确定',
+      type: 'info'
+    })
+  } catch (error) {
+    ElMessage.error('获取智能限流统计失败: ' + (error.message || '未知错误'))
+  }
+}
+
+// 显示故障日志
+const showFaultLogs = async () => {
+  try {
+    const response = await apiClient.get('/admin/intelligent-rate-limit/fault-logs')
+    const logs = response.data
+
+    if (!logs || logs.length === 0) {
+      ElMessage.info('当前没有故障日志')
+      return
+    }
+
+    let message = `📋 最近故障日志 (显示前10条)\n\n`
+
+    logs.slice(0, 10).forEach((log, index) => {
+      const time = new Date(log.timestamp).toLocaleString('zh-CN')
+      const accountType =
+        log.accountType === 'claude-official'
+          ? 'Claude OAuth'
+          : log.accountType === 'claude-console'
+            ? 'Claude Console'
+            : log.accountType === 'gemini'
+              ? 'Gemini'
+              : log.accountType
+      const errorType =
+        log.errorType === 'rate_limit'
+          ? '限流'
+          : log.errorType === 'authentication'
+            ? '认证'
+            : log.errorType === 'server_error'
+              ? '服务器'
+              : log.errorType === 'network_error'
+                ? '网络'
+                : log.errorType
+
+      message += `${index + 1}. ${time}\n`
+      message += `   账户: ${log.accountId} (${accountType})\n`
+      message += `   错误类型: ${errorType}错误\n`
+      message += `   严重程度: ${log.severity || '未知'}\n\n`
+    })
+
+    ElMessageBox.alert(message, '故障日志', {
+      confirmButtonText: '确定',
+      type: 'warning'
+    })
+  } catch (error) {
+    ElMessage.error('获取故障日志失败: ' + (error.message || '未知错误'))
+  }
+}
+
+// 显示智能限流配置
+const showIntelligentRateLimitConfig = async () => {
+  try {
+    const response = await apiClient.get('/admin/intelligent-rate-limit/config')
+    const config = response.data
+
+    let message = `⚙️ 智能限流配置信息\n\n`
+    message += `功能状态: ${config.enabled ? '✅ 已启用' : '❌ 已禁用'}\n`
+    message += `任何错误触发: ${config.triggerOnAnyError ? '✅ 是' : '❌ 否'}\n`
+    message += `恢复测试间隔: ${config.recoveryTestInterval} 分钟\n`
+    message += `恢复测试超时: ${config.recoveryTestTimeout} 秒\n`
+    message += `累积错误阈值: ${config.errorCategories.accumulativeThreshold} 次\n`
+    message += `最大故障日志: ${config.maxFaultLogs} 条\n`
+    message += `日志保留时间: ${config.faultLogRetentionDays} 天\n\n`
+
+    message += `立即触发限流的错误类型:\n`
+    config.errorCategories.immediate.forEach((type) => {
+      const typeName =
+        type === 'rate_limit' ? '限流错误' : type === 'server_error' ? '服务器错误' : type
+      message += `  • ${typeName}\n`
+    })
+
+    message += `\n累积触发限流的错误类型:\n`
+    config.errorCategories.accumulative.forEach((type) => {
+      const typeName =
+        type === 'authentication' ? '认证错误' : type === 'network_error' ? '网络错误' : type
+      message += `  • ${typeName}\n`
+    })
+
+    ElMessageBox.alert(message, '智能限流配置', {
+      confirmButtonText: '确定',
+      type: 'info'
+    })
+  } catch (error) {
+    ElMessage.error('获取配置信息失败: ' + (error.message || '未知错误'))
+  }
+}
+
+// 显示测试恢复对话框
+const showTestRecoveryDialog = async () => {
+  try {
+    // 获取当前受限的账户
+    const statsResponse = await apiClient.get('/admin/intelligent-rate-limit/stats')
+    const stats = statsResponse.data
+
+    if (stats.totalRateLimited === 0) {
+      ElMessage.info('当前没有受限的账户，无需测试恢复')
+      return
+    }
+
+    ElMessageBox.confirm(
+      `当前有 ${stats.totalRateLimited} 个账户处于智能限流状态。\n\n是否要对所有受限账户进行恢复测试？\n\n注意：这将立即测试所有受限账户的可用性。`,
+      '测试账户恢复',
+      {
+        confirmButtonText: '开始测试',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+      .then(async () => {
+        ElMessage.info('正在测试账户恢复，请稍候...')
+
+        try {
+          await apiClient.post('/admin/intelligent-rate-limit/test-recovery')
+          ElMessage.success('恢复测试已完成，请查看账户状态')
+
+          // 刷新账户列表
+          await loadAccounts(true)
+        } catch (error) {
+          ElMessage.error('恢复测试失败: ' + (error.message || '未知错误'))
+        }
+      })
+      .catch(() => {
+        // 用户取消
+      })
+  } catch (error) {
+    ElMessage.error('获取受限账户信息失败: ' + (error.message || '未知错误'))
+  }
 }
 
 // 编辑账户

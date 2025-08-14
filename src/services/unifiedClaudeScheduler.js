@@ -718,7 +718,7 @@ class UnifiedClaudeScheduler {
   async _isAccountRateLimitedAny(accountId, accountType) {
     try {
       // 检查智能限流状态
-      if (config.intelligentRateLimit.enabled) {
+      if (config.intelligentRateLimit?.enabled) {
         const isIntelligentRateLimited = await intelligentRateLimitService.isIntelligentRateLimited(
           accountId,
           accountType

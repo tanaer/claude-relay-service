@@ -105,7 +105,7 @@ class ClaudeAccountService {
 
     await redis.setClaudeAccount(accountId, accountData)
 
-    logger.success(`🏢 Created Claude account: ${name} (${accountId})`)
+    logger.success(`[成功] 创建 Claude 账户：${name}（${accountId}）`)
 
     return {
       id: accountId,
@@ -170,7 +170,7 @@ class ClaudeAccountService {
 
       // 记录开始刷新
       logRefreshStart(accountId, accountData.name, 'claude', 'manual_refresh')
-      logger.info(`🔄 Starting token refresh for account: ${accountData.name} (${accountId})`)
+      logger.info(`[信息] 开始为账户刷新令牌：${accountData.name}（${accountId}）`)
 
       // 创建代理agent
       const agent = this._createProxyAgent(accountData.proxy)
@@ -239,7 +239,7 @@ class ClaudeAccountService {
         await redis.setClaudeAccount(accountId, accountData)
       }
 
-      logger.error(`❌ Failed to refresh token for account ${accountId}:`, error)
+      logger.error(`[错误] 刷新账户 ${accountId} 的令牌失败：`, error)
 
       throw error
     } finally {
@@ -261,7 +261,7 @@ class ClaudeAccountService {
 
       return accountData
     } catch (error) {
-      logger.error('❌ Failed to get Claude account:', error)
+      logger.error('[错误] 获取 Claude 账户失败：', error)
       return null
     }
   }
@@ -288,16 +288,16 @@ class ClaudeAccountService {
       logTokenUsage(accountId, accountData.name, 'claude', accountData.expiresAt, isExpired)
 
       if (isExpired) {
-        logger.info(`🔄 Token expired/expiring for account ${accountId}, attempting refresh...`)
+        logger.info(`[信息] 账户 ${accountId} 的令牌已过期/即将过期，尝试刷新...`)
         try {
           const refreshResult = await this.refreshAccountToken(accountId)
           return refreshResult.accessToken
         } catch (refreshError) {
-          logger.warn(`⚠️ Token refresh failed for account ${accountId}: ${refreshError.message}`)
+          logger.warn(`[警告] 刷新账户 ${accountId} 的令牌失败：${refreshError.message}`)
           // 如果刷新失败，仍然尝试使用当前token（可能是手动添加的长期有效token）
           const currentToken = this._decryptSensitiveData(accountData.accessToken)
           if (currentToken) {
-            logger.info(`🔄 Using current token for account ${accountId} (refresh failed)`)
+            logger.info(`[信息] 使用当前令牌处理账户 ${accountId}（刷新失败）`)
             return currentToken
           }
           throw refreshError
@@ -317,7 +317,7 @@ class ClaudeAccountService {
 
       return accessToken
     } catch (error) {
-      logger.error(`❌ Failed to get valid access token for account ${accountId}:`, error)
+      logger.error(`[错误] 获取账户 ${accountId} 的有效访问令牌失败：`, error)
       throw error
     }
   }
@@ -377,7 +377,7 @@ class ClaudeAccountService {
 
       return processedAccounts
     } catch (error) {
-      logger.error('❌ Failed to get Claude accounts:', error)
+      logger.error('[错误] 获取 Claude 账户列表失败：', error)
       throw error
     }
   }
@@ -467,11 +467,11 @@ class ClaudeAccountService {
 
       await redis.setClaudeAccount(accountId, updatedData)
 
-      logger.success(`📝 Updated Claude account: ${accountId}`)
+      logger.success(`[成功] 更新 Claude 账户：${accountId}`)
 
       return { success: true }
     } catch (error) {
-      logger.error('❌ Failed to update Claude account:', error)
+      logger.error('[错误] 更新 Claude 账户失败：', error)
       throw error
     }
   }
@@ -489,7 +489,7 @@ class ClaudeAccountService {
 
       return { success: true }
     } catch (error) {
-      logger.error('❌ Failed to delete Claude account:', error)
+      logger.error('[错误] 删除 Claude 账户失败：', error)
       throw error
     }
   }
@@ -635,7 +635,7 @@ class ClaudeAccountService {
 
       // 如果没有非限流账户，则从限流账户中选择（按限流时间排序，最早限流的优先）
       if (candidateAccounts.length === 0) {
-        logger.warn('⚠️ All shared accounts are rate limited, selecting from rate limited pool')
+        logger.warn('[警告] 所有共享账户均被限流，从限流池中选择')
         candidateAccounts = rateLimitedAccounts.sort((a, b) => {
           const aRateLimitedAt = new Date(a._rateLimitInfo.rateLimitedAt).getTime()
           const bRateLimitedAt = new Date(b._rateLimitInfo.rateLimitedAt).getTime()
@@ -669,7 +669,7 @@ class ClaudeAccountService {
       )
       return selectedAccountId
     } catch (error) {
-      logger.error('❌ Failed to select account for API key:', error)
+      logger.error('[错误] 为 API Key 选择账户失败：', error)
       throw error
     }
   }
@@ -693,7 +693,7 @@ class ClaudeAccountService {
         return new HttpsProxyAgent(httpUrl)
       }
     } catch (error) {
-      logger.warn('⚠️ Invalid proxy configuration:', error)
+      logger.warn('[警告] 无效的代理配置：', error)
     }
 
     return null
@@ -716,7 +716,7 @@ class ClaudeAccountService {
       // 将IV和加密数据一起返回，用:分隔
       return `${iv.toString('hex')}:${encrypted}`
     } catch (error) {
-      logger.error('❌ Encryption error:', error)
+      logger.error('[错误] 加密错误：', error)
       return data
     }
   }
@@ -753,11 +753,11 @@ class ClaudeAccountService {
         return decrypted
       } catch (oldError) {
         // 如果旧方式也失败，返回原数据
-        logger.warn('⚠️ Could not decrypt data, returning as-is:', oldError.message)
+        logger.warn('[警告] 无法解密数据，按原样返回：', oldError.message)
         return encryptedData
       }
     } catch (error) {
-      logger.error('❌ Decryption error:', error)
+      logger.error('[错误] 解密错误：', error)
       return encryptedData
     }
   }
@@ -810,7 +810,7 @@ class ClaudeAccountService {
 
       return cleanedCount
     } catch (error) {
-      logger.error('❌ Failed to cleanup error accounts:', error)
+      logger.error('[错误] 清理异常账户失败：', error)
       return 0
     }
   }
@@ -878,7 +878,7 @@ class ClaudeAccountService {
 
       return { success: true }
     } catch (error) {
-      logger.error(`❌ Failed to mark account as rate limited: ${accountId}`, error)
+      logger.error(`[错误] 标记账户为限流失败：${accountId}`, error)
       throw error
     }
   }
@@ -897,10 +897,10 @@ class ClaudeAccountService {
       delete accountData.rateLimitEndAt // 清除限流结束时间
       await redis.setClaudeAccount(accountId, accountData)
 
-      logger.success(`✅ Rate limit removed for account: ${accountData.name} (${accountId})`)
+      logger.success(`[成功] 已移除账户限流：${accountData.name}（${accountId}）`)
       return { success: true }
     } catch (error) {
-      logger.error(`❌ Failed to remove rate limit for account: ${accountId}`, error)
+      logger.error(`[错误] 移除账户限流失败：${accountId}`, error)
       throw error
     }
   }
@@ -945,7 +945,7 @@ class ClaudeAccountService {
 
       return false
     } catch (error) {
-      logger.error(`❌ Failed to check rate limit status for account: ${accountId}`, error)
+      logger.error(`[错误] 检查账户是否限流失败：${accountId}`, error)
       return false
     }
   }
@@ -996,7 +996,7 @@ class ClaudeAccountService {
         rateLimitEndAt: null
       }
     } catch (error) {
-      logger.error(`❌ Failed to get rate limit info for account: ${accountId}`, error)
+      logger.error(`[错误] 获取账户限流信息失败：${accountId}`, error)
       return null
     }
   }
@@ -1047,7 +1047,7 @@ class ClaudeAccountService {
 
       return accountData
     } catch (error) {
-      logger.error(`❌ Failed to update session window for account ${accountId}:`, error)
+      logger.error(`[错误] 更新账户 ${accountId} 的会话窗口失败：`, error)
       throw error
     }
   }
@@ -1124,7 +1124,7 @@ class ClaudeAccountService {
         lastRequestTime: accountData.lastRequestTime || null
       }
     } catch (error) {
-      logger.error(`❌ Failed to get session window info for account ${accountId}:`, error)
+      logger.error(`[错误] 获取账户 ${accountId} 的会话窗口信息失败：`, error)
       return null
     }
   }
@@ -1132,7 +1132,7 @@ class ClaudeAccountService {
   // 🔄 初始化所有账户的会话窗口（从历史数据恢复）
   async initializeSessionWindows(forceRecalculate = false) {
     try {
-      logger.info('🔄 Initializing session windows for all Claude accounts...')
+      logger.info('[信息] 正在为所有 Claude 账户初始化会话窗口...')
 
       const accounts = await redis.getAllClaudeAccounts()
       let validWindowCount = 0
@@ -1143,7 +1143,7 @@ class ClaudeAccountService {
       for (const account of accounts) {
         // 如果强制重算，清除现有窗口信息
         if (forceRecalculate && (account.sessionWindowStart || account.sessionWindowEnd)) {
-          logger.info(`🔄 Force recalculating window for account ${account.name} (${account.id})`)
+          logger.info(`[信息] 强制重新计算账户 ${account.name}（${account.id}）的窗口`)
           delete account.sessionWindowStart
           delete account.sessionWindowEnd
           delete account.lastRequestTime
@@ -1183,11 +1183,11 @@ class ClaudeAccountService {
         }
       }
 
-      logger.success('✅ Session window initialization completed:')
-      logger.success(`   📊 Total accounts: ${accounts.length}`)
-      logger.success(`   ✅ Valid windows: ${validWindowCount}`)
-      logger.success(`   ⏰ Expired windows: ${expiredWindowCount}`)
-      logger.success(`   📭 No windows: ${noWindowCount}`)
+      logger.success('[成功] 会话窗口初始化完成：')
+      logger.success(`   [信息] 账户总数：${accounts.length}`)
+      logger.success(`   [成功] 有效窗口：${validWindowCount}`)
+      logger.success(`   [信息] 过期窗口：${expiredWindowCount}`)
+      logger.success(`   [📭] 无窗口：${noWindowCount}`)
 
       return {
         total: accounts.length,
@@ -1196,7 +1196,7 @@ class ClaudeAccountService {
         noWindows: noWindowCount
       }
     } catch (error) {
-      logger.error('❌ Failed to initialize session windows:', error)
+      logger.error('[错误] 初始化会话窗口失败：', error)
       return {
         total: 0,
         validWindows: 0,
@@ -1237,7 +1237,7 @@ class ClaudeAccountService {
 
       return { success: true }
     } catch (error) {
-      logger.error(`❌ Failed to mark account ${accountId} as unauthorized:`, error)
+      logger.error(`[错误] 将账户 ${accountId} 标记为未授权失败：`, error)
       throw error
     }
   }
@@ -1295,8 +1295,193 @@ class ClaudeAccountService {
         }
       }
     } catch (error) {
-      logger.error(`❌ Failed to reset account status for ${accountId}:`, error)
+      logger.error(`[错误] 重置账户 ${accountId} 状态失败：`, error)
       throw error
+    }
+  }
+
+  // 🧪 测试Claude账户连接和服务可用性
+  async testAccount(accountId) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId)
+      if (!accountData || Object.keys(accountData).length === 0) {
+        return { success: false, error: 'Account not found' }
+      }
+
+      logger.info(`[信息] 测试Claude账户服务可用性 - ID: ${accountId}, 名称: ${accountData.name}`)
+
+      // 解密OAuth数据
+      let oauthData
+      try {
+        oauthData = JSON.parse(this._decryptSensitiveData(accountData.claudeAiOauth))
+      } catch (error) {
+        return { success: false, error: 'Failed to decrypt OAuth credentials' }
+      }
+
+      if (!oauthData.accessToken) {
+        return { success: false, error: 'No access token available' }
+      }
+
+      // 构建测试请求 - 使用一个简单的消息测试Claude API
+      const testMessage = {
+        model: 'claude-3-5-haiku-20241022', // 使用最便宜的模型进行测试
+        max_tokens: 10,
+        messages: [
+          {
+            role: 'user',
+            content: 'Hi'
+          }
+        ]
+      }
+
+      const https = require('https')
+      const { URL } = require('url')
+
+      // 如果账户配置了代理，使用代理
+      const requestOptions = {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${oauthData.accessToken}`,
+          'anthropic-version': '2023-06-01',
+          'User-Agent': 'Claude-Relay-Service/Test'
+        },
+        timeout: 10000 // 10秒超时
+      }
+
+      const claudeApiUrl = 'https://api.anthropic.com/v1/messages'
+      const parsedUrl = new URL(claudeApiUrl)
+
+      // 处理代理配置
+      if (accountData.proxyConfig) {
+        let proxyConfig
+        try {
+          proxyConfig = JSON.parse(accountData.proxyConfig)
+        } catch (e) {
+          proxyConfig = null
+        }
+
+        if (proxyConfig && proxyConfig.enabled && proxyConfig.host && proxyConfig.port) {
+          if (proxyConfig.type === 'socks5') {
+            const proxyUrl = proxyConfig.auth
+              ? `socks5://${proxyConfig.auth.username}:${proxyConfig.auth.password}@${proxyConfig.host}:${proxyConfig.port}`
+              : `socks5://${proxyConfig.host}:${proxyConfig.port}`
+            requestOptions.agent = new SocksProxyAgent(proxyUrl)
+          } else if (proxyConfig.type === 'http') {
+            const proxyUrl = proxyConfig.auth
+              ? `http://${proxyConfig.auth.username}:${proxyConfig.auth.password}@${proxyConfig.host}:${proxyConfig.port}`
+              : `http://${proxyConfig.host}:${proxyConfig.port}`
+            requestOptions.agent = new HttpsProxyAgent(proxyUrl)
+          }
+        }
+      }
+
+      requestOptions.hostname = parsedUrl.hostname
+      requestOptions.port = parsedUrl.port || 443
+      requestOptions.path = parsedUrl.pathname
+
+      // 执行测试请求
+      let testResult
+      try {
+        testResult = await new Promise((resolve, reject) => {
+          const req = https.request(requestOptions, (res) => {
+            let data = ''
+            res.on('data', (chunk) => (data += chunk))
+            res.on('end', () => {
+              try {
+                if (res.statusCode === 200) {
+                  const response = JSON.parse(data)
+                  resolve({
+                    success: true,
+                    statusCode: res.statusCode,
+                    hasResponse: !!response.content,
+                    model: response.model || testMessage.model,
+                    usage: response.usage || null
+                  })
+                } else if (res.statusCode === 429) {
+                  resolve({
+                    success: false,
+                    error: 'Rate limited (429)',
+                    statusCode: res.statusCode,
+                    isRateLimit: true
+                  })
+                } else if (res.statusCode === 401) {
+                  resolve({
+                    success: false,
+                    error: 'Unauthorized (401) - Token may be invalid',
+                    statusCode: res.statusCode,
+                    isUnauthorized: true
+                  })
+                } else {
+                  const errorData = data ? JSON.parse(data) : {}
+                  resolve({
+                    success: false,
+                    error: `HTTP ${res.statusCode}: ${errorData.error?.message || 'Unknown error'}`,
+                    statusCode: res.statusCode
+                  })
+                }
+              } catch (error) {
+                resolve({
+                  success: false,
+                  error: `Response parse error: ${error.message}`,
+                  statusCode: res.statusCode
+                })
+              }
+            })
+          })
+
+          req.on('error', (error) => {
+            reject(new Error(`Network error: ${error.message}`))
+          })
+
+          req.on('timeout', () => {
+            req.destroy()
+            reject(new Error('Request timeout (10s)'))
+          })
+
+          req.write(JSON.stringify(testMessage))
+          req.end()
+        })
+      } catch (error) {
+        // 处理网络错误和超时错误
+        testResult = {
+          success: false,
+          error: error.message,
+          networkError: error.message.includes('Network error'),
+          timeout: error.message.includes('timeout')
+        }
+      }
+
+      if (testResult.success) {
+        logger.info(`[成功] Claude 账户测试成功 - ID: ${accountId}, 模型: ${testResult.model}`)
+        return {
+          success: true,
+          data: {
+            status: 'connected',
+            model: testResult.model,
+            usage: testResult.usage,
+            hasProxy: !!(accountData.proxyConfig && JSON.parse(accountData.proxyConfig).enabled),
+            tokenValid: true
+          }
+        }
+      } else {
+        logger.warn(`[警告] Claude 账户测试失败 - ID: ${accountId}, 错误: ${testResult.error}`)
+        return {
+          success: false,
+          error: testResult.error,
+          statusCode: testResult.statusCode,
+          isRateLimit: testResult.isRateLimit,
+          isUnauthorized: testResult.isUnauthorized,
+          networkError: testResult.networkError,
+          timeout: testResult.timeout
+        }
+      }
+    } catch (error) {
+      logger.error(`[错误] 测试 Claude 账户失败 - ID: ${accountId}`, error)
+      return {
+        success: false,
+        error: error.message
+      }
     }
   }
 }

@@ -2,15 +2,17 @@ const claudeAccountService = require('./claudeAccountService')
 const claudeConsoleAccountService = require('./claudeConsoleAccountService')
 const bedrockAccountService = require('./bedrockAccountService')
 const accountGroupService = require('./accountGroupService')
+const intelligentRateLimitService = require('./intelligentRateLimitService')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
+const config = require('../../config/config')
 
 class UnifiedClaudeScheduler {
   constructor() {
     this.SESSION_MAPPING_PREFIX = 'unified_claude_session_mapping:'
   }
 
-  // 🔧 辅助方法：检查账户是否可调度（兼容字符串和布尔值）
+  // 辅助方法：检查账户是否可调度（兼容字符串和布尔值）
   _isSchedulable(schedulable) {
     // 如果是 undefined 或 null，默认为可调度
     if (schedulable === undefined || schedulable === null) {
@@ -20,7 +22,7 @@ class UnifiedClaudeScheduler {
     return schedulable !== false && schedulable !== 'false'
   }
 
-  // 🎯 统一调度Claude账号（官方和Console）
+  // 统一调度Claude账号（官方和Console）
   async selectAccountForApiKey(apiKeyData, sessionHash = null, requestedModel = null) {
     try {
       // 如果API Key绑定了专属账户或分组，优先使用
@@ -28,9 +30,7 @@ class UnifiedClaudeScheduler {
         // 检查是否是分组
         if (apiKeyData.claudeAccountId.startsWith('group:')) {
           const groupId = apiKeyData.claudeAccountId.replace('group:', '')
-          logger.info(
-            `🎯 API key ${apiKeyData.name} is bound to group ${groupId}, selecting from group`
-          )
+          logger.info(`[信息] API Key ${apiKeyData.name} 绑定了分组 ${groupId}，将从分组中选择`)
           return await this.selectAccountFromGroup(groupId, sessionHash, requestedModel)
         }
 
@@ -38,7 +38,7 @@ class UnifiedClaudeScheduler {
         const boundAccount = await redis.getClaudeAccount(apiKeyData.claudeAccountId)
         if (boundAccount && boundAccount.isActive === 'true' && boundAccount.status !== 'error') {
           logger.info(
-            `🎯 Using bound dedicated Claude OAuth account: ${boundAccount.name} (${apiKeyData.claudeAccountId}) for API key ${apiKeyData.name}`
+            `[信息] 使用绑定的 Claude OAuth 账户：${boundAccount.name}（${apiKeyData.claudeAccountId}），用于 API Key ${apiKeyData.name}`
           )
           return {
             accountId: apiKeyData.claudeAccountId,
@@ -46,7 +46,7 @@ class UnifiedClaudeScheduler {
           }
         } else {
           logger.warn(
-            `⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not available, falling back to pool`
+            `[警告] 绑定的 Claude OAuth 账户 ${apiKeyData.claudeAccountId} 不可用，回退到池`
           )
         }
       }
@@ -62,7 +62,7 @@ class UnifiedClaudeScheduler {
           boundConsoleAccount.status === 'active'
         ) {
           logger.info(
-            `🎯 Using bound dedicated Claude Console account: ${boundConsoleAccount.name} (${apiKeyData.claudeConsoleAccountId}) for API key ${apiKeyData.name}`
+            `[信息] 使用绑定的 Claude Console 账户：${boundConsoleAccount.name}（${apiKeyData.claudeConsoleAccountId}），用于 API Key ${apiKeyData.name}`
           )
           return {
             accountId: apiKeyData.claudeConsoleAccountId,
@@ -70,7 +70,7 @@ class UnifiedClaudeScheduler {
           }
         } else {
           logger.warn(
-            `⚠️ Bound Claude Console account ${apiKeyData.claudeConsoleAccountId} is not available, falling back to pool`
+            `[警告] 绑定的 Claude Console 账户 ${apiKeyData.claudeConsoleAccountId} 不可用，回退到池`
           )
         }
       }
@@ -82,16 +82,14 @@ class UnifiedClaudeScheduler {
         )
         if (boundBedrockAccountResult.success && boundBedrockAccountResult.data.isActive === true) {
           logger.info(
-            `🎯 Using bound dedicated Bedrock account: ${boundBedrockAccountResult.data.name} (${apiKeyData.bedrockAccountId}) for API key ${apiKeyData.name}`
+            `[信息] 使用绑定的 Bedrock 账户：${boundBedrockAccountResult.data.name}（${apiKeyData.bedrockAccountId}），用于 API Key ${apiKeyData.name}`
           )
           return {
             accountId: apiKeyData.bedrockAccountId,
             accountType: 'bedrock'
           }
         } else {
-          logger.warn(
-            `⚠️ Bound Bedrock account ${apiKeyData.bedrockAccountId} is not available, falling back to pool`
-          )
+          logger.warn(`[警告] 绑定的 Bedrock 账户 ${apiKeyData.bedrockAccountId} 不可用，回退到池`)
         }
       }
 
@@ -106,13 +104,11 @@ class UnifiedClaudeScheduler {
           )
           if (isAvailable) {
             logger.info(
-              `🎯 Using sticky session account: ${mappedAccount.accountId} (${mappedAccount.accountType}) for session ${sessionHash}`
+              `[信息] 使用会话绑定账户：${mappedAccount.accountId}（${mappedAccount.accountType}），会话 ${sessionHash}`
             )
             return mappedAccount
           } else {
-            logger.warn(
-              `⚠️ Mapped account ${mappedAccount.accountId} is no longer available, selecting new account`
-            )
+            logger.warn(`[警告] 会话映射账户 ${mappedAccount.accountId} 已不可用，重新选择新账户`)
             await this._deleteSessionMapping(sessionHash)
           }
         }
@@ -124,11 +120,9 @@ class UnifiedClaudeScheduler {
       if (availableAccounts.length === 0) {
         // 提供更详细的错误信息
         if (requestedModel) {
-          throw new Error(
-            `No available Claude accounts support the requested model: ${requestedModel}`
-          )
+          throw new Error(`没有可用的 Claude 账户支持请求的模型：${requestedModel}`)
         } else {
-          throw new Error('No available Claude accounts (neither official nor console)')
+          throw new Error('没有可用的 Claude 账户（官方或 Console）')
         }
       }
 
@@ -146,12 +140,12 @@ class UnifiedClaudeScheduler {
           selectedAccount.accountType
         )
         logger.info(
-          `🎯 Created new sticky session mapping: ${selectedAccount.name} (${selectedAccount.accountId}, ${selectedAccount.accountType}) for session ${sessionHash}`
+          `[信息] 创建会话账户映射：${selectedAccount.name}（${selectedAccount.accountId}, ${selectedAccount.accountType}），会话 ${sessionHash}`
         )
       }
 
       logger.info(
-        `🎯 Selected account: ${selectedAccount.name} (${selectedAccount.accountId}, ${selectedAccount.accountType}) with priority ${selectedAccount.priority} for API key ${apiKeyData.name}`
+        `[信息] 已选择账户：${selectedAccount.name}（${selectedAccount.accountId}, ${selectedAccount.accountType}），优先级 ${selectedAccount.priority}，用于 API Key ${apiKeyData.name}`
       )
 
       return {
@@ -159,12 +153,12 @@ class UnifiedClaudeScheduler {
         accountType: selectedAccount.accountType
       }
     } catch (error) {
-      logger.error('❌ Failed to select account for API key:', error)
+      logger.error('[错误] 为 API Key 选择账户失败：', error)
       throw error
     }
   }
 
-  // 📋 获取所有可用账户（合并官方和Console）
+  // 获取所有可用账户（合并官方和Console）
   async _getAllAvailableAccounts(apiKeyData, requestedModel = null) {
     const availableAccounts = []
 
@@ -181,7 +175,7 @@ class UnifiedClaudeScheduler {
         const isRateLimited = await claudeAccountService.isAccountRateLimited(boundAccount.id)
         if (!isRateLimited) {
           logger.info(
-            `🎯 Using bound dedicated Claude OAuth account: ${boundAccount.name} (${apiKeyData.claudeAccountId})`
+            `[信息] 使用绑定的 Claude OAuth 账户：${boundAccount.name}（${apiKeyData.claudeAccountId}）`
           )
           return [
             {
@@ -194,7 +188,7 @@ class UnifiedClaudeScheduler {
           ]
         }
       } else {
-        logger.warn(`⚠️ Bound Claude OAuth account ${apiKeyData.claudeAccountId} is not available`)
+        logger.warn(`[警告] 绑定的 Claude OAuth 账户 ${apiKeyData.claudeAccountId} 不可用`)
       }
     }
 
@@ -213,7 +207,7 @@ class UnifiedClaudeScheduler {
         )
         if (!isRateLimited) {
           logger.info(
-            `🎯 Using bound dedicated Claude Console account: ${boundConsoleAccount.name} (${apiKeyData.claudeConsoleAccountId})`
+            `[信息] 使用绑定的 Claude Console 账户：${boundConsoleAccount.name}（${apiKeyData.claudeConsoleAccountId}）`
           )
           return [
             {
@@ -226,9 +220,7 @@ class UnifiedClaudeScheduler {
           ]
         }
       } else {
-        logger.warn(
-          `⚠️ Bound Claude Console account ${apiKeyData.claudeConsoleAccountId} is not available`
-        )
+        logger.warn(`[警告] 绑定的 Claude Console 账户 ${apiKeyData.claudeConsoleAccountId} 不可用`)
       }
     }
 
@@ -239,7 +231,7 @@ class UnifiedClaudeScheduler {
       )
       if (boundBedrockAccountResult.success && boundBedrockAccountResult.data.isActive === true) {
         logger.info(
-          `🎯 Using bound dedicated Bedrock account: ${boundBedrockAccountResult.data.name} (${apiKeyData.bedrockAccountId})`
+          `[信息] 使用绑定的 Bedrock 账户：${boundBedrockAccountResult.data.name}（${apiKeyData.bedrockAccountId}）`
         )
         return [
           {
@@ -251,7 +243,7 @@ class UnifiedClaudeScheduler {
           }
         ]
       } else {
-        logger.warn(`⚠️ Bound Bedrock account ${apiKeyData.bedrockAccountId} is not available`)
+        logger.warn(`[警告] 绑定的 Bedrock 账户 ${apiKeyData.bedrockAccountId} 不可用`)
       }
     }
 
@@ -267,8 +259,8 @@ class UnifiedClaudeScheduler {
       ) {
         // 检查是否可调度
 
-        // 检查是否被限流
-        const isRateLimited = await claudeAccountService.isAccountRateLimited(account.id)
+        // 检查是否被限流（智能限流或传统限流）
+        const isRateLimited = await this._isAccountRateLimitedAny(account.id, 'claude-official')
         if (!isRateLimited) {
           availableAccounts.push({
             ...account,
@@ -283,11 +275,11 @@ class UnifiedClaudeScheduler {
 
     // 获取Claude Console账户
     const consoleAccounts = await claudeConsoleAccountService.getAllAccounts()
-    logger.info(`📋 Found ${consoleAccounts.length} total Claude Console accounts`)
+    logger.info(`[信息] 共找到 ${consoleAccounts.length} 个 Claude Console 账户`)
 
     for (const account of consoleAccounts) {
       logger.info(
-        `🔍 Checking Claude Console account: ${account.name} - isActive: ${account.isActive}, status: ${account.status}, accountType: ${account.accountType}, schedulable: ${account.schedulable}`
+        `[信息] 检查 Claude Console 账户：${account.name} - isActive: ${account.isActive}, status: ${account.status}, accountType: ${account.accountType}, schedulable: ${account.schedulable}`
       )
 
       // 注意：getAllAccounts返回的isActive是布尔值
@@ -308,9 +300,7 @@ class UnifiedClaudeScheduler {
               account.supportedModels.length > 0 &&
               !account.supportedModels.includes(requestedModel)
             ) {
-              logger.info(
-                `🚫 Claude Console account ${account.name} does not support model ${requestedModel}`
-              )
+              logger.info(`[信息] Claude Console 账户 ${account.name} 不支持模型 ${requestedModel}`)
               continue
             }
           } else if (typeof account.supportedModels === 'object') {
@@ -319,16 +309,14 @@ class UnifiedClaudeScheduler {
               Object.keys(account.supportedModels).length > 0 &&
               !claudeConsoleAccountService.isModelSupported(account.supportedModels, requestedModel)
             ) {
-              logger.info(
-                `🚫 Claude Console account ${account.name} does not support model ${requestedModel}`
-              )
+              logger.info(`[信息] Claude Console 账户 ${account.name} 不支持模型 ${requestedModel}`)
               continue
             }
           }
         }
 
-        // 检查是否被限流
-        const isRateLimited = await claudeConsoleAccountService.isAccountRateLimited(account.id)
+        // 检查是否被限流（智能限流或传统限流）
+        const isRateLimited = await this._isAccountRateLimitedAny(account.id, 'claude-console')
         if (!isRateLimited) {
           availableAccounts.push({
             ...account,
@@ -338,14 +326,14 @@ class UnifiedClaudeScheduler {
             lastUsedAt: account.lastUsedAt || '0'
           })
           logger.info(
-            `✅ Added Claude Console account to available pool: ${account.name} (priority: ${account.priority})`
+            `[信息] 已添加 Claude Console 账户到可用池：${account.name}（优先级：${account.priority}）`
           )
         } else {
-          logger.warn(`⚠️ Claude Console account ${account.name} is rate limited`)
+          logger.warn(`[警告] Claude Console 账户 ${account.name} 已被限流`)
         }
       } else {
         logger.info(
-          `❌ Claude Console account ${account.name} not eligible - isActive: ${account.isActive}, status: ${account.status}, accountType: ${account.accountType}, schedulable: ${account.schedulable}`
+          `[信息] Claude Console 账户 ${account.name} 不符合条件 - isActive: ${account.isActive}, status: ${account.status}, accountType: ${account.accountType}, schedulable: ${account.schedulable}`
         )
       }
     }
@@ -354,11 +342,11 @@ class UnifiedClaudeScheduler {
     const bedrockAccountsResult = await bedrockAccountService.getAllAccounts()
     if (bedrockAccountsResult.success) {
       const bedrockAccounts = bedrockAccountsResult.data
-      logger.info(`📋 Found ${bedrockAccounts.length} total Bedrock accounts`)
+      logger.info(`[信息] 共找到 ${bedrockAccounts.length} 个 Bedrock 账户`)
 
       for (const account of bedrockAccounts) {
         logger.info(
-          `🔍 Checking Bedrock account: ${account.name} - isActive: ${account.isActive}, accountType: ${account.accountType}, schedulable: ${account.schedulable}`
+          `[信息] 检查 Bedrock 账户：${account.name} - isActive: ${account.isActive}, accountType: ${account.accountType}, schedulable: ${account.schedulable}`
         )
 
         if (
@@ -376,23 +364,23 @@ class UnifiedClaudeScheduler {
             lastUsedAt: account.lastUsedAt || '0'
           })
           logger.info(
-            `✅ Added Bedrock account to available pool: ${account.name} (priority: ${account.priority})`
+            `[信息] 已添加 Bedrock 账户到可用池：${account.name}（优先级：${account.priority}）`
           )
         } else {
           logger.info(
-            `❌ Bedrock account ${account.name} not eligible - isActive: ${account.isActive}, accountType: ${account.accountType}, schedulable: ${account.schedulable}`
+            `[信息] Bedrock 账户 ${account.name} 不符合条件 - isActive: ${account.isActive}, accountType: ${account.accountType}, schedulable: ${account.schedulable}`
           )
         }
       }
     }
 
     logger.info(
-      `📊 Total available accounts: ${availableAccounts.length} (Claude: ${availableAccounts.filter((a) => a.accountType === 'claude-official').length}, Console: ${availableAccounts.filter((a) => a.accountType === 'claude-console').length}, Bedrock: ${availableAccounts.filter((a) => a.accountType === 'bedrock').length})`
+      `[信息] 总可用账户数：${availableAccounts.length}（Claude: ${availableAccounts.filter((a) => a.accountType === 'claude-official').length}, Console: ${availableAccounts.filter((a) => a.accountType === 'claude-console').length}, Bedrock: ${availableAccounts.filter((a) => a.accountType === 'bedrock').length})`
     )
     return availableAccounts
   }
 
-  // 🔢 按优先级和最后使用时间排序账户
+  // 按优先级和最后使用时间排序账户
   _sortAccountsByPriority(accounts) {
     return accounts.sort((a, b) => {
       // 首先按优先级排序（数字越小优先级越高）
@@ -407,7 +395,7 @@ class UnifiedClaudeScheduler {
     })
   }
 
-  // 🔍 检查账户是否可用
+  // 检查账户是否可用
   async _isAccountAvailable(accountId, accountType) {
     try {
       if (accountType === 'claude-official') {
@@ -417,7 +405,7 @@ class UnifiedClaudeScheduler {
         }
         // 检查是否可调度
         if (!this._isSchedulable(account.schedulable)) {
-          logger.info(`🚫 Account ${accountId} is not schedulable`)
+          logger.info(`[信息] 账户 ${accountId} 不可调度`)
           return false
         }
         return !(await claudeAccountService.isAccountRateLimited(accountId))
@@ -428,7 +416,7 @@ class UnifiedClaudeScheduler {
         }
         // 检查是否可调度
         if (!this._isSchedulable(account.schedulable)) {
-          logger.info(`🚫 Claude Console account ${accountId} is not schedulable`)
+          logger.info(`[信息] Claude Console 账户 ${accountId} 不可调度`)
           return false
         }
         return !(await claudeConsoleAccountService.isAccountRateLimited(accountId))
@@ -439,7 +427,7 @@ class UnifiedClaudeScheduler {
         }
         // 检查是否可调度
         if (!this._isSchedulable(accountResult.data.schedulable)) {
-          logger.info(`🚫 Bedrock account ${accountId} is not schedulable`)
+          logger.info(`[信息] Bedrock 账户 ${accountId} 不可调度`)
           return false
         }
         // Bedrock账户暂不需要限流检查，因为AWS管理限流
@@ -447,12 +435,12 @@ class UnifiedClaudeScheduler {
       }
       return false
     } catch (error) {
-      logger.warn(`⚠️ Failed to check account availability: ${accountId}`, error)
+      logger.warn(`[警告] 检查账户可用性失败：${accountId}`, error)
       return false
     }
   }
 
-  // 🔗 获取会话映射
+  // 获取会话映射
   async _getSessionMapping(sessionHash) {
     const client = redis.getClientSafe()
     const mappingData = await client.get(`${this.SESSION_MAPPING_PREFIX}${sessionHash}`)
@@ -461,7 +449,7 @@ class UnifiedClaudeScheduler {
       try {
         return JSON.parse(mappingData)
       } catch (error) {
-        logger.warn('⚠️ Failed to parse session mapping:', error)
+        logger.warn('[警告] 会话映射解析失败：', error)
         return null
       }
     }
@@ -469,7 +457,7 @@ class UnifiedClaudeScheduler {
     return null
   }
 
-  // 💾 设置会话映射
+  // 设置会话映射
   async _setSessionMapping(sessionHash, accountId, accountType) {
     const client = redis.getClientSafe()
     const mappingData = JSON.stringify({ accountId, accountType })
@@ -478,13 +466,13 @@ class UnifiedClaudeScheduler {
     await client.setex(`${this.SESSION_MAPPING_PREFIX}${sessionHash}`, 3600, mappingData)
   }
 
-  // 🗑️ 删除会话映射
+  // 删除会话映射
   async _deleteSessionMapping(sessionHash) {
     const client = redis.getClientSafe()
     await client.del(`${this.SESSION_MAPPING_PREFIX}${sessionHash}`)
   }
 
-  // 🚫 标记账户为限流状态
+  // 标记账户为限流状态
   async markAccountRateLimited(
     accountId,
     accountType,
@@ -509,15 +497,12 @@ class UnifiedClaudeScheduler {
 
       return { success: true }
     } catch (error) {
-      logger.error(
-        `❌ Failed to mark account as rate limited: ${accountId} (${accountType})`,
-        error
-      )
+      logger.error(`[错误] 标记账户为限流失败：${accountId}（${accountType}）`, error)
       throw error
     }
   }
 
-  // ✅ 移除账户的限流状态
+  // 移除账户的限流状态
   async removeAccountRateLimit(accountId, accountType) {
     try {
       if (accountType === 'claude-official') {
@@ -528,15 +513,12 @@ class UnifiedClaudeScheduler {
 
       return { success: true }
     } catch (error) {
-      logger.error(
-        `❌ Failed to remove rate limit for account: ${accountId} (${accountType})`,
-        error
-      )
+      logger.error(`[错误] 移除账户限流失败：${accountId}（${accountType}）`, error)
       throw error
     }
   }
 
-  // 🔍 检查账户是否处于限流状态
+  // 检查账户是否处于限流状态
   async isAccountRateLimited(accountId, accountType) {
     try {
       if (accountType === 'claude-official') {
@@ -546,12 +528,12 @@ class UnifiedClaudeScheduler {
       }
       return false
     } catch (error) {
-      logger.error(`❌ Failed to check rate limit status: ${accountId} (${accountType})`, error)
+      logger.error(`[错误] 检查限流状态失败：${accountId}（${accountType}）`, error)
       return false
     }
   }
 
-  // 🚫 标记账户为未授权状态（401错误）
+  // 标记账户为未授权状态（401错误）
   async markAccountUnauthorized(accountId, accountType, sessionHash = null) {
     try {
       // 只处理claude-official类型的账户，不处理claude-console和gemini
@@ -563,44 +545,39 @@ class UnifiedClaudeScheduler {
           await this._deleteSessionMapping(sessionHash)
         }
 
-        logger.warn(`🚫 Account ${accountId} marked as unauthorized due to consecutive 401 errors`)
+        logger.warn(`[警告] 账户 ${accountId} 因连续 401 错误标记为未授权`)
       } else {
-        logger.info(
-          `ℹ️ Skipping unauthorized marking for non-Claude OAuth account: ${accountId} (${accountType})`
-        )
+        logger.info(`[信息] 跳过非 Claude OAuth 账户的未授权标记：${accountId}（${accountType}）`)
       }
 
       return { success: true }
     } catch (error) {
-      logger.error(
-        `❌ Failed to mark account as unauthorized: ${accountId} (${accountType})`,
-        error
-      )
+      logger.error(`[错误] 标记账户为未授权失败：${accountId}（${accountType}）`, error)
       throw error
     }
   }
 
-  // 🚫 标记Claude Console账户为封锁状态（模型不支持）
+  // 标记Claude Console账户为封锁状态（模型不支持）
   async blockConsoleAccount(accountId, reason) {
     try {
       await claudeConsoleAccountService.blockAccount(accountId, reason)
       return { success: true }
     } catch (error) {
-      logger.error(`❌ Failed to block console account: ${accountId}`, error)
+      logger.error(`[错误] 封锁 Console 账户失败：${accountId}`, error)
       throw error
     }
   }
 
-  // 👥 从分组中选择账户
+  // 从分组中选择账户
   async selectAccountFromGroup(groupId, sessionHash = null, requestedModel = null) {
     try {
       // 获取分组信息
       const group = await accountGroupService.getGroup(groupId)
       if (!group) {
-        throw new Error(`Group ${groupId} not found`)
+        throw new Error(`分组 ${groupId} 未找到`)
       }
 
-      logger.info(`👥 Selecting account from group: ${group.name} (${group.platform})`)
+      logger.info(`[信息] 从分组中选择账户：${group.name}（${group.platform}）`)
 
       // 如果有会话哈希，检查是否有已映射的账户
       if (sessionHash) {
@@ -615,7 +592,7 @@ class UnifiedClaudeScheduler {
             )
             if (isAvailable) {
               logger.info(
-                `🎯 Using sticky session account from group: ${mappedAccount.accountId} (${mappedAccount.accountType}) for session ${sessionHash}`
+                `[信息] 使用会话绑定账户从分组中选择：${mappedAccount.accountId}（${mappedAccount.accountType}），会话 ${sessionHash}`
               )
               return mappedAccount
             }
@@ -628,7 +605,7 @@ class UnifiedClaudeScheduler {
       // 获取分组内的所有账户
       const memberIds = await accountGroupService.getGroupMembers(groupId)
       if (memberIds.length === 0) {
-        throw new Error(`Group ${group.name} has no members`)
+        throw new Error(`分组 ${group.name} 没有成员`)
       }
 
       const availableAccounts = []
@@ -658,7 +635,7 @@ class UnifiedClaudeScheduler {
         }
 
         if (!account) {
-          logger.warn(`⚠️ Account ${memberId} not found in group ${group.name}`)
+          logger.warn(`[警告] 分组 ${group.name} 中未找到账户 ${memberId}`)
           continue
         }
 
@@ -682,15 +659,13 @@ class UnifiedClaudeScheduler {
             account.supportedModels.length > 0
           ) {
             if (!account.supportedModels.includes(requestedModel)) {
-              logger.info(
-                `🚫 Account ${account.name} in group does not support model ${requestedModel}`
-              )
+              logger.info(`[信息] 分组中账户 ${account.name} 不支持模型 ${requestedModel}`)
               continue
             }
           }
 
-          // 检查是否被限流
-          const isRateLimited = await this.isAccountRateLimited(account.id, accountType)
+          // 检查是否被限流（智能限流或传统限流）
+          const isRateLimited = await this._isAccountRateLimitedAny(account.id, accountType)
           if (!isRateLimited) {
             availableAccounts.push({
               ...account,
@@ -704,7 +679,7 @@ class UnifiedClaudeScheduler {
       }
 
       if (availableAccounts.length === 0) {
-        throw new Error(`No available accounts in group ${group.name}`)
+        throw new Error(`分组 ${group.name} 中没有可用账户`)
       }
 
       // 使用现有的优先级排序逻辑
@@ -721,12 +696,12 @@ class UnifiedClaudeScheduler {
           selectedAccount.accountType
         )
         logger.info(
-          `🎯 Created new sticky session mapping in group: ${selectedAccount.name} (${selectedAccount.accountId}, ${selectedAccount.accountType}) for session ${sessionHash}`
+          `[信息] 在分组中创建会话账户映射：${selectedAccount.name}（${selectedAccount.accountId}, ${selectedAccount.accountType}），会话 ${sessionHash}`
         )
       }
 
       logger.info(
-        `🎯 Selected account from group ${group.name}: ${selectedAccount.name} (${selectedAccount.accountId}, ${selectedAccount.accountType}) with priority ${selectedAccount.priority}`
+        `[信息] 从分组 ${group.name} 中选择账户：${selectedAccount.name}（${selectedAccount.accountId}, ${selectedAccount.accountType}），优先级 ${selectedAccount.priority}`
       )
 
       return {
@@ -734,8 +709,36 @@ class UnifiedClaudeScheduler {
         accountType: selectedAccount.accountType
       }
     } catch (error) {
-      logger.error(`❌ Failed to select account from group ${groupId}:`, error)
+      logger.error(`[错误] 从分组 ${groupId} 选择账户失败：`, error)
       throw error
+    }
+  }
+
+  // 检查账户是否处于任何类型的限流状态（智能限流或传统限流）
+  async _isAccountRateLimitedAny(accountId, accountType) {
+    try {
+      // 检查智能限流状态
+      if (config.intelligentRateLimit.enabled) {
+        const isIntelligentRateLimited = await intelligentRateLimitService.isIntelligentRateLimited(
+          accountId,
+          accountType
+        )
+        if (isIntelligentRateLimited) {
+          return true
+        }
+      }
+
+      // 检查传统限流状态
+      if (accountType === 'claude-official') {
+        return await claudeAccountService.isAccountRateLimited(accountId)
+      } else if (accountType === 'claude-console') {
+        return await claudeConsoleAccountService.isAccountRateLimited(accountId)
+      }
+
+      return false
+    } catch (error) {
+      logger.error(`[错误] 检查账户限流状态失败：${accountType} 账户 ${accountId}`, error)
+      return false
     }
   }
 }

@@ -7,6 +7,7 @@ const geminiAccountService = require('../services/geminiAccountService')
 const accountGroupService = require('../services/accountGroupService')
 const redemptionCodeService = require('../services/redemptionCodeService')
 const rateTemplateService = require('../services/rateTemplateService')
+const intelligentRateLimitService = require('../services/intelligentRateLimitService')
 const redis = require('../models/redis')
 const { authenticateAdmin } = require('../middleware/auth')
 const logger = require('../utils/logger')
@@ -51,7 +52,7 @@ router.get('/api-keys/:keyId/cost-debug', authenticateAdmin, async (req, res) =>
       timezone: config.system.timezoneOffset || 8
     })
   } catch (error) {
-    logger.error('❌ Failed to get cost debug info:', error)
+    logger.error('[错误] 获取费用调试信息失败：', error)
     return res.status(500).json({ error: 'Failed to get cost debug info', message: error.message })
   }
 })
@@ -314,7 +315,7 @@ router.get('/api-keys', authenticateAdmin, async (req, res) => {
 
     return res.json({ success: true, data: apiKeys })
   } catch (error) {
-    logger.error('❌ Failed to get API keys:', error)
+    logger.error('[错误] 获取 API Key 列表失败：', error)
     return res.status(500).json({ error: 'Failed to get API keys', message: error.message })
   }
 })
@@ -344,7 +345,7 @@ router.get('/supported-clients', authenticateAdmin, async (req, res) => {
 
     return res.json({ success: true, data: clients })
   } catch (error) {
-    logger.error('❌ Failed to get supported clients:', error)
+    logger.error('[错误] 获取受支持客户端失败：', error)
     return res
       .status(500)
       .json({ error: 'Failed to get supported clients', message: error.message })
@@ -371,10 +372,10 @@ router.get('/api-keys/tags', authenticateAdmin, async (req, res) => {
     // 转换为数组并排序
     const tags = Array.from(tagSet).sort()
 
-    logger.info(`📋 Retrieved ${tags.length} unique tags from API keys`)
+    logger.info(`[信息] 从 API Key 中检索到 ${tags.length} 个唯一标签`)
     return res.json({ success: true, data: tags })
   } catch (error) {
-    logger.error('❌ Failed to get API key tags:', error)
+    logger.error('[错误] 获取 API Key 标签失败：', error)
     return res.status(500).json({ error: 'Failed to get API key tags', message: error.message })
   }
 })
@@ -500,7 +501,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
     logger.success(`🔑 Admin created new API key: ${name}`)
     return res.json({ success: true, data: newKey })
   } catch (error) {
-    logger.error('❌ Failed to create API key:', error)
+    logger.error('[错误] 创建 API Key 失败：', error)
     return res.status(500).json({ error: 'Failed to create API key', message: error.message })
   }
 })
@@ -776,7 +777,7 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
     logger.success(`📝 Admin updated API key: ${keyId}`)
     return res.json({ success: true, message: 'API key updated successfully' })
   } catch (error) {
-    logger.error('❌ Failed to update API key:', error)
+    logger.error('[错误] 更新 API Key 失败：', error)
     return res.status(500).json({ error: 'Failed to update API key', message: error.message })
   }
 })
@@ -791,7 +792,7 @@ router.delete('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
     logger.success(`🗑️ Admin deleted API key: ${keyId}`)
     return res.json({ success: true, message: 'API key deleted successfully' })
   } catch (error) {
-    logger.error('❌ Failed to delete API key:', error)
+    logger.error('[错误] 删除 API Key 失败：', error)
     return res.status(500).json({ error: 'Failed to delete API key', message: error.message })
   }
 })
@@ -811,7 +812,7 @@ router.post('/account-groups', authenticateAdmin, async (req, res) => {
 
     return res.json({ success: true, data: group })
   } catch (error) {
-    logger.error('❌ Failed to create account group:', error)
+    logger.error('[错误] 创建账户分组失败：', error)
     return res.status(400).json({ error: error.message })
   }
 })
@@ -823,7 +824,7 @@ router.get('/account-groups', authenticateAdmin, async (req, res) => {
     const groups = await accountGroupService.getAllGroups(platform)
     return res.json({ success: true, data: groups })
   } catch (error) {
-    logger.error('❌ Failed to get account groups:', error)
+    logger.error('[错误] 获取账户分组失败：', error)
     return res.status(500).json({ error: error.message })
   }
 })
@@ -840,7 +841,7 @@ router.get('/account-groups/:groupId', authenticateAdmin, async (req, res) => {
 
     return res.json({ success: true, data: group })
   } catch (error) {
-    logger.error('❌ Failed to get account group:', error)
+    logger.error('[错误] 获取账户分组详情失败：', error)
     return res.status(500).json({ error: error.message })
   }
 })
@@ -854,7 +855,7 @@ router.put('/account-groups/:groupId', authenticateAdmin, async (req, res) => {
     const updatedGroup = await accountGroupService.updateGroup(groupId, updates)
     return res.json({ success: true, data: updatedGroup })
   } catch (error) {
-    logger.error('❌ Failed to update account group:', error)
+    logger.error('[错误] 更新账户分组失败：', error)
     return res.status(400).json({ error: error.message })
   }
 })
@@ -866,7 +867,7 @@ router.delete('/account-groups/:groupId', authenticateAdmin, async (req, res) =>
     await accountGroupService.deleteGroup(groupId)
     return res.json({ success: true, message: '分组删除成功' })
   } catch (error) {
-    logger.error('❌ Failed to delete account group:', error)
+    logger.error('[错误] 删除账户分组失败：', error)
     return res.status(400).json({ error: error.message })
   }
 })
@@ -903,7 +904,7 @@ router.get('/account-groups/:groupId/members', authenticateAdmin, async (req, re
 
     return res.json({ success: true, data: members })
   } catch (error) {
-    logger.error('❌ Failed to get group members:', error)
+    logger.error('[错误] 获取分组成员失败：', error)
     return res.status(500).json({ error: error.message })
   }
 })
@@ -927,7 +928,7 @@ router.post('/claude-accounts/generate-auth-url', authenticateAdmin, async (req,
       expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10分钟过期
     })
 
-    logger.success('🔗 Generated OAuth authorization URL with proxy support')
+    logger.success('[成功] 生成带代理的 OAuth 授权链接')
     return res.json({
       success: true,
       data: {
@@ -943,7 +944,7 @@ router.post('/claude-accounts/generate-auth-url', authenticateAdmin, async (req,
       }
     })
   } catch (error) {
-    logger.error('❌ Failed to generate OAuth URL:', error)
+    logger.error('[错误] 生成 OAuth 授权链接失败：', error)
     return res.status(500).json({ error: 'Failed to generate OAuth URL', message: error.message })
   }
 })
@@ -1058,7 +1059,7 @@ router.post('/claude-accounts/generate-setup-token-url', authenticateAdmin, asyn
       }
     })
   } catch (error) {
-    logger.error('❌ Failed to generate Setup Token URL:', error)
+    logger.error('[错误] 生成 Setup Token 授权链接失败：', error)
     return res
       .status(500)
       .json({ error: 'Failed to generate Setup Token URL', message: error.message })
@@ -1202,7 +1203,7 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
 
     return res.json({ success: true, data: accountsWithStats })
   } catch (error) {
-    logger.error('❌ Failed to get Claude accounts:', error)
+    logger.error('[错误] 获取 Claude 账户失败：', error)
     return res.status(500).json({ error: 'Failed to get Claude accounts', message: error.message })
   }
 })
@@ -1270,7 +1271,7 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
     logger.success(`🏢 Admin created new Claude account: ${name} (${accountType || 'shared'})`)
     return res.json({ success: true, data: newAccount })
   } catch (error) {
-    logger.error('❌ Failed to create Claude account:', error)
+    logger.error('[错误] 创建 Claude 账户失败：', error)
     return res
       .status(500)
       .json({ error: 'Failed to create Claude account', message: error.message })
@@ -1331,7 +1332,7 @@ router.put('/claude-accounts/:accountId', authenticateAdmin, async (req, res) =>
     logger.success(`📝 Admin updated Claude account: ${accountId}`)
     return res.json({ success: true, message: 'Claude account updated successfully' })
   } catch (error) {
-    logger.error('❌ Failed to update Claude account:', error)
+    logger.error('[错误] 更新 Claude 账户失败：', error)
     return res
       .status(500)
       .json({ error: 'Failed to update Claude account', message: error.message })
@@ -1357,7 +1358,7 @@ router.delete('/claude-accounts/:accountId', authenticateAdmin, async (req, res)
     logger.success(`🗑️ Admin deleted Claude account: ${accountId}`)
     return res.json({ success: true, message: 'Claude account deleted successfully' })
   } catch (error) {
-    logger.error('❌ Failed to delete Claude account:', error)
+    logger.error('[错误] 删除 Claude 账户失败：', error)
     return res
       .status(500)
       .json({ error: 'Failed to delete Claude account', message: error.message })
@@ -1374,7 +1375,7 @@ router.post('/claude-accounts/:accountId/refresh', authenticateAdmin, async (req
     logger.success(`🔄 Admin refreshed token for Claude account: ${accountId}`)
     return res.json({ success: true, data: result })
   } catch (error) {
-    logger.error('❌ Failed to refresh Claude account token:', error)
+    logger.error('[错误] 刷新 Claude 账户令牌失败：', error)
     return res.status(500).json({ error: 'Failed to refresh token', message: error.message })
   }
 })
@@ -1389,7 +1390,7 @@ router.post('/claude-accounts/:accountId/reset-status', authenticateAdmin, async
     logger.success(`✅ Admin reset status for Claude account: ${accountId}`)
     return res.json({ success: true, data: result })
   } catch (error) {
-    logger.error('❌ Failed to reset Claude account status:', error)
+    logger.error('[错误] 重置 Claude 账户状态失败：', error)
     return res.status(500).json({ error: 'Failed to reset status', message: error.message })
   }
 })
@@ -1412,12 +1413,12 @@ router.put(
       const newSchedulable = !account.schedulable
       await claudeAccountService.updateAccount(accountId, { schedulable: newSchedulable })
 
-      logger.success(
+      logger.info(
         `🔄 Admin toggled Claude account schedulable status: ${accountId} -> ${newSchedulable ? 'schedulable' : 'not schedulable'}`
       )
       return res.json({ success: true, schedulable: newSchedulable })
     } catch (error) {
-      logger.error('❌ Failed to toggle Claude account schedulable status:', error)
+      logger.error('[错误] 切换 Claude 账户可调度状态失败：', error)
       return res
         .status(500)
         .json({ error: 'Failed to toggle schedulable status', message: error.message })
@@ -1484,7 +1485,7 @@ router.get('/claude-console-accounts', authenticateAdmin, async (req, res) => {
 
     return res.json({ success: true, data: accountsWithStats })
   } catch (error) {
-    logger.error('❌ Failed to get Claude Console accounts:', error)
+    logger.error('[错误] 获取 Claude Console 账户失败：', error)
     return res
       .status(500)
       .json({ error: 'Failed to get Claude Console accounts', message: error.message })
@@ -1550,7 +1551,7 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
     logger.success(`🎮 Admin created Claude Console account: ${name}`)
     return res.json({ success: true, data: newAccount })
   } catch (error) {
-    logger.error('❌ Failed to create Claude Console account:', error)
+    logger.error('[错误] 创建 Claude Console 账户失败：', error)
     return res
       .status(500)
       .json({ error: 'Failed to create Claude Console account', message: error.message })
@@ -1607,7 +1608,7 @@ router.put('/claude-console-accounts/:accountId', authenticateAdmin, async (req,
     logger.success(`📝 Admin updated Claude Console account: ${accountId}`)
     return res.json({ success: true, message: 'Claude Console account updated successfully' })
   } catch (error) {
-    logger.error('❌ Failed to update Claude Console account:', error)
+    logger.error('[错误] 更新 Claude Console 账户失败：', error)
     return res
       .status(500)
       .json({ error: 'Failed to update Claude Console account', message: error.message })
@@ -1633,7 +1634,7 @@ router.delete('/claude-console-accounts/:accountId', authenticateAdmin, async (r
     logger.success(`🗑️ Admin deleted Claude Console account: ${accountId}`)
     return res.json({ success: true, message: 'Claude Console account deleted successfully' })
   } catch (error) {
-    logger.error('❌ Failed to delete Claude Console account:', error)
+    logger.error('[错误] 删除 Claude Console 账户失败：', error)
     return res
       .status(500)
       .json({ error: 'Failed to delete Claude Console account', message: error.message })
@@ -1658,7 +1659,7 @@ router.put('/claude-console-accounts/:accountId/toggle', authenticateAdmin, asyn
     )
     return res.json({ success: true, isActive: newStatus })
   } catch (error) {
-    logger.error('❌ Failed to toggle Claude Console account status:', error)
+    logger.error('[错误] 切换 Claude Console 账户状态失败：', error)
     return res
       .status(500)
       .json({ error: 'Failed to toggle account status', message: error.message })
@@ -1681,12 +1682,12 @@ router.put(
       const newSchedulable = !account.schedulable
       await claudeConsoleAccountService.updateAccount(accountId, { schedulable: newSchedulable })
 
-      logger.success(
+      logger.info(
         `🔄 Admin toggled Claude Console account schedulable status: ${accountId} -> ${newSchedulable ? 'schedulable' : 'not schedulable'}`
       )
       return res.json({ success: true, schedulable: newSchedulable })
     } catch (error) {
-      logger.error('❌ Failed to toggle Claude Console account schedulable status:', error)
+      logger.error('[错误] 切换 Claude Console 账户可调度状态失败：', error)
       return res
         .status(500)
         .json({ error: 'Failed to toggle schedulable status', message: error.message })
@@ -1760,7 +1761,7 @@ router.get('/bedrock-accounts', authenticateAdmin, async (req, res) => {
 
     return res.json({ success: true, data: accountsWithStats })
   } catch (error) {
-    logger.error('❌ Failed to get Bedrock accounts:', error)
+    logger.error('[错误] 获取 Bedrock 账户失败：', error)
     return res.status(500).json({ error: 'Failed to get Bedrock accounts', message: error.message })
   }
 })
@@ -1822,7 +1823,7 @@ router.post('/bedrock-accounts', authenticateAdmin, async (req, res) => {
     logger.success(`☁️ Admin created Bedrock account: ${name}`)
     return res.json({ success: true, data: result.data })
   } catch (error) {
-    logger.error('❌ Failed to create Bedrock account:', error)
+    logger.error('[错误] 创建 Bedrock 账户失败：', error)
     return res
       .status(500)
       .json({ error: 'Failed to create Bedrock account', message: error.message })
@@ -1868,7 +1869,7 @@ router.put('/bedrock-accounts/:accountId', authenticateAdmin, async (req, res) =
     logger.success(`📝 Admin updated Bedrock account: ${accountId}`)
     return res.json({ success: true, message: 'Bedrock account updated successfully' })
   } catch (error) {
-    logger.error('❌ Failed to update Bedrock account:', error)
+    logger.error('[错误] 更新 Bedrock 账户失败：', error)
     return res
       .status(500)
       .json({ error: 'Failed to update Bedrock account', message: error.message })
@@ -1891,7 +1892,7 @@ router.delete('/bedrock-accounts/:accountId', authenticateAdmin, async (req, res
     logger.success(`🗑️ Admin deleted Bedrock account: ${accountId}`)
     return res.json({ success: true, message: 'Bedrock account deleted successfully' })
   } catch (error) {
-    logger.error('❌ Failed to delete Bedrock account:', error)
+    logger.error('[错误] 删除 Bedrock 账户失败：', error)
     return res
       .status(500)
       .json({ error: 'Failed to delete Bedrock account', message: error.message })
@@ -1919,12 +1920,12 @@ router.put('/bedrock-accounts/:accountId/toggle', authenticateAdmin, async (req,
         .json({ error: 'Failed to toggle account status', message: updateResult.error })
     }
 
-    logger.success(
+    logger.info(
       `🔄 Admin toggled Bedrock account status: ${accountId} -> ${newStatus ? 'active' : 'inactive'}`
     )
     return res.json({ success: true, isActive: newStatus })
   } catch (error) {
-    logger.error('❌ Failed to toggle Bedrock account status:', error)
+    logger.error('[错误] 切换 Bedrock 账户状态失败：', error)
     return res
       .status(500)
       .json({ error: 'Failed to toggle account status', message: error.message })
@@ -1955,12 +1956,12 @@ router.put(
           .json({ error: 'Failed to toggle schedulable status', message: updateResult.error })
       }
 
-      logger.success(
+      logger.info(
         `🔄 Admin toggled Bedrock account schedulable status: ${accountId} -> ${newSchedulable ? 'schedulable' : 'not schedulable'}`
       )
       return res.json({ success: true, schedulable: newSchedulable })
     } catch (error) {
-      logger.error('❌ Failed to toggle Bedrock account schedulable status:', error)
+      logger.error('[错误] 切换 Bedrock 账户可调度状态失败：', error)
       return res
         .status(500)
         .json({ error: 'Failed to toggle schedulable status', message: error.message })
@@ -1982,8 +1983,38 @@ router.post('/bedrock-accounts/:accountId/test', authenticateAdmin, async (req, 
     logger.success(`🧪 Admin tested Bedrock account: ${accountId} - ${result.data.status}`)
     return res.json({ success: true, data: result.data })
   } catch (error) {
-    logger.error('❌ Failed to test Bedrock account:', error)
+    logger.error('[错误] 测试 Bedrock 账户失败：', error)
     return res.status(500).json({ error: 'Failed to test Bedrock account', message: error.message })
+  }
+})
+
+// 测试Claude账户连接和服务可用性
+router.post('/claude-accounts/:accountId/test', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+
+    const result = await claudeAccountService.testAccount(accountId)
+
+    if (!result.success) {
+      return res.status(500).json({
+        error: 'Claude account test failed',
+        message: result.error,
+        details: {
+          statusCode: result.statusCode,
+          isRateLimit: result.isRateLimit,
+          isUnauthorized: result.isUnauthorized,
+          networkError: result.networkError,
+          timeout: result.timeout
+        }
+      })
+    }
+
+    logger.success(`🧪 Admin tested Claude account: ${accountId} - ${result.data.status}`)
+
+    return res.json({ success: true, data: result.data })
+  } catch (error) {
+    logger.error('[错误] 测试 Claude 账户失败：', error)
+    return res.status(500).json({ error: 'Failed to test Claude account', message: error.message })
   }
 })
 
@@ -2025,7 +2056,7 @@ router.post('/gemini-accounts/generate-auth-url', authenticateAdmin, async (req,
       }
     })
   } catch (error) {
-    logger.error('❌ Failed to generate Gemini auth URL:', error)
+    logger.error('[错误] 生成 Gemini 授权链接失败：', error)
     return res.status(500).json({ error: 'Failed to generate auth URL', message: error.message })
   }
 })
@@ -2048,7 +2079,7 @@ router.post('/gemini-accounts/poll-auth-status', authenticateAdmin, async (req, 
       return res.json({ success: false, error: result.error })
     }
   } catch (error) {
-    logger.error('❌ Failed to poll Gemini auth status:', error)
+    logger.error('[错误] 轮询 Gemini 授权状态失败：', error)
     return res.status(500).json({ error: 'Failed to poll auth status', message: error.message })
   }
 })
@@ -2088,7 +2119,7 @@ router.post('/gemini-accounts/exchange-code', authenticateAdmin, async (req, res
     logger.success('✅ Successfully exchanged Gemini authorization code')
     return res.json({ success: true, data: { tokens } })
   } catch (error) {
-    logger.error('❌ Failed to exchange Gemini authorization code:', error)
+    logger.error('[错误] 交换 Gemini 授权码失败：', error)
     return res.status(500).json({ error: 'Failed to exchange code', message: error.message })
   }
 })
@@ -2151,7 +2182,7 @@ router.get('/gemini-accounts', authenticateAdmin, async (req, res) => {
 
     return res.json({ success: true, data: accountsWithStats })
   } catch (error) {
-    logger.error('❌ Failed to get Gemini accounts:', error)
+    logger.error('[错误] 获取 Gemini 账户失败：', error)
     return res.status(500).json({ error: 'Failed to get accounts', message: error.message })
   }
 })
@@ -2191,7 +2222,7 @@ router.post('/gemini-accounts', authenticateAdmin, async (req, res) => {
     logger.success(`🏢 Admin created new Gemini account: ${accountData.name}`)
     return res.json({ success: true, data: newAccount })
   } catch (error) {
-    logger.error('❌ Failed to create Gemini account:', error)
+    logger.error('[错误] 创建 Gemini 账户失败：', error)
     return res.status(500).json({ error: 'Failed to create account', message: error.message })
   }
 })
@@ -2240,7 +2271,7 @@ router.put('/gemini-accounts/:accountId', authenticateAdmin, async (req, res) =>
     logger.success(`📝 Admin updated Gemini account: ${accountId}`)
     return res.json({ success: true, data: updatedAccount })
   } catch (error) {
-    logger.error('❌ Failed to update Gemini account:', error)
+    logger.error('[错误] 更新 Gemini 账户失败：', error)
     return res.status(500).json({ error: 'Failed to update account', message: error.message })
   }
 })
@@ -2264,7 +2295,7 @@ router.delete('/gemini-accounts/:accountId', authenticateAdmin, async (req, res)
     logger.success(`🗑️ Admin deleted Gemini account: ${accountId}`)
     return res.json({ success: true, message: 'Gemini account deleted successfully' })
   } catch (error) {
-    logger.error('❌ Failed to delete Gemini account:', error)
+    logger.error('[错误] 删除 Gemini 账户失败：', error)
     return res.status(500).json({ error: 'Failed to delete account', message: error.message })
   }
 })
@@ -2279,7 +2310,7 @@ router.post('/gemini-accounts/:accountId/refresh', authenticateAdmin, async (req
     logger.success(`🔄 Admin refreshed token for Gemini account: ${accountId}`)
     return res.json({ success: true, data: result })
   } catch (error) {
-    logger.error('❌ Failed to refresh Gemini account token:', error)
+    logger.error('[错误] 刷新 Gemini 账户令牌失败：', error)
     return res.status(500).json({ error: 'Failed to refresh token', message: error.message })
   }
 })
@@ -2303,12 +2334,12 @@ router.put(
 
       await geminiAccountService.updateAccount(accountId, { schedulable: String(newSchedulable) })
 
-      logger.success(
+      logger.info(
         `🔄 Admin toggled Gemini account schedulable status: ${accountId} -> ${newSchedulable ? 'schedulable' : 'not schedulable'}`
       )
       return res.json({ success: true, schedulable: newSchedulable })
     } catch (error) {
-      logger.error('❌ Failed to toggle Gemini account schedulable status:', error)
+      logger.error('[错误] 切换 Gemini 账户可调度状态失败：', error)
       return res
         .status(500)
         .json({ error: 'Failed to toggle schedulable status', message: error.message })
@@ -2341,7 +2372,7 @@ router.get('/accounts/usage-stats', authenticateAdmin, async (req, res) => {
       timestamp: new Date().toISOString()
     })
   } catch (error) {
-    logger.error('❌ Failed to get accounts usage stats:', error)
+    logger.error('[错误] 获取账户使用统计失败：', error)
     return res.status(500).json({
       success: false,
       error: 'Failed to get accounts usage stats',
@@ -2380,7 +2411,7 @@ router.get('/accounts/:accountId/usage-stats', authenticateAdmin, async (req, re
       timestamp: new Date().toISOString()
     })
   } catch (error) {
-    logger.error('❌ Failed to get account usage stats:', error)
+    logger.error('[错误] 获取账户使用统计失败：', error)
     return res.status(500).json({
       success: false,
       error: 'Failed to get account usage stats',
@@ -2659,7 +2690,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
 
     return res.json({ success: true, data: dashboard })
   } catch (error) {
-    logger.error('❌ Failed to get dashboard data:', error)
+    logger.error('[错误] 获取仪表盘数据失败：', error)
     return res.status(500).json({ error: 'Failed to get dashboard data', message: error.message })
   }
 })
@@ -2680,7 +2711,7 @@ router.get('/usage-stats', authenticateAdmin, async (req, res) => {
 
     return res.json({ success: true, data: { period, stats } })
   } catch (error) {
-    logger.error('❌ Failed to get usage stats:', error)
+    logger.error('[错误] 获取使用统计失败：', error)
     return res.status(500).json({ error: 'Failed to get usage stats', message: error.message })
   }
 })
@@ -2854,7 +2885,7 @@ router.get('/model-stats', authenticateAdmin, async (req, res) => {
 
     return res.json({ success: true, data: modelStats })
   } catch (error) {
-    logger.error('❌ Failed to get model stats:', error)
+    logger.error('[错误] 获取模型统计失败：', error)
     return res.status(500).json({ error: 'Failed to get model stats', message: error.message })
   }
 })
@@ -2884,7 +2915,7 @@ router.post('/cleanup', authenticateAdmin, async (req, res) => {
       }
     })
   } catch (error) {
-    logger.error('❌ Cleanup failed:', error)
+    logger.error('[错误] 清理失败：', error)
     return res.status(500).json({ error: 'Cleanup failed', message: error.message })
   }
 })
@@ -3144,7 +3175,7 @@ router.get('/usage-trend', authenticateAdmin, async (req, res) => {
 
     return res.json({ success: true, data: trendData, granularity })
   } catch (error) {
-    logger.error('❌ Failed to get usage trend:', error)
+    logger.error('[错误] 获取使用趋势失败：', error)
     return res.status(500).json({ error: 'Failed to get usage trend', message: error.message })
   }
 })
@@ -3329,7 +3360,7 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
               usingDynamicPricing: costData.usingDynamicPricing
             })
 
-            logger.info('📊 Generated display data from API key usage stats')
+            logger.info('[信息] 从 API Key 使用统计生成展示数据')
           } else {
             logger.info(`📊 No usage data found for period ${period} in API key data`)
           }
@@ -3337,7 +3368,7 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
           logger.info(`📊 API key ${keyId} not found or has no usage data`)
         }
       } catch (error) {
-        logger.error('❌ Error fetching API key usage data:', error)
+        logger.error('[错误] 获取 API Key 使用数据失败：', error)
       }
     }
 
@@ -3348,7 +3379,7 @@ router.get('/api-keys/:keyId/model-stats', authenticateAdmin, async (req, res) =
 
     return res.json({ success: true, data: modelStats })
   } catch (error) {
-    logger.error('❌ Failed to get API key model stats:', error)
+    logger.error('[错误] 获取 API Key 模型统计失败：', error)
     return res
       .status(500)
       .json({ error: 'Failed to get API key model stats', message: error.message })
@@ -3642,7 +3673,7 @@ router.get('/api-keys-usage-trend', authenticateAdmin, async (req, res) => {
       totalApiKeys: apiKeyTotals.size
     })
   } catch (error) {
-    logger.error('❌ Failed to get API keys usage trend:', error)
+    logger.error('[错误] 获取 API Key 使用趋势失败：', error)
     return res
       .status(500)
       .json({ error: 'Failed to get API keys usage trend', message: error.message })
@@ -3972,7 +4003,7 @@ router.get('/usage-costs', authenticateAdmin, async (req, res) => {
       }
     })
   } catch (error) {
-    logger.error('❌ Failed to calculate usage costs:', error)
+    logger.error('[错误] 计算使用费用失败：', error)
     return res
       .status(500)
       .json({ error: 'Failed to calculate usage costs', message: error.message })
@@ -4006,7 +4037,7 @@ router.get('/claude-code-headers', authenticateAdmin, async (req, res) => {
       data: formattedData
     })
   } catch (error) {
-    logger.error('❌ Failed to get Claude Code headers:', error)
+    logger.error('[错误] 获取 Claude Code headers 失败：', error)
     return res
       .status(500)
       .json({ error: 'Failed to get Claude Code headers', message: error.message })
@@ -4024,7 +4055,7 @@ router.delete('/claude-code-headers/:accountId', authenticateAdmin, async (req, 
       message: `Claude Code headers cleared for account ${accountId}`
     })
   } catch (error) {
-    logger.error('❌ Failed to clear Claude Code headers:', error)
+    logger.error('[错误] 清除 Claude Code headers 失败：', error)
     return res
       .status(500)
       .json({ error: 'Failed to clear Claude Code headers', message: error.message })
@@ -4129,7 +4160,7 @@ router.get('/check-updates', authenticateAdmin, async (req, res) => {
       request: error.request ? 'Request was made but no response received' : null
     }
 
-    logger.error('❌ Failed to check for updates:', errorDetails.message)
+    logger.error('[错误] 检查更新失败：', errorDetails.message)
 
     // 处理 404 错误 - 仓库或版本不存在
     if (error.response && error.response.status === 404) {
@@ -4247,7 +4278,7 @@ router.get('/oem-settings', async (req, res) => {
       data: settings
     })
   } catch (error) {
-    logger.error('❌ Failed to get OEM settings:', error)
+    logger.error('[错误] 获取 OEM 设置失败：', error)
     return res.status(500).json({ error: 'Failed to get OEM settings', message: error.message })
   }
 })
@@ -4300,7 +4331,7 @@ router.put('/oem-settings', authenticateAdmin, async (req, res) => {
       data: settings
     })
   } catch (error) {
-    logger.error('❌ Failed to update OEM settings:', error)
+    logger.error('[错误] 更新 OEM 设置失败：', error)
     return res.status(500).json({ error: 'Failed to update OEM settings', message: error.message })
   }
 })
@@ -4527,7 +4558,7 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
       data: accounts
     })
   } catch (error) {
-    logger.error('获取 OpenAI 账户列表失败:', error)
+    logger.error('[错误] 获取 OpenAI 账户列表失败：', error)
     return res.status(500).json({
       success: false,
       message: '获取账户列表失败',
@@ -4614,7 +4645,7 @@ router.post('/openai-accounts', authenticateAdmin, async (req, res) => {
       }
     })
   } catch (error) {
-    logger.error('创建 OpenAI 账户失败:', error)
+    logger.error('[错误] 创建 OpenAI 账户失败：', error)
     return res.status(500).json({
       success: false,
       message: '创建账户失败',
@@ -4653,7 +4684,7 @@ router.delete('/openai-accounts/:id', authenticateAdmin, async (req, res) => {
       message: '账户删除成功'
     })
   } catch (error) {
-    logger.error('删除 OpenAI 账户失败:', error)
+    logger.error('[错误] 删除 OpenAI 账户失败：', error)
     return res.status(500).json({
       success: false,
       message: '删除账户失败',
@@ -4691,7 +4722,7 @@ router.put('/openai-accounts/:id/toggle', authenticateAdmin, async (req, res) =>
       data: account
     })
   } catch (error) {
-    logger.error('切换 OpenAI 账户状态失败:', error)
+    logger.error('[错误] 切换 OpenAI 账户状态失败：', error)
     return res.status(500).json({
       success: false,
       message: '切换账户状态失败',
@@ -4708,7 +4739,7 @@ router.get('/redemption-codes/stats', authenticateAdmin, async (req, res) => {
     const stats = await redemptionCodeService.getRedemptionStats()
     return res.json({ success: true, data: stats })
   } catch (error) {
-    logger.error('❌ Failed to get redemption code stats:', error)
+    logger.error('[错误] 获取兑换码统计失败：', error)
     return res
       .status(500)
       .json({ error: 'Failed to get redemption code stats', message: error.message })
@@ -4724,7 +4755,7 @@ router.get('/redemption-codes', authenticateAdmin, async (req, res) => {
     const codes = await redemptionCodeService.getAllRedemptionCodes(filters)
     return res.json({ success: true, data: codes })
   } catch (error) {
-    logger.error('❌ Failed to get redemption codes:', error)
+    logger.error('[错误] 获取兑换码失败：', error)
     return res.status(500).json({ error: 'Failed to get redemption codes', message: error.message })
   }
 })
@@ -4749,7 +4780,7 @@ router.post('/redemption-codes/generate', authenticateAdmin, async (req, res) =>
       data: codes
     })
   } catch (error) {
-    logger.error('❌ Failed to generate redemption codes:', error)
+    logger.error('[错误] 生成兑换码失败：', error)
     return res
       .status(500)
       .json({ error: 'Failed to generate redemption codes', message: error.message })
@@ -4775,7 +4806,7 @@ router.get('/redemption-codes/extract/:type', authenticateAdmin, async (req, res
       message: `Extracted ${codeStrings.length} available ${type} codes`
     })
   } catch (error) {
-    logger.error('❌ Failed to extract redemption codes:', error)
+    logger.error('[错误] 提取兑换码失败：', error)
     return res
       .status(500)
       .json({ error: 'Failed to extract redemption codes', message: error.message })
@@ -5029,6 +5060,109 @@ router.put('/system-groups/:accountType/rate-template', authenticateAdmin, async
       success: false,
       error: '设置系统分组倍率模板失败'
     })
+  }
+})
+
+// 🧠 智能限流管理端点
+
+// 获取智能限流统计信息
+router.get('/intelligent-rate-limit/stats', authenticateAdmin, async (req, res) => {
+  try {
+    const stats = await intelligentRateLimitService.getRateLimitStats()
+    res.json({ success: true, data: stats })
+  } catch (error) {
+    logger.error('❌ Failed to get intelligent rate limit stats:', error)
+    res.status(500).json({ error: 'Failed to get rate limit stats', message: error.message })
+  }
+})
+
+// 获取故障日志
+router.get('/intelligent-rate-limit/fault-logs', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId, accountType, limit = 50 } = req.query
+    const logs = await intelligentRateLimitService.getFaultLogs(
+      accountId,
+      accountType,
+      parseInt(limit)
+    )
+    res.json({ success: true, data: logs })
+  } catch (error) {
+    logger.error('❌ Failed to get fault logs:', error)
+    res.status(500).json({ error: 'Failed to get fault logs', message: error.message })
+  }
+})
+
+// 手动移除账户的智能限流状态
+router.post(
+  '/intelligent-rate-limit/remove/:accountType/:accountId',
+  authenticateAdmin,
+  async (req, res) => {
+    try {
+      const { accountType, accountId } = req.params
+      const { reason = 'manual_removal' } = req.body
+
+      const result = await intelligentRateLimitService.removeIntelligentRateLimit(
+        accountId,
+        accountType,
+        reason
+      )
+
+      if (result.success) {
+        logger.success(
+          `✅ Admin removed intelligent rate limit: ${accountType} account ${accountId}`
+        )
+        res.json({ success: true, message: 'Intelligent rate limit removed' })
+      } else {
+        res.status(500).json({ error: 'Failed to remove intelligent rate limit' })
+      }
+    } catch (error) {
+      logger.error('[错误] 手动移除智能限流状态失败：', error)
+      res
+        .status(500)
+        .json({ error: 'Failed to remove intelligent rate limit', message: error.message })
+    }
+  }
+)
+
+// 手动测试账户恢复状态
+router.post(
+  '/intelligent-rate-limit/test-recovery/:accountType/:accountId',
+  authenticateAdmin,
+  async (req, res) => {
+    try {
+      const { accountType, accountId } = req.params
+
+      const result = await intelligentRateLimitService.testAccountRecovery(accountId, accountType)
+
+      logger.info(
+        `🧪 Admin triggered recovery test: ${accountType} account ${accountId} - ${result.recovered ? 'recovered' : 'still limited'}`
+      )
+      res.json({ success: true, data: result })
+    } catch (error) {
+      logger.error('[错误] 手动测试账户恢复状态失败：', error)
+      res.status(500).json({ error: 'Failed to test account recovery', message: error.message })
+    }
+  }
+)
+
+// 获取智能限流配置信息
+router.get('/intelligent-rate-limit/config', authenticateAdmin, async (req, res) => {
+  try {
+    const configInfo = {
+      enabled: config.intelligentRateLimit.enabled,
+      triggerOnAnyError: config.intelligentRateLimit.triggerOnAnyError,
+      recoveryTestInterval: config.intelligentRateLimit.recoveryTestInterval,
+      recoveryTestTimeout: config.intelligentRateLimit.recoveryTestTimeout,
+      maxFaultLogs: config.intelligentRateLimit.maxFaultLogs,
+      faultLogRetentionDays: config.intelligentRateLimit.faultLogRetentionDays,
+      errorCategories: config.intelligentRateLimit.errorCategories,
+      alerting: config.intelligentRateLimit.alerting
+    }
+
+    res.json({ success: true, data: configInfo })
+  } catch (error) {
+    logger.error('❌ Failed to get intelligent rate limit config:', error)
+    res.status(500).json({ error: 'Failed to get config', message: error.message })
   }
 })
 

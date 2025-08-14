@@ -12,15 +12,15 @@ class IntelligentRateLimitService {
     this.FAULT_LOG_PREFIX = 'fault_log:'
     this.ERROR_COUNT_PREFIX = 'error_count:'
 
-    // 从配置读取参数
-    this.RECOVERY_TEST_INTERVAL =
-      (config.intelligentRateLimit.recoveryTestInterval || 5) * 60 * 1000
-    this.RECOVERY_TEST_TIMEOUT = (config.intelligentRateLimit.recoveryTestTimeout || 30) * 1000
-    this.MAX_FAULT_LOGS = config.intelligentRateLimit.maxFaultLogs || 1000
-    this.FAULT_LOG_RETENTION_DAYS = config.intelligentRateLimit.faultLogRetentionDays || 30
+    // 从配置读取参数，添加防护措施
+    const rateLimitConfig = config.intelligentRateLimit || {}
+    this.RECOVERY_TEST_INTERVAL = (rateLimitConfig.recoveryTestInterval || 5) * 60 * 1000
+    this.RECOVERY_TEST_TIMEOUT = (rateLimitConfig.recoveryTestTimeout || 30) * 1000
+    this.MAX_FAULT_LOGS = rateLimitConfig.maxFaultLogs || 1000
+    this.FAULT_LOG_RETENTION_DAYS = rateLimitConfig.faultLogRetentionDays || 30
 
     // 仅在启用时启动定期恢复测试
-    if (config.intelligentRateLimit.enabled) {
+    if (rateLimitConfig.enabled) {
       this.startRecoveryTestingLoop()
     }
   }
@@ -28,9 +28,15 @@ class IntelligentRateLimitService {
   // 检查是否应该应用智能限流（考虑累积阈值）
   async shouldApplyIntelligentRateLimit(accountId, accountType, errorInfo) {
     try {
+      const rateLimitConfig = config.intelligentRateLimit || {}
+      const errorCategories = rateLimitConfig.errorCategories || {
+        immediate: ['rate_limit', 'server_error'],
+        accumulative: ['authentication', 'network_error'],
+        accumulativeThreshold: 3
+      }
+
       const errorType = this._categorizeError(errorInfo)
-      const { immediate, accumulative, accumulativeThreshold } =
-        config.intelligentRateLimit.errorCategories
+      const { immediate, accumulative, accumulativeThreshold } = errorCategories
 
       // 立即触发限流的错误类型
       if (immediate.includes(errorType)) {
@@ -52,7 +58,7 @@ class IntelligentRateLimitService {
       }
 
       // 如果配置为对任何错误都进行限流
-      if (config.intelligentRateLimit.triggerOnAnyError) {
+      if (rateLimitConfig.triggerOnAnyError) {
         return true
       }
 

@@ -179,7 +179,7 @@ class ClaudeRelayService {
         }
 
         // 检查是否启用智能限流
-        if (config.intelligentRateLimit.enabled) {
+        if (config.intelligentRateLimit?.enabled) {
           // 智能限流逻辑：使用累积阈值检查是否应该触发限流
           const shouldTriggerIntelligentRateLimit =
             await intelligentRateLimitService.shouldApplyIntelligentRateLimit(

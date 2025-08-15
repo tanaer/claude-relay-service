@@ -276,6 +276,54 @@
           </table>
         </div>
       </div>
+
+      <!-- 分页控件 -->
+      <div class="mt-4 flex items-center justify-between">
+        <div class="text-sm text-gray-500">
+          显示
+          {{
+            Math.min((pagination.currentPage - 1) * pagination.pageSize + 1, pagination.totalCount)
+          }}
+          -
+          {{ Math.min(pagination.currentPage * pagination.pageSize, pagination.totalCount) }}
+          共 {{ pagination.totalCount }} 条记录
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            class="rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="pagination.currentPage <= 1"
+            @click="changePage(pagination.currentPage - 1)"
+          >
+            上一页
+          </button>
+
+          <div class="flex items-center gap-1">
+            <template v-for="page in getPageNumbers()" :key="page">
+              <button
+                v-if="page !== '...'"
+                class="rounded-lg px-3 py-2 text-sm"
+                :class="
+                  page === pagination.currentPage
+                    ? 'bg-blue-600 text-white'
+                    : 'border border-gray-300 hover:bg-gray-50'
+                "
+                @click="changePage(page)"
+              >
+                {{ page }}
+              </button>
+              <span v-else class="px-2 text-gray-500">...</span>
+            </template>
+          </div>
+
+          <button
+            class="rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="pagination.currentPage >= pagination.totalPages"
+            @click="changePage(pagination.currentPage + 1)"
+          >
+            下一页
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- 策略配置弹窗 -->
@@ -310,15 +358,27 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { showToast } from '../utils/toast'
+import { useApi } from '../composables/useApi'
 import CustomDropdown from '../components/common/CustomDropdown.vue'
 import PolicyConfigModal from '../components/redemption/PolicyConfigModal.vue'
 import PolicyStatusMonitor from '../components/redemption/PolicyStatusMonitor.vue'
+
+// 使用API组合式函数
+const api = useApi()
 
 // 响应式数据
 const isLoading = ref(false)
 const isGenerating = ref(false)
 const codes = ref([])
 const stats = ref(null)
+
+// 分页数据
+const pagination = reactive({
+  currentPage: 1,
+  pageSize: 20,
+  totalCount: 0,
+  totalPages: 0
+})
 
 // 策略配置相关状态
 const showTypeDropdown = ref(false)
@@ -367,24 +427,28 @@ const debounceSearch = () => {
 const loadCodes = async () => {
   isLoading.value = true
   try {
-    const params = new URLSearchParams()
-    if (filters.status) params.append('status', filters.status)
-    if (filters.type) params.append('type', filters.type)
-    if (filters.code) params.append('code', filters.code)
-    if (filters.apiKey) params.append('apiKey', filters.apiKey)
+    const params = {}
+    if (filters.status) params.status = filters.status
+    if (filters.type) params.type = filters.type
+    if (filters.code) params.code = filters.code
+    if (filters.apiKey) params.apiKey = filters.apiKey
 
-    const response = await fetch(`/admin/redemption-codes?${params}`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('authToken')}`
-      }
+    // 添加分页参数
+    params.page = pagination.currentPage
+    params.pageSize = pagination.pageSize
+
+    const result = await api.get('/admin/redemption-codes', {
+      params: new URLSearchParams(params)
     })
 
-    if (!response.ok) {
-      throw new Error('Failed to load redemption codes')
-    }
+    if (result.success) {
+      codes.value = result.data.items || result.data
 
-    const result = await response.json()
-    codes.value = result.data
+      // 更新分页信息
+      if (result.data.pagination) {
+        Object.assign(pagination, result.data.pagination)
+      }
+    }
   } catch (error) {
     console.error('Error loading redemption codes:', error)
     showToast('加载兑换码失败', 'error')
@@ -396,18 +460,10 @@ const loadCodes = async () => {
 // 加载统计信息
 const loadStats = async () => {
   try {
-    const response = await fetch('/admin/redemption-codes/stats', {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('authToken')}`
-      }
-    })
-
-    if (!response.ok) {
-      throw new Error('Failed to load stats')
+    const result = await api.get('/admin/redemption-codes/stats')
+    if (result.success) {
+      stats.value = result.data
     }
-
-    const result = await response.json()
-    stats.value = result.data
   } catch (error) {
     console.error('Error loading stats:', error)
     showToast('加载统计信息失败', 'error')
@@ -418,24 +474,13 @@ const loadStats = async () => {
 const generateCodes = async (type) => {
   isGenerating.value = true
   try {
-    const response = await fetch('/admin/redemption-codes/generate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('authToken')}`
-      },
-      body: JSON.stringify({ type, count: 20 })
-    })
+    const result = await api.post('/admin/redemption-codes/generate', { type, count: 20 })
 
-    if (!response.ok) {
-      throw new Error('Failed to generate codes')
+    if (result.success) {
+      showToast(`成功生成 ${result.data.length} 个${type === 'daily' ? '日卡' : '月卡'}`, 'success')
+      // 刷新数据
+      await refreshData()
     }
-
-    const result = await response.json()
-    showToast(`成功生成 ${result.data.length} 个${type === 'daily' ? '日卡' : '月卡'}`, 'success')
-
-    // 刷新数据
-    await refreshData()
   } catch (error) {
     console.error('Error generating codes:', error)
     showToast('生成兑换码失败', 'error')
@@ -457,25 +502,18 @@ const extractCodes = async (type) => {
       showToast('最多一次提取 100 个，已自动调整为 100', 'info')
     }
 
-    const response = await fetch(`/admin/redemption-codes/extract/${type}?count=${count}`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('authToken')}`
-      }
-    })
+    const result = await api.get(`/admin/redemption-codes/extract/${type}?count=${count}`)
 
-    if (!response.ok) {
-      throw new Error('Failed to extract codes')
+    if (result.success) {
+      const codeText = result.data.join('\n')
+
+      // 复制到剪贴板
+      await navigator.clipboard.writeText(codeText)
+      showToast(
+        `成功提取 ${result.data.length} 个${type === 'daily' ? '日卡' : '月卡'}并复制到剪贴板`,
+        'success'
+      )
     }
-
-    const result = await response.json()
-    const codeText = result.data.join('\n')
-
-    // 复制到剪贴板
-    await navigator.clipboard.writeText(codeText)
-    showToast(
-      `成功提取 ${result.data.length} 个${type === 'daily' ? '日卡' : '月卡'}并复制到剪贴板`,
-      'success'
-    )
   } catch (error) {
     console.error('Error extracting codes:', error)
     showToast('提取兑换码失败', 'error')
@@ -563,6 +601,53 @@ const handleConfigureFromStatus = (config) => {
   if (config?.type && config?.id) {
     openPolicyConfig('code', config.id)
   }
+}
+
+// 分页相关方法
+const changePage = (page) => {
+  if (page < 1 || page > pagination.totalPages) return
+  pagination.currentPage = page
+  loadCodes()
+}
+
+const getPageNumbers = () => {
+  const { currentPage, totalPages } = pagination
+  const pages = []
+
+  if (totalPages <= 7) {
+    // 如果总页数不超过7页，显示所有页码
+    for (let i = 1; i <= totalPages; i++) {
+      pages.push(i)
+    }
+  } else {
+    // 复杂分页逻辑
+    if (currentPage <= 4) {
+      // 当前页在前4页
+      for (let i = 1; i <= 5; i++) {
+        pages.push(i)
+      }
+      pages.push('...')
+      pages.push(totalPages)
+    } else if (currentPage >= totalPages - 3) {
+      // 当前页在后4页
+      pages.push(1)
+      pages.push('...')
+      for (let i = totalPages - 4; i <= totalPages; i++) {
+        pages.push(i)
+      }
+    } else {
+      // 当前页在中间
+      pages.push(1)
+      pages.push('...')
+      for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+        pages.push(i)
+      }
+      pages.push('...')
+      pages.push(totalPages)
+    }
+  }
+
+  return pages
 }
 
 // 组件挂载时加载数据

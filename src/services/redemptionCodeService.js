@@ -88,7 +88,7 @@ class RedemptionCodeService {
   }
 
   // 获取所有兑换码
-  async getAllRedemptionCodes(filters = {}) {
+  async getAllRedemptionCodes(filters = {}, pagination = null) {
     try {
       const client = redis.getClientSafe()
       const keys = await client.keys('redemption_code:*')
@@ -132,7 +132,27 @@ class RedemptionCodeService {
       // 按创建时间倒序排列
       filteredCodes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 
-      return filteredCodes
+      // 如果没有分页参数，返回所有数据（向后兼容）
+      if (!pagination) {
+        return filteredCodes
+      }
+
+      // 分页处理
+      const totalCount = filteredCodes.length
+      const totalPages = Math.ceil(totalCount / pagination.pageSize)
+      const startIndex = (pagination.page - 1) * pagination.pageSize
+      const endIndex = startIndex + pagination.pageSize
+      const items = filteredCodes.slice(startIndex, endIndex)
+
+      return {
+        items,
+        pagination: {
+          currentPage: pagination.page,
+          pageSize: pagination.pageSize,
+          totalCount,
+          totalPages
+        }
+      }
     } catch (error) {
       logger.error('❌ Failed to get redemption codes:', error)
       throw error

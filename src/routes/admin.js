@@ -4753,11 +4753,17 @@ router.get('/redemption-codes/stats', authenticateAdmin, async (req, res) => {
 // 获取所有兑换码
 router.get('/redemption-codes', authenticateAdmin, async (req, res) => {
   try {
-    const { status, type, code, apiKey } = req.query
+    const { status, type, code, apiKey, page = 1, pageSize = 20 } = req.query
     const filters = { status, type, code, apiKey }
 
-    const codes = await redemptionCodeService.getAllRedemptionCodes(filters)
-    return res.json({ success: true, data: codes })
+    // 分页参数
+    const pagination = {
+      page: parseInt(page),
+      pageSize: Math.min(parseInt(pageSize), 100) // 限制最大页面大小
+    }
+
+    const result = await redemptionCodeService.getAllRedemptionCodes(filters, pagination)
+    return res.json({ success: true, data: result })
   } catch (error) {
     logger.error('[错误] 获取兑换码失败：', error)
     return res.status(500).json({ error: 'Failed to get redemption codes', message: error.message })
@@ -5464,6 +5470,58 @@ router.post('/key-logs/test', authenticateAdmin, async (req, res) => {
   } catch (error) {
     logger.error('❌ Failed to create test log:', error)
     res.status(500).json({ error: 'Failed to create test log', message: error.message })
+  }
+})
+
+// 切换策略引擎状态
+router.post('/redemption-policies/toggle-engine', authenticateAdmin, async (req, res) => {
+  try {
+    const { enabled } = req.body
+
+    if (enabled) {
+      await dynamicPolicyEngine.start()
+      logger.info('[策略引擎] 已启动')
+    } else {
+      await dynamicPolicyEngine.stop()
+      logger.info('[策略引擎] 已停止')
+    }
+
+    return res.json({
+      success: true,
+      message: `策略引擎已${enabled ? '启动' : '停止'}`
+    })
+  } catch (error) {
+    logger.error('[错误] 切换策略引擎状态失败：', error)
+    return res.status(500).json({
+      error: 'Failed to toggle policy engine',
+      message: error.message
+    })
+  }
+})
+
+// 切换调度器状态
+router.post('/redemption-policies/toggle-scheduler', authenticateAdmin, async (req, res) => {
+  try {
+    const { enabled } = req.body
+
+    if (enabled) {
+      policySchedulerService.start()
+      logger.info('[调度器] 已启动')
+    } else {
+      policySchedulerService.stop()
+      logger.info('[调度器] 已停止')
+    }
+
+    return res.json({
+      success: true,
+      message: `调度器已${enabled ? '启动' : '停止'}`
+    })
+  } catch (error) {
+    logger.error('[错误] 切换调度器状态失败：', error)
+    return res.status(500).json({
+      error: 'Failed to toggle scheduler',
+      message: error.message
+    })
   }
 })
 

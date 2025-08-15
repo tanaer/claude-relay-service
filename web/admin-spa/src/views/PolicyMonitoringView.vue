@@ -20,13 +20,36 @@
                   {{ engineStatus?.isRunning ? '运行中' : '已停止' }}
                 </div>
               </div>
-              <div
-                class="text-2xl"
-                :class="engineStatus?.isRunning ? 'text-green-500' : 'text-red-500'"
-              >
-                <i
-                  :class="engineStatus?.isRunning ? 'fas fa-play-circle' : 'fas fa-stop-circle'"
-                ></i>
+              <div class="flex flex-col items-end gap-2">
+                <div
+                  class="text-2xl"
+                  :class="engineStatus?.isRunning ? 'text-green-500' : 'text-red-500'"
+                >
+                  <i
+                    :class="engineStatus?.isRunning ? 'fas fa-play-circle' : 'fas fa-stop-circle'"
+                  ></i>
+                </div>
+                <button
+                  class="rounded px-2 py-1 text-xs font-medium transition-colors"
+                  :class="
+                    engineStatus?.isRunning
+                      ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                      : 'bg-green-100 text-green-700 hover:bg-green-200'
+                  "
+                  :disabled="toggleEngineLoading"
+                  @click="togglePolicyEngine"
+                >
+                  <i
+                    :class="[
+                      'fas',
+                      {
+                        'fa-spin fa-spinner': toggleEngineLoading,
+                        'fa-power-off': !toggleEngineLoading
+                      }
+                    ]"
+                  />
+                  {{ engineStatus?.isRunning ? '停止' : '启动' }}
+                </button>
               </div>
             </div>
           </div>
@@ -42,11 +65,36 @@
                   {{ schedulerStatus?.isRunning ? '运行中' : '已停止' }}
                 </div>
               </div>
-              <div
-                class="text-2xl"
-                :class="schedulerStatus?.isRunning ? 'text-green-500' : 'text-red-500'"
-              >
-                <i :class="schedulerStatus?.isRunning ? 'fas fa-clock' : 'fas fa-times-circle'"></i>
+              <div class="flex flex-col items-end gap-2">
+                <div
+                  class="text-2xl"
+                  :class="schedulerStatus?.isRunning ? 'text-green-500' : 'text-red-500'"
+                >
+                  <i
+                    :class="schedulerStatus?.isRunning ? 'fas fa-clock' : 'fas fa-times-circle'"
+                  ></i>
+                </div>
+                <button
+                  class="rounded px-2 py-1 text-xs font-medium transition-colors"
+                  :class="
+                    schedulerStatus?.isRunning
+                      ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                      : 'bg-green-100 text-green-700 hover:bg-green-200'
+                  "
+                  :disabled="toggleSchedulerLoading"
+                  @click="toggleScheduler"
+                >
+                  <i
+                    :class="[
+                      'fas',
+                      {
+                        'fa-spin fa-spinner': toggleSchedulerLoading,
+                        'fa-power-off': !toggleSchedulerLoading
+                      }
+                    ]"
+                  />
+                  {{ schedulerStatus?.isRunning ? '停止' : '启动' }}
+                </button>
               </div>
             </div>
           </div>
@@ -347,6 +395,7 @@
 <script>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { showToast } from '@/utils/toast'
+import { useRedemptionPolicyApi, useRateTemplateApi } from '@/composables/useApi'
 import PolicyStatusMonitor from '@/components/redemption/PolicyStatusMonitor.vue'
 
 export default {
@@ -355,9 +404,14 @@ export default {
     PolicyStatusMonitor
   },
   setup() {
+    // API 组合式函数
+    const policyApi = useRedemptionPolicyApi()
+    const templateApi = useRateTemplateApi()
     const loading = ref(false)
     const triggeringReset = ref(false)
     const triggeringCleanup = ref(false)
+    const toggleEngineLoading = ref(false)
+    const toggleSchedulerLoading = ref(false)
     const activeTab = ref('active')
     const searchQuery = ref('')
 
@@ -408,8 +462,7 @@ export default {
     // 方法
     const loadEngineStatus = async () => {
       try {
-        const response = await fetch('/admin/redemption-policies/engine-status')
-        const result = await response.json()
+        const result = await policyApi.getEngineStatus()
         if (result.success) {
           engineStatus.value = result.data
         }
@@ -420,8 +473,7 @@ export default {
 
     const loadSchedulerStatus = async () => {
       try {
-        const response = await fetch('/admin/redemption-policies/scheduler-status')
-        const result = await response.json()
+        const result = await policyApi.getSchedulerStatus()
         if (result.success) {
           schedulerStatus.value = result.data
         }
@@ -432,9 +484,7 @@ export default {
 
     const loadActivePolicies = async () => {
       try {
-        // 这个端点需要后端实现
-        const response = await fetch('/admin/redemption-policies/active')
-        const result = await response.json()
+        const result = await policyApi.getActivePolicies()
         if (result.success) {
           activePolicies.value = result.data || []
         }
@@ -446,8 +496,7 @@ export default {
 
     const loadResetHistory = async () => {
       try {
-        const response = await fetch('/admin/redemption-policies/reset-history?days=7')
-        const result = await response.json()
+        const result = await policyApi.getResetHistory(7)
         if (result.success) {
           resetHistory.value = result.data || []
         }
@@ -459,8 +508,7 @@ export default {
 
     const loadRateTemplates = async () => {
       try {
-        const response = await fetch('/admin/rate-templates')
-        const result = await response.json()
+        const result = await templateApi.getTemplates()
         if (result.success) {
           rateTemplates.value = result.data || []
         }
@@ -486,15 +534,12 @@ export default {
     const triggerDailyReset = async () => {
       try {
         triggeringReset.value = true
-        const response = await fetch('/admin/redemption-policies/trigger-daily-reset', {
-          method: 'POST'
-        })
-        const result = await response.json()
+        const result = await policyApi.triggerDailyReset()
         if (result.success) {
           showToast('每日重置触发成功', 'success')
           await refreshData()
         } else {
-          showToast(result.message || '触发失败', 'error')
+          showToast(result.error || '触发失败', 'error')
         }
       } catch (error) {
         console.error('Failed to trigger daily reset:', error)
@@ -507,21 +552,58 @@ export default {
     const triggerCleanup = async () => {
       try {
         triggeringCleanup.value = true
-        const response = await fetch('/admin/redemption-policies/trigger-cleanup', {
-          method: 'POST'
-        })
-        const result = await response.json()
+        const result = await policyApi.triggerCleanup()
         if (result.success) {
           showToast('数据清理触发成功', 'success')
           await refreshData()
         } else {
-          showToast(result.message || '触发失败', 'error')
+          showToast(result.error || '触发失败', 'error')
         }
       } catch (error) {
         console.error('Failed to trigger cleanup:', error)
         showToast('触发数据清理失败', 'error')
       } finally {
         triggeringCleanup.value = false
+      }
+    }
+
+    const togglePolicyEngine = async () => {
+      try {
+        toggleEngineLoading.value = true
+        const newState = !engineStatus.value?.isRunning
+        const result = await policyApi.togglePolicyEngine(newState)
+
+        if (result.success) {
+          showToast(`策略引擎已${newState ? '启动' : '停止'}`, 'success')
+          await loadEngineStatus()
+        } else {
+          showToast(result.error || '操作失败', 'error')
+        }
+      } catch (error) {
+        console.error('Failed to toggle policy engine:', error)
+        showToast('切换策略引擎状态失败', 'error')
+      } finally {
+        toggleEngineLoading.value = false
+      }
+    }
+
+    const toggleScheduler = async () => {
+      try {
+        toggleSchedulerLoading.value = true
+        const newState = !schedulerStatus.value?.isRunning
+        const result = await policyApi.toggleScheduler(newState)
+
+        if (result.success) {
+          showToast(`调度服务已${newState ? '启动' : '停止'}`, 'success')
+          await loadSchedulerStatus()
+        } else {
+          showToast(result.error || '操作失败', 'error')
+        }
+      } catch (error) {
+        console.error('Failed to toggle scheduler:', error)
+        showToast('切换调度服务状态失败', 'error')
+      } finally {
+        toggleSchedulerLoading.value = false
       }
     }
 
@@ -619,6 +701,8 @@ export default {
       loading,
       triggeringReset,
       triggeringCleanup,
+      toggleEngineLoading,
+      toggleSchedulerLoading,
       activeTab,
       searchQuery,
       engineStatus,
@@ -633,6 +717,8 @@ export default {
       refreshData,
       triggerDailyReset,
       triggerCleanup,
+      togglePolicyEngine,
+      toggleScheduler,
       viewPolicyDetails,
       closeDetailModal,
       configurePolicy,

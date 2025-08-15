@@ -217,7 +217,7 @@
 
 <script>
 import { ref, computed, watch, onMounted } from 'vue'
-import { toast } from '@/utils/toast'
+import { showToast } from '@/utils/toast'
 
 export default {
   name: 'PolicyConfigModal',
@@ -350,7 +350,7 @@ export default {
         }
       } catch (error) {
         console.error('Failed to load policy:', error)
-        toast.error('加载策略配置失败')
+        showToast('加载策略配置失败', 'error')
       } finally {
         loading.value = false
       }
@@ -425,15 +425,15 @@ export default {
 
         const result = await response.json()
         if (result.success) {
-          toast.success('策略配置保存成功')
+          showToast('策略配置保存成功', 'success')
           emit('saved', submitData)
           closeModal()
         } else {
-          toast.error(result.message || '保存失败')
+          showToast(result.message || '保存失败', 'error')
         }
       } catch (error) {
         console.error('Failed to save policy:', error)
-        toast.error('保存策略配置失败')
+        showToast('保存策略配置失败', 'error')
       } finally {
         loading.value = false
       }

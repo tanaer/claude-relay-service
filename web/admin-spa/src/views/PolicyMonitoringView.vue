@@ -346,7 +346,7 @@
 
 <script>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
-import { toast } from '@/utils/toast'
+import { showToast } from '@/utils/toast'
 import PolicyStatusMonitor from '@/components/redemption/PolicyStatusMonitor.vue'
 
 export default {
@@ -491,14 +491,14 @@ export default {
         })
         const result = await response.json()
         if (result.success) {
-          toast.success('每日重置触发成功')
+          showToast('每日重置触发成功', 'success')
           await refreshData()
         } else {
-          toast.error(result.message || '触发失败')
+          showToast(result.message || '触发失败', 'error')
         }
       } catch (error) {
         console.error('Failed to trigger daily reset:', error)
-        toast.error('触发每日重置失败')
+        showToast('触发每日重置失败', 'error')
       } finally {
         triggeringReset.value = false
       }
@@ -512,14 +512,14 @@ export default {
         })
         const result = await response.json()
         if (result.success) {
-          toast.success('数据清理触发成功')
+          showToast('数据清理触发成功', 'success')
           await refreshData()
         } else {
-          toast.error(result.message || '触发失败')
+          showToast(result.message || '触发失败', 'error')
         }
       } catch (error) {
         console.error('Failed to trigger cleanup:', error)
-        toast.error('触发数据清理失败')
+        showToast('触发数据清理失败', 'error')
       } finally {
         triggeringCleanup.value = false
       }
@@ -540,7 +540,7 @@ export default {
       const metadata = policy.metadata
       if (metadata?.originalCode) {
         // 这里可以通过路由跳转到兑换码管理页面并打开策略配置
-        toast.info('请在兑换码管理页面进行策略配置')
+        showToast('请在兑换码管理页面进行策略配置', 'info')
       }
     }
 

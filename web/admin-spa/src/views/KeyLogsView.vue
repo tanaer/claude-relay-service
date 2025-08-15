@@ -115,10 +115,7 @@
         <button
           class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="currentPage === 1"
-          @click="
-            currentPage--
-            loadLogs()
-          "
+          @click="goPrevPage"
         >
           上一页
         </button>
@@ -126,10 +123,7 @@
         <button
           class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="currentPage === totalPages"
-          @click="
-            currentPage++
-            loadLogs()
-          "
+          @click="goNextPage"
         >
           下一页
         </button>
@@ -186,6 +180,21 @@ const loadLogs = async () => {
     logs.value = []
   } finally {
     loading.value = false
+  }
+}
+
+// 分页方法，避免模板内多语句触发 Prettier 报错
+const goPrevPage = () => {
+  if (currentPage.value > 1) {
+    currentPage.value--
+    loadLogs()
+  }
+}
+
+const goNextPage = () => {
+  if (currentPage.value < totalPages.value) {
+    currentPage.value++
+    loadLogs()
   }
 }
 

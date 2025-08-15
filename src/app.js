@@ -526,6 +526,9 @@ class Application {
       // 🔄 定期清理任务
       this.startCleanupTasks()
 
+      // 🎯 启动策略调度服务
+      this.startPolicyScheduler()
+
       // 🛑 优雅关闭
       this.setupGracefulShutdown()
     } catch (error) {
@@ -563,6 +566,16 @@ class Application {
     )
   }
 
+  startPolicyScheduler() {
+    try {
+      const policySchedulerService = require('./services/policySchedulerService')
+      policySchedulerService.start()
+      logger.success('🎯 Policy scheduler service started successfully')
+    } catch (error) {
+      logger.error('❌ Failed to start policy scheduler service:', error)
+    }
+  }
+
   setupGracefulShutdown() {
     const shutdown = async (signal) => {
       logger.info(`🛑 Received ${signal}, starting graceful shutdown...`)
@@ -577,6 +590,15 @@ class Application {
             logger.info('💰 Pricing service cleaned up')
           } catch (error) {
             logger.error('❌ Error cleaning up pricing service:', error)
+          }
+
+          // 停止策略调度服务
+          try {
+            const policySchedulerService = require('./services/policySchedulerService')
+            policySchedulerService.stop()
+            logger.info('🎯 Policy scheduler service stopped')
+          } catch (error) {
+            logger.error('❌ Error stopping policy scheduler service:', error)
           }
 
           try {

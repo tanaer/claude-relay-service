@@ -6,6 +6,9 @@ const bedrockAccountService = require('../services/bedrockAccountService')
 const geminiAccountService = require('../services/geminiAccountService')
 const accountGroupService = require('../services/accountGroupService')
 const redemptionCodeService = require('../services/redemptionCodeService')
+const redemptionPolicyService = require('../services/redemptionPolicyService')
+const dynamicPolicyEngine = require('../services/dynamicPolicyEngine')
+const policySchedulerService = require('../services/policySchedulerService')
 const rateTemplateService = require('../services/rateTemplateService')
 const intelligentRateLimitService = require('../services/intelligentRateLimitService')
 const keyLogsService = require('../services/keyLogsService')
@@ -4811,6 +4814,223 @@ router.get('/redemption-codes/extract/:type', authenticateAdmin, async (req, res
     return res
       .status(500)
       .json({ error: 'Failed to extract redemption codes', message: error.message })
+  }
+})
+
+// 🎯 兑换码策略管理
+
+// 获取全局策略
+router.get('/redemption-policies/global', authenticateAdmin, async (req, res) => {
+  try {
+    const policy = await redemptionPolicyService.getGlobalPolicy()
+    return res.json({ success: true, data: policy })
+  } catch (error) {
+    logger.error('[错误] 获取全局策略失败：', error)
+    return res.status(500).json({ error: 'Failed to get global policy', message: error.message })
+  }
+})
+
+// 设置全局策略
+router.post('/redemption-policies/global', authenticateAdmin, async (req, res) => {
+  try {
+    await redemptionPolicyService.setGlobalPolicy(req.body)
+    return res.json({ success: true, message: 'Global policy updated successfully' })
+  } catch (error) {
+    logger.error('[错误] 设置全局策略失败：', error)
+    return res.status(500).json({ error: 'Failed to set global policy', message: error.message })
+  }
+})
+
+// 获取类型策略
+router.get('/redemption-policies/type/:type', authenticateAdmin, async (req, res) => {
+  try {
+    const { type } = req.params
+    const policy = await redemptionPolicyService.getTypePolicy(type)
+    return res.json({ success: true, data: policy })
+  } catch (error) {
+    logger.error('[错误] 获取类型策略失败：', error)
+    return res.status(500).json({ error: 'Failed to get type policy', message: error.message })
+  }
+})
+
+// 设置类型策略
+router.post('/redemption-policies/type/:type', authenticateAdmin, async (req, res) => {
+  try {
+    const { type } = req.params
+    await redemptionPolicyService.setTypePolicy(type, req.body)
+    return res.json({ success: true, message: 'Type policy updated successfully' })
+  } catch (error) {
+    logger.error('[错误] 设置类型策略失败：', error)
+    return res.status(500).json({ error: 'Failed to set type policy', message: error.message })
+  }
+})
+
+// 获取个别兑换码策略
+router.get('/redemption-policies/code/:codeId', authenticateAdmin, async (req, res) => {
+  try {
+    const { codeId } = req.params
+    const policy = await redemptionPolicyService.getCodePolicy(codeId)
+    return res.json({ success: true, data: policy })
+  } catch (error) {
+    logger.error('[错误] 获取兑换码策略失败：', error)
+    return res.status(500).json({ error: 'Failed to get code policy', message: error.message })
+  }
+})
+
+// 设置个别兑换码策略
+router.post('/redemption-policies/code/:codeId', authenticateAdmin, async (req, res) => {
+  try {
+    const { codeId } = req.params
+    await redemptionPolicyService.setCodePolicy(codeId, req.body)
+    return res.json({ success: true, message: 'Code policy updated successfully' })
+  } catch (error) {
+    logger.error('[错误] 设置兑换码策略失败：', error)
+    return res.status(500).json({ error: 'Failed to set code policy', message: error.message })
+  }
+})
+
+// 获取有效策略（考虑继承关系）
+router.get(
+  '/redemption-policies/effective/:codeId/:codeType',
+  authenticateAdmin,
+  async (req, res) => {
+    try {
+      const { codeId, codeType } = req.params
+      const policy = await redemptionPolicyService.getEffectivePolicy(codeId, codeType)
+      return res.json({ success: true, data: policy })
+    } catch (error) {
+      logger.error('[错误] 获取有效策略失败：', error)
+      return res
+        .status(500)
+        .json({ error: 'Failed to get effective policy', message: error.message })
+    }
+  }
+)
+
+// 获取API Key策略绑定状态
+router.get('/redemption-policies/api-key/:apiKeyId', authenticateAdmin, async (req, res) => {
+  try {
+    const { apiKeyId } = req.params
+    const policyBinding = await redemptionPolicyService.getApiKeyPolicy(apiKeyId)
+    return res.json({ success: true, data: policyBinding })
+  } catch (error) {
+    logger.error('[错误] 获取API Key策略失败：', error)
+    return res.status(500).json({ error: 'Failed to get API key policy', message: error.message })
+  }
+})
+
+// 获取API Key使用量监控数据
+router.get('/redemption-policies/usage/:apiKeyId', authenticateAdmin, async (req, res) => {
+  try {
+    const { apiKeyId } = req.params
+    const { date } = req.query
+    const usageData = await redemptionPolicyService.getUsageMonitor(apiKeyId, date)
+    return res.json({ success: true, data: usageData })
+  } catch (error) {
+    logger.error('[错误] 获取使用量监控数据失败：', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to get usage monitor data', message: error.message })
+  }
+})
+
+// 获取模板切换历史
+router.get('/redemption-policies/switch-history/:apiKeyId', authenticateAdmin, async (req, res) => {
+  try {
+    const { apiKeyId } = req.params
+    const { limit = 10 } = req.query
+    const history = await dynamicPolicyEngine.getSwitchHistory(apiKeyId, parseInt(limit))
+    return res.json({ success: true, data: history })
+  } catch (error) {
+    logger.error('[错误] 获取模板切换历史失败：', error)
+    return res.status(500).json({ error: 'Failed to get switch history', message: error.message })
+  }
+})
+
+// 手动触发每日重置
+router.post('/redemption-policies/trigger-daily-reset', authenticateAdmin, async (req, res) => {
+  try {
+    await policySchedulerService.triggerDailyReset()
+    return res.json({ success: true, message: 'Daily reset triggered successfully' })
+  } catch (error) {
+    logger.error('[错误] 手动触发每日重置失败：', error)
+    return res.status(500).json({ error: 'Failed to trigger daily reset', message: error.message })
+  }
+})
+
+// 手动触发数据清理
+router.post('/redemption-policies/trigger-cleanup', authenticateAdmin, async (req, res) => {
+  try {
+    await policySchedulerService.triggerDataCleanup()
+    return res.json({ success: true, message: 'Data cleanup triggered successfully' })
+  } catch (error) {
+    logger.error('[错误] 手动触发数据清理失败：', error)
+    return res.status(500).json({ error: 'Failed to trigger data cleanup', message: error.message })
+  }
+})
+
+// 获取策略调度服务状态
+router.get('/redemption-policies/scheduler-status', authenticateAdmin, async (req, res) => {
+  try {
+    const status = policySchedulerService.getStatus()
+    return res.json({ success: true, data: status })
+  } catch (error) {
+    logger.error('[错误] 获取调度服务状态失败：', error)
+    return res.status(500).json({ error: 'Failed to get scheduler status', message: error.message })
+  }
+})
+
+// 获取策略引擎状态
+router.get('/redemption-policies/engine-status', authenticateAdmin, async (req, res) => {
+  try {
+    const status = dynamicPolicyEngine.getStatus()
+    return res.json({ success: true, data: status })
+  } catch (error) {
+    logger.error('[错误] 获取策略引擎状态失败：', error)
+    return res.status(500).json({ error: 'Failed to get engine status', message: error.message })
+  }
+})
+
+// 获取活跃策略列表
+router.get('/redemption-policies/active', authenticateAdmin, async (req, res) => {
+  try {
+    const redisClient = redis.getClientSafe()
+
+    // 获取所有活跃策略的API Key ID
+    const activeApiKeys = await redisClient.smembers('active_policies:redemption')
+    const policiesData = []
+
+    // 批量获取策略绑定信息
+    for (const apiKeyId of activeApiKeys) {
+      try {
+        const policyBinding = await redemptionPolicyService.getApiKeyPolicy(apiKeyId)
+        if (policyBinding) {
+          policiesData.push({
+            apiKeyId,
+            ...policyBinding
+          })
+        }
+      } catch (error) {
+        logger.error(`[错误] 获取API Key ${apiKeyId} 策略失败: ${error.message}`)
+      }
+    }
+
+    return res.json({ success: true, data: policiesData })
+  } catch (error) {
+    logger.error('[错误] 获取活跃策略列表失败：', error)
+    return res.status(500).json({ error: 'Failed to get active policies', message: error.message })
+  }
+})
+
+// 获取重置历史
+router.get('/redemption-policies/reset-history', authenticateAdmin, async (req, res) => {
+  try {
+    const { days = 7 } = req.query
+    const history = await policySchedulerService.getResetHistory(parseInt(days))
+    return res.json({ success: true, data: history })
+  } catch (error) {
+    logger.error('[错误] 获取重置历史失败：', error)
+    return res.status(500).json({ error: 'Failed to get reset history', message: error.message })
   }
 })
 

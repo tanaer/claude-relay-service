@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid')
 const config = require('../../config/config')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
+const dynamicPolicyEngine = require('./dynamicPolicyEngine')
 
 class ApiKeyService {
   constructor() {
@@ -588,6 +589,22 @@ class ApiKeyService {
       logParts.push(`Total: ${totalTokens} tokens`)
 
       logger.database(`📊 Recorded usage: ${keyId} - ${logParts.join(', ')}`)
+
+      // 触发动态策略检查（兑换码动态计费功能）
+      try {
+        await dynamicPolicyEngine.handleUsageUpdate(keyId, {
+          totalTokens,
+          inputTokens,
+          outputTokens,
+          cacheCreateTokens,
+          cacheReadTokens,
+          model,
+          accountId
+        })
+      } catch (policyError) {
+        // 策略检查失败不影响主要功能，仅记录警告
+        logger.warn(`⚠️ 策略检查失败 API Key ${keyId}: ${policyError.message}`)
+      }
     } catch (error) {
       logger.error('❌ Failed to record usage:', error)
     }

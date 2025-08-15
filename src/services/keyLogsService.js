@@ -291,6 +291,16 @@ class KeyLogsService {
     })
   }
 
+  async logPolicyBinding(apiKeyId, codeType, codeId, success, details = {}) {
+    await this.logKeyEvent({
+      type: 'redemption',
+      level: success ? 'success' : 'error',
+      title: `策略绑定${success ? '成功' : '失败'}`,
+      message: `API Key ${apiKeyId} 策略绑定${success ? '成功' : '失败'} - ${codeType} 兑换码`,
+      details: { apiKeyId, codeType, codeId, success, bindingType: 'policy', ...details }
+    })
+  }
+
   async logSystemEvent(event, level = 'info', details = {}) {
     await this.logKeyEvent({
       type: 'system',

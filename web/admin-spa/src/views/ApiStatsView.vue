@@ -178,12 +178,12 @@
                 redemptionResult.alreadyUsed ? 'text-blue-800' : 'text-green-800'
               ]"
             >
-              <div class="flex justify-between">
+              <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <span>API Key（密钥）:</span>
-                <div class="flex items-center gap-2">
+                <div class="flex items-start gap-2 md:items-center">
                   <code
                     :class="[
-                      'rounded px-2 py-1 text-xs',
+                      'max-w-full whitespace-pre-wrap break-all rounded px-2 py-1 text-xs md:max-w-[28rem]',
                       redemptionResult.alreadyUsed ? 'bg-blue-100' : 'bg-green-100'
                     ]"
                     >{{ redemptionResult.apiKey }}</code

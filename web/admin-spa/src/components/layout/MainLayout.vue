@@ -43,7 +43,8 @@ const tabRouteMap = {
   accounts: '/accounts',
   'redemption-codes': '/redemption-codes',
   'rate-templates': '/rate-templates',
-  tutorial: '/tutorial',
+  'policy-monitoring': '/policy-monitoring',
+  'key-logs': '/key-logs',
   settings: '/settings'
 }
 

@@ -2,6 +2,8 @@ const { v4: uuidv4 } = require('uuid')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const apiKeyService = require('./apiKeyService')
+const redemptionPolicyService = require('./redemptionPolicyService')
+const keyLogsService = require('./keyLogsService')
 
 class RedemptionCodeService {
   constructor() {
@@ -231,6 +233,22 @@ class RedemptionCodeService {
         generatedApiKeyName: apiKeyName
       })
 
+      // 集成策略绑定功能
+      try {
+        await this._bindRedemptionPolicy(newApiKey.apiKey, {
+          codeId,
+          codeType: codeData.type,
+          code,
+          templateId: null, // 将使用策略配置中的初始模板
+          groupId: null // 将使用策略配置中的初始分组
+        })
+
+        logger.info(`✅ API Key ${newApiKey.apiKey} 策略绑定成功`)
+      } catch (policyError) {
+        logger.warn(`⚠️ API Key ${newApiKey.apiKey} 策略绑定失败: ${policyError.message}`)
+        // 策略绑定失败不影响兑换成功，仅记录警告
+      }
+
       logger.info(`✅ Redemption code ${code} used, generated API Key: ${newApiKey.apiKey}`)
 
       return {
@@ -247,6 +265,47 @@ class RedemptionCodeService {
     } catch (error) {
       logger.error('❌ Failed to redeem code:', error)
       return { success: false, error: '兑换失败，请稍后重试' }
+    }
+  }
+
+  // 策略绑定私有方法
+  async _bindRedemptionPolicy(apiKeyId, redemptionData) {
+    try {
+      // 调用策略服务进行绑定
+      await redemptionPolicyService.bindApiKeyPolicy(apiKeyId, redemptionData)
+
+      // 记录策略绑定日志
+      await keyLogsService.logPolicyBinding(
+        apiKeyId,
+        redemptionData.codeType,
+        redemptionData.codeId,
+        true,
+        {
+          bindingType: 'redemption_auto',
+          code: redemptionData.code,
+          timestamp: new Date().toISOString()
+        }
+      )
+
+      logger.info(`[兑换码服务] API Key ${apiKeyId} 策略绑定成功 - 兑换码: ${redemptionData.code}`)
+    } catch (error) {
+      logger.error(`[兑换码服务] API Key ${apiKeyId} 策略绑定失败: ${error.message}`)
+
+      // 记录失败日志
+      await keyLogsService.logPolicyBinding(
+        apiKeyId,
+        redemptionData.codeType,
+        redemptionData.codeId,
+        false,
+        {
+          bindingType: 'redemption_auto',
+          code: redemptionData.code,
+          error: error.message,
+          timestamp: new Date().toISOString()
+        }
+      )
+
+      throw error
     }
   }
 

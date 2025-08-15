@@ -13,6 +13,7 @@ const SettingsView = () => import('@/views/SettingsView.vue')
 const ApiStatsView = () => import('@/views/ApiStatsView.vue')
 const RedemptionCodesView = () => import('@/views/RedemptionCodesView.vue')
 const RateTemplatesView = () => import('@/views/RateTemplates.vue')
+const PolicyMonitoringView = () => import('@/views/PolicyMonitoringView.vue')
 
 const routes = [
   {
@@ -112,6 +113,18 @@ const routes = [
         path: '',
         name: 'KeyLogs',
         component: KeyLogsView
+      }
+    ]
+  },
+  {
+    path: '/policy-monitoring',
+    component: MainLayout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'PolicyMonitoring',
+        component: PolicyMonitoringView
       }
     ]
   },

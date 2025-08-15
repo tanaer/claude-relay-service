@@ -8,7 +8,7 @@ const MainLayout = () => import('@/components/layout/MainLayout.vue')
 const DashboardView = () => import('@/views/DashboardView.vue')
 const ApiKeysView = () => import('@/views/ApiKeysView.vue')
 const AccountsView = () => import('@/views/AccountsView.vue')
-const TutorialView = () => import('@/views/TutorialView.vue')
+const KeyLogsView = () => import('@/views/KeyLogsView.vue')
 const SettingsView = () => import('@/views/SettingsView.vue')
 const ApiStatsView = () => import('@/views/ApiStatsView.vue')
 const RedemptionCodesView = () => import('@/views/RedemptionCodesView.vue')
@@ -104,14 +104,14 @@ const routes = [
     ]
   },
   {
-    path: '/tutorial',
+    path: '/key-logs',
     component: MainLayout,
     meta: { requiresAuth: true },
     children: [
       {
         path: '',
-        name: 'Tutorial',
-        component: TutorialView
+        name: 'KeyLogs',
+        component: KeyLogsView
       }
     ]
   },

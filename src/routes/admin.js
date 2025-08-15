@@ -8,6 +8,7 @@ const accountGroupService = require('../services/accountGroupService')
 const redemptionCodeService = require('../services/redemptionCodeService')
 const rateTemplateService = require('../services/rateTemplateService')
 const intelligentRateLimitService = require('../services/intelligentRateLimitService')
+const keyLogsService = require('../services/keyLogsService')
 const redis = require('../models/redis')
 const { authenticateAdmin } = require('../middleware/auth')
 const logger = require('../utils/logger')
@@ -5163,6 +5164,86 @@ router.get('/intelligent-rate-limit/config', authenticateAdmin, async (req, res)
   } catch (error) {
     logger.error('❌ Failed to get intelligent rate limit config:', error)
     res.status(500).json({ error: 'Failed to get config', message: error.message })
+  }
+})
+
+// 📋 关键日志管理
+
+// 获取关键日志列表
+router.get('/key-logs', authenticateAdmin, async (req, res) => {
+  try {
+    const { type, page, pageSize, level } = req.query
+
+    const options = {
+      type: type && type !== 'all' ? type : undefined,
+      page: parseInt(page) || 1,
+      pageSize: parseInt(pageSize) || 20,
+      level: level && level !== 'all' ? level : undefined
+    }
+
+    const result = await keyLogsService.getKeyLogs(options)
+
+    res.json({
+      success: true,
+      data: {
+        logs: result.logs,
+        totalPages: result.pagination.totalPages,
+        currentPage: result.pagination.currentPage,
+        totalCount: result.pagination.totalCount
+      }
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get key logs:', error)
+    res.status(500).json({ error: 'Failed to get key logs', message: error.message })
+  }
+})
+
+// 获取关键日志统计信息
+router.get('/key-logs/stats', authenticateAdmin, async (req, res) => {
+  try {
+    const stats = await keyLogsService.getLogStats()
+    res.json({ success: true, data: stats })
+  } catch (error) {
+    logger.error('❌ Failed to get key logs stats:', error)
+    res.status(500).json({ error: 'Failed to get key logs stats', message: error.message })
+  }
+})
+
+// 清空所有关键日志
+router.delete('/key-logs', authenticateAdmin, async (req, res) => {
+  try {
+    await keyLogsService.clearAllLogs()
+
+    // 记录管理员操作
+    await keyLogsService.logSystemEvent('管理员清空了所有关键日志', 'warn', {
+      adminAction: 'clear_all_logs',
+      timestamp: new Date().toISOString()
+    })
+
+    res.json({ success: true, message: '所有关键日志已清空' })
+  } catch (error) {
+    logger.error('❌ Failed to clear key logs:', error)
+    res.status(500).json({ error: 'Failed to clear key logs', message: error.message })
+  }
+})
+
+// 手动记录测试日志（开发/调试用）
+router.post('/key-logs/test', authenticateAdmin, async (req, res) => {
+  try {
+    const { type, level, title, message, details } = req.body
+
+    await keyLogsService.logKeyEvent({
+      type: type || 'system',
+      level: level || 'info',
+      title: title || '测试日志',
+      message: message || '这是一条测试日志',
+      details: details || { test: true, source: 'admin_api' }
+    })
+
+    res.json({ success: true, message: '测试日志记录成功' })
+  } catch (error) {
+    logger.error('❌ Failed to create test log:', error)
+    res.status(500).json({ error: 'Failed to create test log', message: error.message })
   }
 })
 

@@ -834,6 +834,235 @@
       @cancel="handleCancel"
       @confirm="handleConfirm"
     />
+
+    <!-- 智能限流配置模态框 -->
+    <div v-if="showRateLimitConfigModal" class="modal-overlay" @click="closeRateLimitConfigModal">
+      <div class="modal-content max-w-4xl" @click.stop>
+        <div class="modal-header">
+          <h3 class="modal-title">智能限流配置</h3>
+          <button class="modal-close-btn" @click="closeRateLimitConfigModal">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <div class="modal-body max-h-[70vh] overflow-y-auto">
+          <form @submit.prevent="saveRateLimitConfig">
+            <!-- 基本配置 -->
+            <div class="mb-6">
+              <h4 class="mb-4 text-base font-semibold text-gray-900">基本配置</h4>
+
+              <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div class="form-group">
+                  <label class="mb-2 block text-sm font-medium text-gray-700">启用智能限流</label>
+                  <div class="flex items-center">
+                    <input
+                      id="rate-limit-enabled"
+                      v-model="rateLimitConfig.enabled"
+                      class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      type="checkbox"
+                    />
+                    <label class="ml-2 text-sm text-gray-700" for="rate-limit-enabled">
+                      {{ rateLimitConfig.enabled ? '已启用' : '已禁用' }}
+                    </label>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="mb-2 block text-sm font-medium text-gray-700"
+                    >任何错误触发限流</label
+                  >
+                  <div class="flex items-center">
+                    <input
+                      id="trigger-any-error"
+                      v-model="rateLimitConfig.triggerOnAnyError"
+                      class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      type="checkbox"
+                    />
+                    <label class="ml-2 text-sm text-gray-700" for="trigger-any-error">
+                      {{ rateLimitConfig.triggerOnAnyError ? '是' : '否' }}
+                    </label>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="mb-2 block text-sm font-medium text-gray-700"
+                    >恢复测试间隔（分钟）</label
+                  >
+                  <input
+                    v-model.number="rateLimitConfig.recoveryTestInterval"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                    max="60"
+                    min="1"
+                    type="number"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label class="mb-2 block text-sm font-medium text-gray-700"
+                    >恢复测试超时（秒）</label
+                  >
+                  <input
+                    v-model.number="rateLimitConfig.recoveryTestTimeout"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                    max="120"
+                    min="5"
+                    type="number"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label class="mb-2 block text-sm font-medium text-gray-700">最大故障日志数</label>
+                  <input
+                    v-model.number="rateLimitConfig.maxFaultLogs"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                    max="10000"
+                    min="100"
+                    type="number"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label class="mb-2 block text-sm font-medium text-gray-700"
+                    >故障日志保留天数</label
+                  >
+                  <input
+                    v-model.number="rateLimitConfig.faultLogRetentionDays"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                    max="365"
+                    min="1"
+                    type="number"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- 错误类型配置 -->
+            <div class="mb-6">
+              <h4 class="mb-4 text-base font-semibold text-gray-900">错误类型配置</h4>
+
+              <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div>
+                  <label class="mb-2 block text-sm font-medium text-gray-700"
+                    >立即触发限流的错误类型</label
+                  >
+                  <div class="space-y-2">
+                    <div class="flex items-center">
+                      <input
+                        id="immediate-rate-limit"
+                        :checked="
+                          rateLimitConfig.errorCategories?.immediate?.includes('rate_limit')
+                        "
+                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        type="checkbox"
+                        @change="
+                          toggleErrorCategory('immediate', 'rate_limit', $event.target.checked)
+                        "
+                      />
+                      <label class="ml-2 text-sm text-gray-700" for="immediate-rate-limit"
+                        >限流错误</label
+                      >
+                    </div>
+                    <div class="flex items-center">
+                      <input
+                        id="immediate-server-error"
+                        :checked="
+                          rateLimitConfig.errorCategories?.immediate?.includes('server_error')
+                        "
+                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        type="checkbox"
+                        @change="
+                          toggleErrorCategory('immediate', 'server_error', $event.target.checked)
+                        "
+                      />
+                      <label class="ml-2 text-sm text-gray-700" for="immediate-server-error"
+                        >服务器错误</label
+                      >
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="mb-2 block text-sm font-medium text-gray-700"
+                    >累积触发限流的错误类型</label
+                  >
+                  <div class="space-y-2">
+                    <div class="flex items-center">
+                      <input
+                        id="accumulative-auth"
+                        :checked="
+                          rateLimitConfig.errorCategories?.accumulative?.includes('authentication')
+                        "
+                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        type="checkbox"
+                        @change="
+                          toggleErrorCategory(
+                            'accumulative',
+                            'authentication',
+                            $event.target.checked
+                          )
+                        "
+                      />
+                      <label class="ml-2 text-sm text-gray-700" for="accumulative-auth"
+                        >认证错误</label
+                      >
+                    </div>
+                    <div class="flex items-center">
+                      <input
+                        id="accumulative-network"
+                        :checked="
+                          rateLimitConfig.errorCategories?.accumulative?.includes('network_error')
+                        "
+                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        type="checkbox"
+                        @change="
+                          toggleErrorCategory(
+                            'accumulative',
+                            'network_error',
+                            $event.target.checked
+                          )
+                        "
+                      />
+                      <label class="ml-2 text-sm text-gray-700" for="accumulative-network"
+                        >网络错误</label
+                      >
+                    </div>
+                  </div>
+
+                  <div class="mt-4">
+                    <label class="mb-2 block text-sm font-medium text-gray-700">累积错误阈值</label>
+                    <input
+                      v-model.number="rateLimitConfig.errorCategories.accumulativeThreshold"
+                      class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                      max="20"
+                      min="1"
+                      type="number"
+                    />
+                    <p class="mt-1 text-xs text-gray-500">5分钟内达到此次数则触发限流</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <div class="modal-footer">
+          <button
+            class="rounded-lg border border-gray-300 bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+            type="button"
+            @click="closeRateLimitConfigModal"
+          >
+            取消
+          </button>
+          <button
+            class="ml-3 rounded-lg border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            type="button"
+            @click="saveRateLimitConfig"
+          >
+            保存配置
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -896,6 +1125,7 @@ const intelligentRateLimitOptions = ref([
   { value: 'stats', label: '限流统计', icon: 'fa-chart-bar' },
   { value: 'faultLogs', label: '故障日志', icon: 'fa-exclamation-triangle' },
   { value: 'config', label: '配置信息', icon: 'fa-cog' },
+  { value: 'editConfig', label: '编辑配置', icon: 'fa-edit' },
   { value: 'testRecovery', label: '测试恢复', icon: 'fa-heartbeat' }
 ])
 
@@ -918,7 +1148,9 @@ const groupOptions = computed(() => {
 const showCreateAccountModal = ref(false)
 const showEditAccountModal = ref(false)
 const showGroupManagementModal = ref(false)
+const showRateLimitConfigModal = ref(false)
 const editingAccount = ref(null)
+const rateLimitConfig = ref({})
 
 // 计算排序后的账户列表
 const sortedAccounts = computed(() => {
@@ -1329,6 +1561,9 @@ const handleIntelligentRateLimitAction = async (action) => {
       case 'config':
         await showIntelligentRateLimitConfig()
         break
+      case 'editConfig':
+        await openRateLimitConfigModal()
+        break
       case 'testRecovery':
         await showTestRecoveryDialog()
         break
@@ -1454,25 +1689,35 @@ const showIntelligentRateLimitConfig = async () => {
     let message = `⚙️ 智能限流配置信息\n\n`
     message += `功能状态: ${config.enabled ? '✅ 已启用' : '❌ 已禁用'}\n`
     message += `任何错误触发: ${config.triggerOnAnyError ? '✅ 是' : '❌ 否'}\n`
-    message += `恢复测试间隔: ${config.recoveryTestInterval} 分钟\n`
+    message += `恢复测试间隔: ${Math.round(config.recoveryTestInterval / 60000)} 分钟\n`
     message += `恢复测试超时: ${config.recoveryTestTimeout} 秒\n`
-    message += `累积错误阈值: ${config.errorCategories.accumulativeThreshold} 次\n`
+    message += `累积错误阈值: ${config.errorCategories.accumulativeThreshold || 0} 次\n`
     message += `最大故障日志: ${config.maxFaultLogs} 条\n`
     message += `日志保留时间: ${config.faultLogRetentionDays} 天\n\n`
 
     message += `立即触发限流的错误类型:\n`
-    config.errorCategories.immediate.forEach((type) => {
-      const typeName =
-        type === 'rate_limit' ? '限流错误' : type === 'server_error' ? '服务器错误' : type
-      message += `  • ${typeName}\n`
-    })
+    const immediate = config.errorCategories.immediate || []
+    if (immediate.length === 0) {
+      message += `  • 无\n`
+    } else {
+      immediate.forEach((type) => {
+        const typeName =
+          type === 'rate_limit' ? '限流错误' : type === 'server_error' ? '服务器错误' : type
+        message += `  • ${typeName}\n`
+      })
+    }
 
     message += `\n累积触发限流的错误类型:\n`
-    config.errorCategories.accumulative.forEach((type) => {
-      const typeName =
-        type === 'authentication' ? '认证错误' : type === 'network_error' ? '网络错误' : type
-      message += `  • ${typeName}\n`
-    })
+    const accumulative = config.errorCategories.accumulative || []
+    if (accumulative.length === 0) {
+      message += `  • 无\n`
+    } else {
+      accumulative.forEach((type) => {
+        const typeName =
+          type === 'authentication' ? '认证错误' : type === 'network_error' ? '网络错误' : type
+        message += `  • ${typeName}\n`
+      })
+    }
 
     ElMessageBox.alert(message, '智能限流配置', {
       confirmButtonText: '确定',
@@ -1523,6 +1768,45 @@ const showTestRecoveryDialog = async () => {
   } catch (error) {
     ElMessage.error('获取受限账户信息失败: ' + (error.message || '未知错误'))
   }
+}
+
+// 打开智能限流配置编辑模态框
+const openRateLimitConfigModal = async () => {
+  try {
+    const response = await apiClient.get('/admin/intelligent-rate-limit/config')
+    if (response.success) {
+      rateLimitConfig.value = response.data
+      showRateLimitConfigModal.value = true
+    } else {
+      ElMessage.error('获取配置失败: ' + (response.message || '未知错误'))
+    }
+  } catch (error) {
+    ElMessage.error('获取配置失败: ' + (error.message || '未知错误'))
+  }
+}
+
+// 保存智能限流配置
+const saveRateLimitConfig = async () => {
+  try {
+    const response = await apiClient.post(
+      '/admin/intelligent-rate-limit/config',
+      rateLimitConfig.value
+    )
+    if (response.success) {
+      ElMessage.success('配置保存成功')
+      showRateLimitConfigModal.value = false
+    } else {
+      ElMessage.error('保存失败: ' + (response.message || '未知错误'))
+    }
+  } catch (error) {
+    ElMessage.error('保存失败: ' + (error.message || '未知错误'))
+  }
+}
+
+// 关闭智能限流配置模态框
+const closeRateLimitConfigModal = () => {
+  showRateLimitConfigModal.value = false
+  rateLimitConfig.value = {}
 }
 
 // 编辑账户
@@ -1852,6 +2136,30 @@ const getRateTemplateName = (account) => {
 //   await toggleSchedulable(account)
 // }
 
+// 切换错误类型配置
+const toggleErrorCategory = (categoryType, errorType, checked) => {
+  if (!rateLimitConfig.value.errorCategories) {
+    rateLimitConfig.value.errorCategories = {
+      immediate: [],
+      accumulative: [],
+      accumulativeThreshold: 3
+    }
+  }
+
+  if (!rateLimitConfig.value.errorCategories[categoryType]) {
+    rateLimitConfig.value.errorCategories[categoryType] = []
+  }
+
+  const category = rateLimitConfig.value.errorCategories[categoryType]
+  const index = category.indexOf(errorType)
+
+  if (checked && index === -1) {
+    category.push(errorType)
+  } else if (!checked && index > -1) {
+    category.splice(index, 1)
+  }
+}
+
 // 监听排序选择变化
 watch(accountSortBy, (newVal) => {
   const fieldMap = {
@@ -1921,5 +2229,38 @@ onMounted(() => {
 
 .table-row:hover {
   background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* 模态框样式 */
+.modal-overlay {
+  @apply fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50;
+}
+
+.modal-content {
+  @apply max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-xl;
+}
+
+.modal-header {
+  @apply flex items-center justify-between border-b border-gray-200 px-6 py-4;
+}
+
+.modal-title {
+  @apply text-lg font-semibold text-gray-900;
+}
+
+.modal-close-btn {
+  @apply rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600;
+}
+
+.modal-body {
+  @apply px-6 py-4;
+}
+
+.modal-footer {
+  @apply flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4;
+}
+
+.form-group {
+  @apply mb-4;
 }
 </style>

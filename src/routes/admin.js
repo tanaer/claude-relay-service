@@ -5385,14 +5385,104 @@ router.get('/intelligent-rate-limit/config', authenticateAdmin, async (req, res)
       recoveryTestTimeout: rateLimitConfig.recoveryTestTimeout || 30000,
       maxFaultLogs: rateLimitConfig.maxFaultLogs || 1000,
       faultLogRetentionDays: rateLimitConfig.faultLogRetentionDays || 7,
-      errorCategories: rateLimitConfig.errorCategories || {},
-      alerting: rateLimitConfig.alerting || {}
+      errorCategories: rateLimitConfig.errorCategories || {
+        immediate: [],
+        accumulative: [],
+        accumulativeThreshold: 3
+      },
+      alerting: rateLimitConfig.alerting || {
+        enabled: false,
+        webhookUrl: null,
+        emailNotification: false
+      }
     }
 
     res.json({ success: true, data: configInfo })
   } catch (error) {
     logger.error('❌ Failed to get intelligent rate limit config:', error)
     res.status(500).json({ error: 'Failed to get config', message: error.message })
+  }
+})
+
+// 更新智能限流配置信息
+router.post('/intelligent-rate-limit/config', authenticateAdmin, async (req, res) => {
+  try {
+    const { configData } = req.body
+
+    // 验证必要字段
+    if (!configData || typeof configData !== 'object') {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid config data'
+      })
+    }
+
+    // 验证数据格式
+    const {
+      enabled,
+      triggerOnAnyError,
+      recoveryTestInterval,
+      recoveryTestTimeout,
+      maxFaultLogs,
+      faultLogRetentionDays,
+      errorCategories,
+      alerting
+    } = configData
+
+    // 构建新配置
+    const newConfig = {
+      enabled: Boolean(enabled),
+      triggerOnAnyError: Boolean(triggerOnAnyError),
+      recoveryTestInterval: parseInt(recoveryTestInterval) || 300000,
+      recoveryTestTimeout: parseInt(recoveryTestTimeout) || 30000,
+      maxFaultLogs: parseInt(maxFaultLogs) || 1000,
+      faultLogRetentionDays: parseInt(faultLogRetentionDays) || 7,
+      errorCategories: {
+        immediate: Array.isArray(errorCategories?.immediate) ? errorCategories.immediate : [],
+        accumulative: Array.isArray(errorCategories?.accumulative)
+          ? errorCategories.accumulative
+          : [],
+        accumulativeThreshold: parseInt(errorCategories?.accumulativeThreshold) || 3
+      },
+      alerting: {
+        enabled: Boolean(alerting?.enabled),
+        webhookUrl: alerting?.webhookUrl || null,
+        emailNotification: Boolean(alerting?.emailNotification)
+      }
+    }
+
+    // 更新运行时配置
+    config.intelligentRateLimit = { ...config.intelligentRateLimit, ...newConfig }
+
+    // 如果智能限流服务正在运行，需要重新加载配置
+    try {
+      if (intelligentRateLimitService.reloadConfig) {
+        await intelligentRateLimitService.reloadConfig()
+        logger.info('[智能限流] 配置已重新加载')
+      }
+    } catch (serviceError) {
+      logger.warn('[智能限流] 服务配置重载失败，但配置已更新：', serviceError.message)
+    }
+
+    logger.info('[管理员] 智能限流配置已更新：', {
+      enabled: newConfig.enabled,
+      triggerOnAnyError: newConfig.triggerOnAnyError,
+      recoveryTestInterval: newConfig.recoveryTestInterval,
+      errorCategories: newConfig.errorCategories
+    })
+
+    res.json({
+      success: true,
+      message: '智能限流配置更新成功',
+      data: newConfig
+    })
+  } catch (error) {
+    logger.error('❌ Failed to update intelligent rate limit config:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update config',
+      message: error.message
+    })
   }
 })
 

@@ -231,8 +231,8 @@ async function handleMessagesRequest(req, res) {
                 logger.error('❌ Failed to record Bedrock stream usage:', error)
               })
 
-            // 更新时间窗口内的token计数
-            if (req.rateLimitInfo) {
+            // 更新时间窗口内的token计数（无时限计划跳过）
+            if (req.rateLimitInfo && req.apiKey.planType !== 'lifetime') {
               const totalTokens = inputTokens + outputTokens
               redis
                 .getClient()
@@ -398,8 +398,8 @@ async function handleMessagesRequest(req, res) {
             responseAccountId
           )
 
-          // 更新时间窗口内的token计数
-          if (req.rateLimitInfo) {
+          // 更新时间窗口内的token计数（无时限计划跳过）
+          if (req.rateLimitInfo && req.apiKey.planType !== 'lifetime') {
             const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
             await redis.getClient().incrby(req.rateLimitInfo.tokenCountKey, totalTokens)
             logger.api(`📊 Updated rate limit token count: +${totalTokens} tokens`)

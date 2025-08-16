@@ -38,6 +38,21 @@
             <p class="mt-1 text-xs text-gray-500 sm:mt-2">名称不可修改</p>
           </div>
 
+          <!-- 套餐类型与余额 -->
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label class="mb-1 block text-xs font-semibold text-gray-700 sm:mb-3 sm:text-sm">套餐类型</label>
+              <select v-model="form.planType" class="form-input w-full text-sm">
+                <option value="windowed">按窗口限速</option>
+                <option value="lifetime">无时限（一次性余额）</option>
+              </select>
+            </div>
+            <div v-if="form.planType === 'lifetime'">
+              <label class="mb-1 block text-xs font-semibold text-gray-700 sm:mb-3 sm:text-sm">无时限余额（tokens）</label>
+              <input v-model.number="form.lifetimeTokenBalance" class="form-input w-full text-sm" min="0" type="number" />
+            </div>
+          </div>
+
           <!-- 标签 -->
           <div>
             <label class="mb-1.5 block text-xs font-semibold text-gray-700 sm:mb-3 sm:text-sm"
@@ -557,7 +572,10 @@ const form = reactive({
   enableClientRestriction: false,
   allowedClients: [],
   tags: [],
-  isActive: true
+  isActive: true,
+  // 新增
+  planType: 'windowed',
+  lifetimeTokenBalance: 0
 })
 
 // 添加限制的模型
@@ -635,7 +653,11 @@ const updateApiKey = async () => {
           ? parseFloat(form.dailyCostLimit)
           : 0,
       permissions: form.permissions,
-      tags: form.tags
+      tags: form.tags,
+      // 新增
+      planType: form.planType,
+      lifetimeTokenBalance:
+        form.planType === 'lifetime' ? Number(form.lifetimeTokenBalance) || 0 : undefined
     }
 
     // 处理Claude账户绑定（区分OAuth和Console）
@@ -807,6 +829,9 @@ onMounted(async () => {
   form.enableClientRestriction = props.apiKey.enableClientRestriction || false
   // 初始化活跃状态，默认为 true
   form.isActive = props.apiKey.isActive !== undefined ? props.apiKey.isActive : true
+  // 新增：无时限配置
+  form.planType = props.apiKey.planType || 'windowed'
+  form.lifetimeTokenBalance = props.apiKey.lifetimeTokenBalance || 0
 })
 </script>
 

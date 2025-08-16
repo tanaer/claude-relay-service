@@ -400,7 +400,9 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
-      tags
+      tags,
+      planType,
+      lifetimeTokenBalance
     } = req.body
 
     // 输入验证
@@ -496,7 +498,9 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
-      tags
+      tags,
+      planType,
+      lifetimeTokenBalance
     })
 
     logger.success(`🔑 Admin created new API key: ${name}`)
@@ -527,10 +531,12 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       enableModelRestriction,
       restrictedModels,
       enableClientRestriction,
-      allowedClients,
+            allowedClients,
       dailyCostLimit,
-      tags
-    } = req.body
+      tags,
+      planType,
+      lifetimeTokenBalance
+     } = req.body
 
     // 输入验证
     if (!baseName || typeof baseName !== 'string' || baseName.trim().length === 0) {
@@ -572,7 +578,9 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
           enableClientRestriction,
           allowedClients,
           dailyCostLimit,
-          tags
+          tags,
+          planType,
+          lifetimeTokenBalance
         })
 
         // 保留原始 API Key 供返回
@@ -640,7 +648,9 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       allowedClients,
       expiresAt,
       dailyCostLimit,
-      tags
+      tags,
+      planType,
+      lifetimeTokenBalance
     } = req.body
 
     // 只允许更新指定字段
@@ -771,6 +781,22 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
         return res.status(400).json({ error: 'All tags must be non-empty strings' })
       }
       updates.tags = tags
+    }
+
+    // 新增：无时限字段
+    if (planType !== undefined) {
+      if (!['windowed', 'lifetime'].includes(planType)) {
+        return res.status(400).json({ error: 'Invalid planType. Use windowed or lifetime' })
+      }
+      updates.planType = planType
+    }
+
+    if (lifetimeTokenBalance !== undefined && lifetimeTokenBalance !== null && lifetimeTokenBalance !== '') {
+      const num = Number(lifetimeTokenBalance)
+      if (!Number.isInteger(num) || num < 0) {
+        return res.status(400).json({ error: 'lifetimeTokenBalance must be a non-negative integer' })
+      }
+      updates.lifetimeTokenBalance = num
     }
 
     // 处理活跃/禁用状态状态, 放在过期处理后，以确保后续增加禁用key功能

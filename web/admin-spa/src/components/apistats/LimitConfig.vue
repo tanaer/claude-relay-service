@@ -7,6 +7,16 @@
         限制配置
       </h3>
       <div class="space-y-4 md:space-y-5">
+        <!-- 无时限余额摘要（仅当为无时限） -->
+        <div v-if="statsData.planType === 'lifetime'" class="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+          <div class="flex items-center justify-between text-sm md:text-base">
+            <span class="text-emerald-800"><i class="fas fa-bolt mr-1" /> 无时限套餐</span>
+            <span class="font-semibold text-emerald-700">余额：{{ (statsData.lifetimeTokenBalance || 0).toLocaleString() }} tokens</span>
+          </div>
+          <div class="mt-1 text-xs text-emerald-700">
+            使用上方“API Key 信息”中的“充值兑换码”按钮可为此 Key 叠加余额
+          </div>
+        </div>
         <!-- 每日费用限制 -->
         <div>
           <div class="mb-2 flex items-center justify-between">

@@ -32,6 +32,28 @@
             formatPermissions(statsData.permissions)
           }}</span>
         </div>
+        <!-- 新增：套餐类型与余额显示 -->
+        <div class="flex items-start justify-between">
+          <span class="mt-1 flex-shrink-0 text-sm text-gray-600 md:text-base">套餐类型</span>
+          <div class="text-right text-sm font-medium md:text-base">
+            <div v-if="statsData.planType === 'lifetime'" class="flex items-center justify-end gap-2">
+              <span class="inline-flex items-center rounded bg-emerald-100 px-2 py-0.5 text-emerald-700">
+                <i class="fas fa-bolt mr-1 text-xs" /> 无时限
+              </span>
+              <span class="text-gray-700">余额：{{ formatNumber(statsData.lifetimeTokenBalance || 0) }} tokens</span>
+            </div>
+            <div v-else class="text-gray-700">按窗口限速</div>
+          </div>
+        </div>
+        <div v-if="statsData.planType === 'lifetime'" class="flex items-center justify-between">
+          <span class="text-sm text-gray-600 md:text-base">无时限充值</span>
+          <button
+            class="rounded-lg bg-gradient-to-r from-purple-500 to-purple-600 px-3 py-1.5 text-xs font-medium text-white shadow hover:from-purple-600 hover:to-purple-700 md:text-sm"
+            @click="onTopupClicked"
+          >
+            <i class="fas fa-coins mr-1" /> 充值兑换码
+          </button>
+        </div>
         <div class="flex items-center justify-between">
           <span class="text-sm text-gray-600 md:text-base">创建时间</span>
           <span class="break-all text-xs font-medium text-gray-900 md:text-base">{{
@@ -125,6 +147,29 @@ import dayjs from 'dayjs'
 
 const apiStatsStore = useApiStatsStore()
 const { statsData, statsPeriod, currentPeriodData } = storeToRefs(apiStatsStore)
+
+// 充值
+const onTopupClicked = async () => {
+  const code = window.prompt('请输入无时限兑换码：')
+  if (!code || !code.trim()) return
+  try {
+    const resp = await fetch(`/apiStats/api/topup-lifetime`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiId: statsData.value.id, code: code.trim() })
+    })
+    const data = await resp.json()
+    if (data && data.success) {
+      // 刷新统计以显示新余额
+      await apiStatsStore.loadStatsWithApiId()
+      alert('充值成功！已更新余额。')
+    } else {
+      alert(data.message || '充值失败，请稍后重试')
+    }
+  } catch (e) {
+    alert('充值失败，请稍后重试')
+  }
+}
 
 // 格式化日期
 const formatDate = (dateString) => {

@@ -21,6 +21,7 @@ const pricingService = require('../services/pricingService')
 const claudeCodeHeadersService = require('../services/claudeCodeHeadersService')
 const axios = require('axios')
 const crypto = require('crypto')
+const upstreamErrorService = require('../services/upstreamErrorService')
 const fs = require('fs')
 const path = require('path')
 const config = require('../../config/config')
@@ -1698,6 +1699,94 @@ router.put(
     }
   }
 )
+
+// ================ 上游错误聚合与自定义文案 ================
+
+// 获取某账户的上游错误聚合（每种仅返回1条示例）
+router.get('/upstream-errors/:accountId', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+    const result = await upstreamErrorService.getAggregatedErrors(accountId, 1)
+    return res.json({ success: true, data: result.data })
+  } catch (error) {
+    logger.error('Failed to get upstream errors:', error)
+    return res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// 获取/设置某账户自定义错误文案
+router.get('/upstream-errors/:accountId/custom-messages', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+    const data = await upstreamErrorService.getCustomMessages(accountId)
+    return res.json({ success: true, data })
+  } catch (error) {
+    logger.error('Failed to get custom messages:', error)
+    return res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+router.post('/upstream-errors/:accountId/custom-messages', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+    const { messages } = req.body || {}
+    const result = await upstreamErrorService.setCustomMessages(accountId, messages || {})
+    if (!result.success) {
+      return res.status(500).json({ success: false, message: result.message || 'save failed' })
+    }
+    return res.json({ success: true })
+  } catch (error) {
+    logger.error('Failed to set custom messages:', error)
+    return res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// 复制错误信息：从源账户复制到目标账户
+router.post(
+  '/upstream-errors/:targetAccountId/copy-messages',
+  authenticateAdmin,
+  async (req, res) => {
+    try {
+      const { targetAccountId } = req.params
+      const { sourceAccountId, overwrite = false } = req.body
+
+      if (!sourceAccountId) {
+        return res.status(400).json({
+          success: false,
+          message: '缺少源账户ID参数'
+        })
+      }
+
+      if (sourceAccountId === targetAccountId) {
+        return res.status(400).json({
+          success: false,
+          message: '源账户和目标账户不能相同'
+        })
+      }
+
+      const result = await upstreamErrorService.copyCustomMessages(
+        sourceAccountId,
+        targetAccountId,
+        overwrite
+      )
+      return res.json(result)
+    } catch (error) {
+      logger.error('Failed to copy upstream error messages:', error)
+      return res.status(500).json({ success: false, message: error.message })
+    }
+  }
+)
+
+// 获取所有有自定义错误信息的账户列表（用于复制功能选择源账户）
+router.get('/upstream-errors/accounts-with-messages', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await upstreamErrorService.getAccountsWithCustomMessages()
+    return res.json(result)
+  } catch (error) {
+    logger.error('Failed to get accounts with custom messages:', error)
+    return res.status(500).json({ success: false, message: error.message })
+  }
+})
 
 // ☁️ Bedrock 账户管理
 

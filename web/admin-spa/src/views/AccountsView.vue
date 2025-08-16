@@ -117,6 +117,15 @@
               <i class="fas fa-plus"></i>
               <span>添加账户</span>
             </button>
+
+            <!-- 上游错误按钮 -->
+            <button
+              class="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-rose-500 to-pink-600 px-5 py-2.5 text-sm font-medium text-white shadow-md transition-all duration-200 hover:from-rose-600 hover:to-pink-700 hover:shadow-lg sm:w-auto"
+              @click.stop="openUpstreamErrorsModal"
+            >
+              <i class="fas fa-bug"></i>
+              <span>上游错误</span>
+            </button>
           </div>
         </div>
       </div>
@@ -835,6 +844,156 @@
       @confirm="handleConfirm"
     />
 
+    <!-- 上游错误弹窗 -->
+    <div v-if="showUpstreamErrorsModal" class="modal-overlay">
+      <div class="modal-content max-w-3xl">
+        <div class="modal-header">
+          <h3 class="modal-title">上游错误与自定义返回</h3>
+          <button class="modal-close-btn" @click="closeUpstreamErrorsModal">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <div class="mb-4">
+            <label class="mb-2 block text-sm font-medium text-gray-700">选择账户</label>
+            <select
+              v-model="selectedAccountIdForErrors"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2"
+              @change="loadUpstreamErrors"
+            >
+              <option v-for="acc in accounts" :key="acc.id" :value="acc.id">
+                {{ acc.name || acc.id }} ({{ acc.platform }})
+              </option>
+            </select>
+          </div>
+
+          <!-- 复制错误信息功能 -->
+          <div
+            v-if="selectedAccountIdForErrors"
+            class="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4"
+          >
+            <h4 class="mb-3 text-sm font-semibold text-blue-900">复制错误信息</h4>
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <label class="mb-1 block text-xs font-medium text-gray-700">从源账户复制</label>
+                <select
+                  v-model="copySourceAccountId"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                  @change="loadSourceAccountMessages"
+                >
+                  <option value="">选择源账户</option>
+                  <option
+                    v-for="sourceAccount in accountsWithMessages"
+                    :key="sourceAccount.accountId"
+                    :value="sourceAccount.accountId"
+                  >
+                    {{ getAccountDisplayName(sourceAccount.accountId) }} ({{
+                      sourceAccount.messageCount
+                    }}条)
+                  </option>
+                </select>
+              </div>
+              <div class="flex items-end">
+                <button
+                  class="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:bg-gray-400"
+                  :disabled="!copySourceAccountId || copyingMessages"
+                  @click="copyErrorMessages"
+                >
+                  <i class="fas fa-copy"></i>
+                  <span v-if="copyingMessages">复制中...</span>
+                  <span v-else>复制到当前账户</span>
+                </button>
+              </div>
+            </div>
+            <div class="mt-2 flex items-center">
+              <input
+                id="overwrite-messages"
+                v-model="overwriteMessages"
+                class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                type="checkbox"
+              />
+              <label class="ml-2 text-xs text-gray-600" for="overwrite-messages">
+                覆盖当前账户已有的自定义信息
+              </label>
+            </div>
+            <div v-if="sourceAccountMessages.length > 0" class="mt-3">
+              <div class="text-xs text-gray-600">源账户包含的错误类型：</div>
+              <div class="mt-1 flex flex-wrap gap-1">
+                <span
+                  v-for="errorType in sourceAccountMessages"
+                  :key="errorType"
+                  class="rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-800"
+                >
+                  {{ errorType }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-4 flex items-center gap-2">
+            <button
+              class="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+              @click="loadUpstreamErrors"
+            >
+              加载错误
+            </button>
+            <span class="text-xs text-gray-500">每种错误仅显示1条示例</span>
+          </div>
+
+          <div v-if="upstreamErrorsLoading" class="text-center text-gray-500">加载中...</div>
+          <div v-else>
+            <div v-if="aggregatedUpstreamErrors.length === 0" class="text-sm text-gray-500">
+              暂无错误
+            </div>
+            <div v-else class="space-y-4">
+              <div
+                v-for="item in aggregatedUpstreamErrors"
+                :key="item.errorType"
+                class="rounded border border-gray-200 p-3"
+              >
+                <div class="mb-2 flex items-center justify-between">
+                  <div class="text-sm font-semibold text-gray-900">
+                    错误类型：{{ item.errorType }}
+                  </div>
+                  <div class="text-xs text-gray-500">次数：{{ item.count }}</div>
+                </div>
+                <div v-if="item.sample" class="mb-2 break-all text-xs text-gray-600">
+                  <div>状态：{{ item.sample.status }} | 代码：{{ item.sample.code || '-' }}</div>
+                  <div class="mt-1">示例：{{ item.sample.message || item.sample.sampleBody }}</div>
+                </div>
+
+                <div class="mt-2">
+                  <label class="mb-1 block text-xs font-medium text-gray-700"
+                    >自定义返回给客户端的文案</label
+                  >
+                  <input
+                    v-model="customErrorMessages[item.errorType]"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                    placeholder="不填写则使用系统默认"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button
+            class="rounded-lg border border-gray-300 bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
+            @click="closeUpstreamErrorsModal"
+          >
+            关闭
+          </button>
+          <button
+            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            @click="saveCustomMessages"
+          >
+            保存文案
+          </button>
+        </div>
+      </div>
+    </div>
     <!-- 智能限流配置模态框 -->
     <div v-if="showRateLimitConfigModal" class="modal-overlay">
       <div class="modal-content max-w-4xl">
@@ -1094,6 +1253,20 @@ const systemGroupRates = ref({}) // 存储系统分组的倍率模板映射
 const groupFilter = ref('all')
 const platformFilter = ref('all')
 const intelligentRateLimitAction = ref('') // 智能限流操作选择
+
+// 上游错误弹窗状态
+const showUpstreamErrorsModal = ref(false)
+const selectedAccountIdForErrors = ref('')
+const upstreamErrorsLoading = ref(false)
+const aggregatedUpstreamErrors = ref([])
+const customErrorMessages = ref({})
+
+// 复制功能相关状态
+const accountsWithMessages = ref([])
+const copySourceAccountId = ref('')
+const sourceAccountMessages = ref([])
+const overwriteMessages = ref(false)
+const copyingMessages = ref(false)
 
 // 缓存状态标志
 const apiKeysLoaded = ref(false)
@@ -2178,6 +2351,123 @@ onMounted(() => {
   // 首次加载时强制刷新所有数据
   loadAccounts(true)
 })
+
+// 上游错误：打开/关闭
+const openUpstreamErrorsModal = async () => {
+  if (accounts.value.length > 0) {
+    selectedAccountIdForErrors.value = accounts.value[0].id
+  }
+  aggregatedUpstreamErrors.value = []
+  customErrorMessages.value = {}
+
+  // 加载所有有自定义错误信息的账户列表
+  await loadAccountsWithMessages()
+
+  showUpstreamErrorsModal.value = true
+}
+const closeUpstreamErrorsModal = () => {
+  showUpstreamErrorsModal.value = false
+  // 清理复制相关状态
+  copySourceAccountId.value = ''
+  sourceAccountMessages.value = []
+  overwriteMessages.value = false
+}
+
+// 加载聚合错误和自定义文案
+const loadUpstreamErrors = async () => {
+  if (!selectedAccountIdForErrors.value) return
+  upstreamErrorsLoading.value = true
+  try {
+    const [agg, cm] = await Promise.all([
+      apiClient.get(`/admin/upstream-errors/${selectedAccountIdForErrors.value}`),
+      apiClient.get(`/admin/upstream-errors/${selectedAccountIdForErrors.value}/custom-messages`)
+    ])
+    aggregatedUpstreamErrors.value = (agg && agg.data) || []
+    customErrorMessages.value = (cm && cm.data) || {}
+  } catch (e) {
+    ElMessage.error('加载失败')
+  } finally {
+    upstreamErrorsLoading.value = false
+  }
+}
+
+const saveCustomMessages = async () => {
+  if (!selectedAccountIdForErrors.value) return
+  try {
+    const res = await apiClient.post(
+      `/admin/upstream-errors/${selectedAccountIdForErrors.value}/custom-messages`,
+      { messages: customErrorMessages.value }
+    )
+    if (res.success) {
+      ElMessage.success('保存成功')
+    } else {
+      ElMessage.error(res.message || '保存失败')
+    }
+  } catch (e) {
+    ElMessage.error('保存失败')
+  }
+}
+
+// 复制功能相关方法
+const loadAccountsWithMessages = async () => {
+  try {
+    const res = await apiClient.get('/admin/upstream-errors/accounts-with-messages')
+    if (res.success) {
+      accountsWithMessages.value = res.data || []
+    }
+  } catch (e) {
+    console.error('加载有自定义错误信息的账户列表失败:', e)
+  }
+}
+
+const getAccountDisplayName = (accountId) => {
+  const account = accounts.value.find((acc) => acc.id === accountId)
+  return account ? account.name || account.id : accountId
+}
+
+const loadSourceAccountMessages = () => {
+  if (!copySourceAccountId.value) {
+    sourceAccountMessages.value = []
+    return
+  }
+
+  const sourceAccount = accountsWithMessages.value.find(
+    (acc) => acc.accountId === copySourceAccountId.value
+  )
+  if (sourceAccount) {
+    sourceAccountMessages.value = sourceAccount.errorTypes || []
+  }
+}
+
+const copyErrorMessages = async () => {
+  if (!copySourceAccountId.value || !selectedAccountIdForErrors.value) {
+    ElMessage.warning('请选择源账户和目标账户')
+    return
+  }
+
+  copyingMessages.value = true
+  try {
+    const res = await apiClient.post(
+      `/admin/upstream-errors/${selectedAccountIdForErrors.value}/copy-messages`,
+      {
+        sourceAccountId: copySourceAccountId.value,
+        overwrite: overwriteMessages.value
+      }
+    )
+
+    if (res.success) {
+      ElMessage.success(res.message || '复制成功')
+      // 重新加载当前账户的错误信息和自定义文案
+      await loadUpstreamErrors()
+    } else {
+      ElMessage.error(res.message || '复制失败')
+    }
+  } catch (e) {
+    ElMessage.error('复制失败')
+  } finally {
+    copyingMessages.value = false
+  }
+}
 </script>
 
 <style scoped>

@@ -2,10 +2,78 @@ const axios = require('axios')
 const claudeConsoleAccountService = require('./claudeConsoleAccountService')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
+const upstreamErrorService = require('./upstreamErrorService')
 
 class ClaudeConsoleRelayService {
   constructor() {
     this.defaultUserAgent = 'claude-cli/1.0.69 (external, cli)'
+  }
+
+  // 将上游HTTP状态映射为对客户端更友好的状态
+  _mapErrorStatus(status) {
+    if (!status) {
+      return 502
+    }
+
+    // 保持原样的状态码（客户端需要明确知道的）
+    if (status === 429) {
+      return 429
+    } // 限流
+    if (status === 401) {
+      return 401
+    } // 未授权
+    if (status === 403) {
+      return 403
+    } // 禁止访问
+    if (status === 404) {
+      return 404
+    } // 未找到
+    if (status === 400) {
+      return 400
+    } // 请求错误
+
+    // 4xx 客户端错误映射
+    if (status === 402) {
+      return 402
+    } // 付费要求
+    if (status === 405) {
+      return 405
+    } // 方法不允许
+    if (status === 406) {
+      return 400
+    } // 不可接受 -> 请求错误
+    if (status === 408) {
+      return 408
+    } // 请求超时
+    if (status === 409) {
+      return 409
+    } // 冲突
+    if (status === 410) {
+      return 404
+    } // 已删除 -> 未找到
+    if (status === 413) {
+      return 413
+    } // 载荷过大
+    if (status === 414) {
+      return 400
+    } // URI过长 -> 请求错误
+    if (status === 415) {
+      return 415
+    } // 不支持的媒体类型
+    if (status === 422) {
+      return 400
+    } // 无法处理的实体 -> 请求错误
+    if (status >= 400 && status < 500) {
+      return 400
+    } // 其他4xx -> 请求错误
+
+    // 5xx 服务器错误统一映射为502 Bad Gateway
+    if (status >= 500) {
+      return 502
+    }
+
+    // 其他未知状态码
+    return 502
   }
 
   // 🚀 转发请求到Claude Console API
@@ -185,6 +253,25 @@ class ClaudeConsoleRelayService {
         typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
       logger.debug(`[DEBUG] Final response body to return: ${responseBody}`)
 
+      // 如果是非2xx，统一拦截改写为自定义文案（不透传上游详细）
+      if (response.status < 200 || response.status >= 300) {
+        const { errorType } = await upstreamErrorService.recordError({
+          accountId,
+          status: response.status,
+          message:
+            typeof response.data === 'string' ? response.data : JSON.stringify(response.data),
+          provider: 'claude-console',
+          accountType: 'claude-console'
+        })
+        const clientMessage = await upstreamErrorService.getClientMessage(accountId, errorType)
+        return {
+          statusCode: this._mapErrorStatus(response.status),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: clientMessage }),
+          accountId
+        }
+      }
+
       return {
         statusCode: response.status,
         headers: response.headers,
@@ -199,10 +286,26 @@ class ClaudeConsoleRelayService {
       }
 
       logger.error('❌ Claude Console Claude relay request failed:', error.message)
+      // 记录网络类/异常错误并返回统一文案
+      const { errorType } = await upstreamErrorService.recordError({
+        accountId,
+        status: error.response?.status || 0,
+        code: error.code,
+        message: error.message,
+        data: error.response?.data,
+        provider: 'claude-console',
+        accountType: 'claude-console'
+      })
+      const clientMessage = await upstreamErrorService.getClientMessage(accountId, errorType)
+      const statusCode = this._mapErrorStatus(error.response?.status)
+      return {
+        statusCode,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: clientMessage }),
+        accountId
+      }
 
       // 不再因为模型不支持而block账号
-
-      throw error
     }
   }
 
@@ -358,31 +461,42 @@ class ClaudeConsoleRelayService {
               claudeConsoleAccountService.markAccountRateLimited(accountId)
             }
 
-            // 设置错误响应的状态码和响应头
-            if (!responseStream.headersSent) {
-              const errorHeaders = {
-                'Content-Type': response.headers['content-type'] || 'application/json',
-                'Cache-Control': 'no-cache',
-                Connection: 'keep-alive'
-              }
-              // 避免 Transfer-Encoding 冲突，让 Express 自动处理
-              delete errorHeaders['Transfer-Encoding']
-              delete errorHeaders['Content-Length']
-              responseStream.writeHead(response.status, errorHeaders)
-            }
+            // 记录上游错误
+            const chunks = []
+            response.data.on('data', (chunk) => chunks.push(Buffer.from(chunk)))
+            response.data.on('end', async () => {
+              const raw = Buffer.concat(chunks).toString('utf8')
+              await upstreamErrorService.recordError({
+                accountId,
+                status: response.status,
+                message: raw,
+                provider: 'claude-console',
+                accountType: 'claude-console'
+              })
 
-            // 直接透传错误数据，不进行包装
-            response.data.on('data', (chunk) => {
-              if (!responseStream.destroyed) {
-                responseStream.write(chunk)
-              }
-            })
+              // 统一自定义文案返回
+              const errorType = upstreamErrorService.classifyError({
+                status: response.status,
+                message: raw
+              })
+              const clientMessage = await upstreamErrorService.getClientMessage(
+                accountId,
+                errorType
+              )
 
-            response.data.on('end', () => {
+              if (!responseStream.headersSent) {
+                responseStream.writeHead(this._mapErrorStatus(response.status), {
+                  'Content-Type': 'text/event-stream',
+                  'Cache-Control': 'no-cache',
+                  Connection: 'keep-alive'
+                })
+              }
               if (!responseStream.destroyed) {
+                responseStream.write('event: error\n')
+                responseStream.write(`data: ${JSON.stringify({ error: clientMessage })}\n\n`)
                 responseStream.end()
               }
-              resolve() // 不抛出异常，正常完成流处理
+              resolve()
             })
             return
           }
@@ -543,28 +657,35 @@ class ClaudeConsoleRelayService {
             claudeConsoleAccountService.markAccountRateLimited(accountId)
           }
 
-          // 发送错误响应
-          if (!responseStream.headersSent) {
-            responseStream.writeHead(error.response?.status || 500, {
-              'Content-Type': 'text/event-stream',
-              'Cache-Control': 'no-cache',
-              Connection: 'keep-alive'
+          // 记录错误并以统一文案返回
+          ;(async () => {
+            const { errorType } = await upstreamErrorService.recordError({
+              accountId,
+              status: error.response?.status || 0,
+              code: error.code,
+              message: error.message,
+              data: error.response?.data,
+              provider: 'claude-console',
+              accountType: 'claude-console'
             })
-          }
+            const clientMessage = await upstreamErrorService.getClientMessage(accountId, errorType)
 
-          if (!responseStream.destroyed) {
-            responseStream.write('event: error\n')
-            responseStream.write(
-              `data: ${JSON.stringify({
-                error: error.message,
-                code: error.code,
-                timestamp: new Date().toISOString()
-              })}\n\n`
-            )
-            responseStream.end()
-          }
+            if (!responseStream.headersSent) {
+              responseStream.writeHead(this._mapErrorStatus(error.response?.status), {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                Connection: 'keep-alive'
+              })
+            }
 
-          reject(error)
+            if (!responseStream.destroyed) {
+              responseStream.write('event: error\n')
+              responseStream.write(`data: ${JSON.stringify({ error: clientMessage })}\n\n`)
+              responseStream.end()
+            }
+
+            reject(error)
+          })()
         })
 
       // 处理客户端断开连接

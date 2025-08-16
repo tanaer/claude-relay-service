@@ -11,18 +11,43 @@ class UpstreamErrorService {
   constructor() {
     this.MAX_LOGS_PER_ACCOUNT = 500
     this.DEFAULT_MESSAGES = {
-      rate_limit: '当前服务繁忙，请稍后再试。',
-      authentication: '认证失败，请联系管理员检查配置。',
-      forbidden: '拒绝访问，请联系管理员。',
-      bad_request: '请求参数不被接受，请检查后重试。',
-      server_error: '服务出现异常，请稍后再试。',
-      network_error: '通讯异常，请稍后重试。',
-      timeout: '与通讯超时，请稍后重试。',
-      not_found: '资源不存在。',
+      rate_limit: '当前服务繁忙，请稍后再试',
+      authentication: '认证失败，请联系管理员检查配置',
+      forbidden: '拒绝访问，请联系管理员',
+      bad_request: '请求参数不被接受，请检查后重试',
+      server_error: '服务出现异常，请稍后再试',
+      network_error: '通讯异常，请稍后重试',
+      timeout: '与通讯超时，请稍后重试',
+      not_found: '资源不存在',
       unsupported_model: '当前模型暂不可用，请更换模型后重试。',
       unknown: '服务暂时不可用，请稍后再试。'
     }
     this.CUSTOM_MESSAGES_INDEX_KEY = 'upstream_error_messages_accounts'
+  }
+
+  /**
+   * 使用SCAN遍历键，兼容禁用KEYS或集群环境
+   */
+  async _scanKeys(client, pattern) {
+    return await new Promise((resolve, reject) => {
+      try {
+        const keys = []
+        const stream = client.scanStream({ match: pattern, count: 200 })
+        stream.on('data', (resultKeys) => {
+          if (Array.isArray(resultKeys)) {
+            keys.push(...resultKeys)
+          }
+        })
+        stream.on('end', () => resolve(keys))
+        stream.on('error', (err) => reject(err))
+      } catch (err) {
+        // 回退 KEYS（不推荐，但避免完全失败）
+        client
+          .keys(pattern)
+          .then((keys) => resolve(keys || []))
+          .catch((e) => reject(e))
+      }
+    })
   }
 
   /**
@@ -337,7 +362,7 @@ class UpstreamErrorService {
 
       // 兼容：索引为空时，回退扫描（仅用于初始化或兼容老数据）
       const pattern = 'upstream_error_messages:*'
-      const keys = await client.keys(pattern)
+      const keys = await this._scanKeys(client, pattern)
       for (const key of keys) {
         const accountId = key.replace('upstream_error_messages:', '')
         const messages = await client.hgetall(key)
@@ -367,7 +392,7 @@ class UpstreamErrorService {
     try {
       const client = redis.getClientSafe()
       const pattern = 'upstream_error_messages:*'
-      const keys = await client.keys(pattern)
+      const keys = await this._scanKeys(client, pattern)
       // 清空旧索引
       await client.del(this.CUSTOM_MESSAGES_INDEX_KEY)
 

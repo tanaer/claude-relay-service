@@ -94,6 +94,26 @@
             </div>
           </div>
 
+          <!-- 新增：套餐类型 -->
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label class="mb-1 flex items-center text-sm font-medium text-gray-700">
+                <i class="fas fa-layer-group mr-2 text-blue-500" /> 套餐类型
+              </label>
+              <select v-model="form.planType" class="form-input w-full text-sm">
+                <option value="windowed">按窗口限速</option>
+                <option value="lifetime">无时限（一次性余额）</option>
+              </select>
+              <p class="mt-1 text-xs text-gray-500">无时限：不会重置，可叠加余额直至用尽</p>
+            </div>
+            <div v-if="form.planType === 'lifetime'">
+              <label class="mb-1 flex items-center text-sm font-medium text-gray-700">
+                <i class="fas fa-coins mr-2 text-amber-500" /> 初始余额（Tokens）
+              </label>
+              <input v-model.number="form.lifetimeTokenBalance" class="form-input w-full text-sm" min="0" placeholder="例如 1000000" type="number" />
+            </div>
+          </div>
+
           <div>
             <label class="mb-1.5 block text-xs font-semibold text-gray-700 sm:mb-2 sm:text-sm"
               >名称 <span class="text-red-500">*</span></label
@@ -663,7 +683,9 @@ const form = reactive({
   modelInput: '',
   enableClientRestriction: false,
   allowedClients: [],
-  tags: []
+  tags: [],
+  planType: 'windowed', // 新增：套餐类型
+  lifetimeTokenBalance: 0 // 新增：初始余额
 })
 
 // 加载支持的客户端和已存在的标签
@@ -946,6 +968,14 @@ const createApiKey = async () => {
         name: form.name
       }
 
+      // 透传新增的无时限字段
+      if (form.planType) {
+        data.planType = form.planType
+      }
+      if (form.planType === 'lifetime') {
+        data.lifetimeTokenBalance = Number(form.lifetimeTokenBalance) || 0
+      }
+
       const result = await apiClient.post('/admin/api-keys', data)
 
       if (result.success) {
@@ -962,6 +992,14 @@ const createApiKey = async () => {
         createType: 'batch',
         baseName: form.name,
         count: form.batchCount
+      }
+
+      // 透传新增的无时限字段（批量）
+      if (form.planType) {
+        data.planType = form.planType
+      }
+      if (form.planType === 'lifetime') {
+        data.lifetimeTokenBalance = Number(form.lifetimeTokenBalance) || 0
       }
 
       const result = await apiClient.post('/admin/api-keys/batch', data)

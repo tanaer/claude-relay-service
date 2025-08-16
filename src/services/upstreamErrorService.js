@@ -329,7 +329,10 @@ class UpstreamErrorService {
             await client.srem(this.CUSTOM_MESSAGES_INDEX_KEY, accountId)
           }
         }
-        return { success: true, data: accountsWithMessages }
+        // 如果索引存在但读取为空，降级执行一次全量扫描
+        if (accountsWithMessages.length > 0) {
+          return { success: true, data: accountsWithMessages }
+        }
       }
 
       // 兼容：索引为空时，回退扫描（仅用于初始化或兼容老数据）

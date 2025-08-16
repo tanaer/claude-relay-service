@@ -1734,6 +1734,14 @@ router.post('/upstream-errors/:accountId/custom-messages', authenticateAdmin, as
     if (!result.success) {
       return res.status(500).json({ success: false, message: result.message || 'save failed' })
     }
+
+    // 保存成功后，触发一次索引维护（确保索引集合是最新的）
+    try {
+      await upstreamErrorService.getAccountsWithCustomMessages()
+    } catch (indexError) {
+      logger.warn('Failed to maintain index after saving custom messages:', indexError)
+    }
+
     return res.json({ success: true })
   } catch (error) {
     logger.error('Failed to set custom messages:', error)
@@ -1784,6 +1792,27 @@ router.get('/upstream-errors/accounts-with-messages', authenticateAdmin, async (
     return res.json(result)
   } catch (error) {
     logger.error('Failed to get accounts with custom messages:', error)
+    return res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// 重建自定义错误信息账户索引（用于修复索引丢失问题）
+router.post('/upstream-errors/rebuild-messages-index', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await upstreamErrorService.rebuildAccountsWithCustomMessagesIndex()
+    if (result.success) {
+      // 重建后立即返回账户列表
+      const accounts = await upstreamErrorService.getAccountsWithCustomMessages()
+      return res.json({
+        success: true,
+        message: '索引重建成功',
+        data: accounts.data || []
+      })
+    } else {
+      return res.status(500).json(result)
+    }
+  } catch (error) {
+    logger.error('Failed to rebuild custom messages index:', error)
     return res.status(500).json({ success: false, message: error.message })
   }
 })

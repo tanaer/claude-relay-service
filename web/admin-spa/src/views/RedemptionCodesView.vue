@@ -438,7 +438,7 @@ const loadCodes = async () => {
     params.pageSize = pagination.pageSize
 
     const result = await api.get('/admin/redemption-codes', {
-      params: new URLSearchParams(params)
+      params
     })
 
     if (result.success) {

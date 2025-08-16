@@ -5433,8 +5433,8 @@ router.post('/intelligent-rate-limit/config', authenticateAdmin, async (req, res
     const newConfig = {
       enabled: Boolean(enabled),
       triggerOnAnyError: Boolean(triggerOnAnyError),
-      recoveryTestInterval: parseInt(recoveryTestInterval) || 300000,
-      recoveryTestTimeout: parseInt(recoveryTestTimeout) || 30000,
+      recoveryTestInterval: (parseInt(recoveryTestInterval) || 5) * 60 * 1000, // 分钟转毫秒
+      recoveryTestTimeout: (parseInt(recoveryTestTimeout) || 30) * 1000, // 秒转毫秒
       maxFaultLogs: parseInt(maxFaultLogs) || 1000,
       faultLogRetentionDays: parseInt(faultLogRetentionDays) || 7,
       errorCategories: {

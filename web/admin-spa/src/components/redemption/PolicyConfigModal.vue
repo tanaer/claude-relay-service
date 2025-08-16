@@ -1,6 +1,6 @@
 <template>
-  <div v-if="show" class="modal-overlay" @click="handleBackdropClick">
-    <div class="modal-content" @click.stop>
+  <div v-if="show" class="modal-overlay">
+    <div class="modal-content">
       <div class="modal-header">
         <h3 class="modal-title">
           {{ modalTitle }}
@@ -434,12 +434,6 @@ export default {
       emit('close')
     }
 
-    const handleBackdropClick = (event) => {
-      if (event.target === event.currentTarget) {
-        closeModal()
-      }
-    }
-
     // 监听器
     watch(
       () => props.show,
@@ -467,8 +461,7 @@ export default {
       addThreshold,
       removeThreshold,
       savePolicy,
-      closeModal,
-      handleBackdropClick
+      closeModal
     }
   }
 }

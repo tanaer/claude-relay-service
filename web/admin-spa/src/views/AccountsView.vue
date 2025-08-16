@@ -836,8 +836,8 @@
     />
 
     <!-- 智能限流配置模态框 -->
-    <div v-if="showRateLimitConfigModal" class="modal-overlay" @click="closeRateLimitConfigModal">
-      <div class="modal-content max-w-4xl" @click.stop>
+    <div v-if="showRateLimitConfigModal" class="modal-overlay">
+      <div class="modal-content max-w-4xl">
         <div class="modal-header">
           <h3 class="modal-title">智能限流配置</h3>
           <button class="modal-close-btn" @click="closeRateLimitConfigModal">
@@ -1788,10 +1788,9 @@ const openRateLimitConfigModal = async () => {
 // 保存智能限流配置
 const saveRateLimitConfig = async () => {
   try {
-    const response = await apiClient.post(
-      '/admin/intelligent-rate-limit/config',
-      rateLimitConfig.value
-    )
+    const response = await apiClient.post('/admin/intelligent-rate-limit/config', {
+      configData: rateLimitConfig.value
+    })
     if (response.success) {
       ElMessage.success('配置保存成功')
       showRateLimitConfigModal.value = false

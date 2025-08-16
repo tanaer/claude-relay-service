@@ -1,4 +1,4 @@
-const redis = require('../models/redis')
+const redisClient = require('../models/redis')
 const logger = require('../utils/logger')
 const keyLogsService = require('./keyLogsService')
 
@@ -16,6 +16,11 @@ class RedemptionPolicyService {
     this.SWITCH_HISTORY_PREFIX = 'template_switch_history:'
   }
 
+  // 获取 Redis 客户端
+  _getRedis() {
+    return redisClient.getClientSafe()
+  }
+
   // ==================== 策略配置管理 ====================
 
   /**
@@ -23,7 +28,7 @@ class RedemptionPolicyService {
    */
   async getGlobalPolicy() {
     try {
-      const policy = await redis.hgetall(this.GLOBAL_POLICY_KEY)
+      const policy = await this._getRedis().hgetall(this.GLOBAL_POLICY_KEY)
       if (!policy || Object.keys(policy).length === 0) {
         return this._getDefaultGlobalPolicy()
       }
@@ -56,12 +61,12 @@ class RedemptionPolicyService {
       }
 
       // 如果是首次创建，添加创建时间
-      const existing = await redis.hgetall(this.GLOBAL_POLICY_KEY)
+      const existing = await this._getRedis().hgetall(this.GLOBAL_POLICY_KEY)
       if (!existing || Object.keys(existing).length === 0) {
         policy.createdAt = new Date().toISOString()
       }
 
-      await redis.hset(this.GLOBAL_POLICY_KEY, policy)
+      await this._getRedis().hset(this.GLOBAL_POLICY_KEY, policy)
 
       // 记录日志
       await keyLogsService.logSystemEvent('全局兑换码策略配置已更新', 'info', {
@@ -82,7 +87,7 @@ class RedemptionPolicyService {
    */
   async getTypePolicy(type) {
     try {
-      const policy = await redis.hgetall(`${this.TYPE_POLICY_PREFIX}${type}`)
+      const policy = await this._getRedis().hgetall(`${this.TYPE_POLICY_PREFIX}${type}`)
       if (!policy || Object.keys(policy).length === 0) {
         return null
       }
@@ -117,12 +122,12 @@ class RedemptionPolicyService {
       }
 
       // 如果是首次创建，添加创建时间
-      const existing = await redis.hgetall(`${this.TYPE_POLICY_PREFIX}${type}`)
+      const existing = await this._getRedis().hgetall(`${this.TYPE_POLICY_PREFIX}${type}`)
       if (!existing || Object.keys(existing).length === 0) {
         policy.createdAt = new Date().toISOString()
       }
 
-      await redis.hset(`${this.TYPE_POLICY_PREFIX}${type}`, policy)
+      await this._getRedis().hset(`${this.TYPE_POLICY_PREFIX}${type}`, policy)
 
       // 记录日志
       await keyLogsService.logSystemEvent(`${type}类型兑换码策略配置已更新`, 'info', {
@@ -144,7 +149,7 @@ class RedemptionPolicyService {
    */
   async getCodePolicy(codeId) {
     try {
-      const policy = await redis.hgetall(`${this.CODE_POLICY_PREFIX}${codeId}`)
+      const policy = await this._getRedis().hgetall(`${this.CODE_POLICY_PREFIX}${codeId}`)
       if (!policy || Object.keys(policy).length === 0) {
         return null
       }
@@ -175,12 +180,12 @@ class RedemptionPolicyService {
       }
 
       // 如果是首次创建，添加创建时间
-      const existing = await redis.hgetall(`${this.CODE_POLICY_PREFIX}${codeId}`)
+      const existing = await this._getRedis().hgetall(`${this.CODE_POLICY_PREFIX}${codeId}`)
       if (!existing || Object.keys(existing).length === 0) {
         policy.createdAt = new Date().toISOString()
       }
 
-      await redis.hset(`${this.CODE_POLICY_PREFIX}${codeId}`, policy)
+      await this._getRedis().hset(`${this.CODE_POLICY_PREFIX}${codeId}`, policy)
 
       // 记录日志
       await keyLogsService.logSystemEvent(`兑换码 ${codeId} 策略配置已更新`, 'info', {
@@ -283,16 +288,16 @@ class RedemptionPolicyService {
         })
       }
 
-      await redis.hset(`${this.API_KEY_POLICY_PREFIX}${apiKeyId}`, binding)
-      await redis.sadd(this.ACTIVE_POLICIES_INDEX, apiKeyId)
-      await redis.sadd(`${this.TYPE_INDEX_PREFIX}${codeType}`, apiKeyId)
+      await this._getRedis().hset(`${this.API_KEY_POLICY_PREFIX}${apiKeyId}`, binding)
+      await this._getRedis().sadd(this.ACTIVE_POLICIES_INDEX, apiKeyId)
+      await this._getRedis().sadd(`${this.TYPE_INDEX_PREFIX}${codeType}`, apiKeyId)
 
       // 初始化使用量监控
       await this._initUsageMonitor(apiKeyId, effectivePolicy)
 
       // 添加到策略检查队列
       const nextCheck = Date.now() + (parseInt(effectivePolicy.monitorInterval) || 5) * 60 * 1000
-      await redis.zadd(this.POLICY_CHECK_QUEUE, nextCheck, apiKeyId)
+      await this._getRedis().zadd(this.POLICY_CHECK_QUEUE, nextCheck, apiKeyId)
 
       // 记录日志
       await keyLogsService.logRedemption(codeId, apiKeyId, codeType, true, {
@@ -313,7 +318,7 @@ class RedemptionPolicyService {
    */
   async getApiKeyPolicy(apiKeyId) {
     try {
-      const binding = await redis.hgetall(`${this.API_KEY_POLICY_PREFIX}${apiKeyId}`)
+      const binding = await this._getRedis().hgetall(`${this.API_KEY_POLICY_PREFIX}${apiKeyId}`)
       if (!binding || Object.keys(binding).length === 0) {
         return null
       }
@@ -356,10 +361,10 @@ class RedemptionPolicyService {
         thresholdHistory: JSON.stringify([])
       }
 
-      await redis.hset(monitorKey, monitorData)
+      await this._getRedis().hset(monitorKey, monitorData)
 
       // 设置过期时间（31天）
-      await redis.expire(monitorKey, 31 * 24 * 60 * 60)
+      await this._getRedis().expire(monitorKey, 31 * 24 * 60 * 60)
 
       logger.debug(`[策略服务] 已初始化 ${apiKeyId} 的使用量监控`)
     } catch (error) {
@@ -376,7 +381,7 @@ class RedemptionPolicyService {
       const monitorKey = `${this.USAGE_MONITOR_PREFIX}${apiKeyId}:${today}`
 
       // 获取当前数据
-      const current = await redis.hgetall(monitorKey)
+      const current = await this._getRedis().hgetall(monitorKey)
       if (!current || Object.keys(current).length === 0) {
         await this._initUsageMonitor(apiKeyId, {})
         return await this.updateUsageMonitor(apiKeyId, usageData)
@@ -402,7 +407,7 @@ class RedemptionPolicyService {
       const percentage = (parseInt(updated.totalTokens) / dailyLimit) * 100
       updated.currentPercentage = percentage.toFixed(2)
 
-      await redis.hset(monitorKey, updated)
+      await this._getRedis().hset(monitorKey, updated)
 
       logger.debug(`[策略服务] 已更新 ${apiKeyId} 使用量: ${updated.currentPercentage}%`)
       return percentage
@@ -420,7 +425,7 @@ class RedemptionPolicyService {
       const targetDate = date || this._getTodayString()
       const monitorKey = `${this.USAGE_MONITOR_PREFIX}${apiKeyId}:${targetDate}`
 
-      const data = await redis.hgetall(monitorKey)
+      const data = await this._getRedis().hgetall(monitorKey)
       if (!data || Object.keys(data).length === 0) {
         return null
       }

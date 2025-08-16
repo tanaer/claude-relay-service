@@ -218,6 +218,7 @@
 <script>
 import { ref, computed, watch, onMounted } from 'vue'
 import { showToast } from '@/utils/toast'
+import { apiClient } from '@/config/api'
 
 export default {
   name: 'PolicyConfigModal',
@@ -279,7 +280,7 @@ export default {
     // 方法
     const loadRateTemplates = async () => {
       try {
-        const response = await fetch('/admin/rate-templates')
+        const response = await apiClient.get('/admin/rate-templates')
         const result = await response.json()
         if (result.success) {
           rateTemplates.value = result.data || []
@@ -291,7 +292,7 @@ export default {
 
     const loadAccountGroups = async () => {
       try {
-        const response = await fetch('/admin/account-groups')
+        const response = await apiClient.get('/admin/account-groups')
         const result = await response.json()
         if (result.success) {
           accountGroups.value = result.data || []
@@ -310,13 +311,13 @@ export default {
 
         switch (props.policyType) {
           case 'global':
-            response = await fetch('/admin/redemption-policies/global')
+            response = await apiClient.get('/admin/redemption-policies/global')
             break
           case 'type':
-            response = await fetch(`/admin/redemption-policies/type/${props.targetId}`)
+            response = await apiClient.get(`/admin/redemption-policies/type/${props.targetId}`)
             break
           case 'code':
-            response = await fetch(`/admin/redemption-policies/code/${props.targetId}`)
+            response = await apiClient.get(`/admin/redemption-policies/code/${props.targetId}`)
             break
         }
 
@@ -401,21 +402,21 @@ export default {
         let response
         switch (props.policyType) {
           case 'global':
-            response = await fetch('/admin/redemption-policies/global', {
+            response = await apiClient.post('/admin/redemption-policies/global', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(submitData)
             })
             break
           case 'type':
-            response = await fetch(`/admin/redemption-policies/type/${props.targetId}`, {
+            response = await apiClient.post(`/admin/redemption-policies/type/${props.targetId}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(submitData)
             })
             break
           case 'code':
-            response = await fetch(`/admin/redemption-policies/code/${props.targetId}`, {
+            response = await apiClient.post(`/admin/redemption-policies/code/${props.targetId}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(submitData)

@@ -171,6 +171,7 @@
 
 <script>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { apiClient } from '@/config/api'
 
 export default {
   name: 'PolicyStatusMonitor',
@@ -210,7 +211,7 @@ export default {
     // 方法
     const loadPolicyBinding = async () => {
       try {
-        const response = await fetch(`/admin/redemption-policies/api-key/${props.apiKeyId}`)
+        const response = await apiClient.get(`/admin/redemption-policies/api-key/${props.apiKeyId}`)
         const result = await response.json()
         if (result.success) {
           policyBinding.value = result.data
@@ -225,7 +226,7 @@ export default {
 
     const loadUsageData = async () => {
       try {
-        const response = await fetch(`/admin/redemption-policies/usage/${props.apiKeyId}`)
+        const response = await apiClient.get(`/admin/redemption-policies/usage/${props.apiKeyId}`)
         const result = await response.json()
         if (result.success) {
           usageData.value = result.data
@@ -240,7 +241,7 @@ export default {
 
     const loadSwitchHistory = async () => {
       try {
-        const response = await fetch(
+        const response = await apiClient.get(
           `/admin/redemption-policies/switch-history/${props.apiKeyId}?limit=10`
         )
         const result = await response.json()
@@ -255,7 +256,7 @@ export default {
 
     const loadRateTemplates = async () => {
       try {
-        const response = await fetch('/admin/rate-templates')
+        const response = await apiClient.get('/admin/rate-templates')
         const result = await response.json()
         if (result.success) {
           rateTemplates.value = result.data || []

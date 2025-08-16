@@ -280,8 +280,7 @@ export default {
     // 方法
     const loadRateTemplates = async () => {
       try {
-        const response = await apiClient.get('/admin/rate-templates')
-        const result = await response.json()
+        const result = await apiClient.get('/admin/rate-templates')
         if (result.success) {
           rateTemplates.value = result.data || []
         }
@@ -292,8 +291,7 @@ export default {
 
     const loadAccountGroups = async () => {
       try {
-        const response = await apiClient.get('/admin/account-groups')
-        const result = await response.json()
+        const result = await apiClient.get('/admin/account-groups')
         if (result.success) {
           accountGroups.value = result.data || []
         }
@@ -307,21 +305,20 @@ export default {
 
       try {
         loading.value = true
-        let response
+        let result
 
         switch (props.policyType) {
           case 'global':
-            response = await apiClient.get('/admin/redemption-policies/global')
+            result = await apiClient.get('/admin/redemption-policies/global')
             break
           case 'type':
-            response = await apiClient.get(`/admin/redemption-policies/type/${props.targetId}`)
+            result = await apiClient.get(`/admin/redemption-policies/type/${props.targetId}`)
             break
           case 'code':
-            response = await apiClient.get(`/admin/redemption-policies/code/${props.targetId}`)
+            result = await apiClient.get(`/admin/redemption-policies/code/${props.targetId}`)
             break
         }
 
-        const result = await response.json()
         if (result.success && result.data) {
           const data = result.data
 
@@ -399,32 +396,25 @@ export default {
           }
         }
 
-        let response
+        let result
         switch (props.policyType) {
           case 'global':
-            response = await apiClient.post('/admin/redemption-policies/global', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(submitData)
-            })
+            result = await apiClient.post('/admin/redemption-policies/global', submitData)
             break
           case 'type':
-            response = await apiClient.post(`/admin/redemption-policies/type/${props.targetId}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(submitData)
-            })
+            result = await apiClient.post(
+              `/admin/redemption-policies/type/${props.targetId}`,
+              submitData
+            )
             break
           case 'code':
-            response = await apiClient.post(`/admin/redemption-policies/code/${props.targetId}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(submitData)
-            })
+            result = await apiClient.post(
+              `/admin/redemption-policies/code/${props.targetId}`,
+              submitData
+            )
             break
         }
 
-        const result = await response.json()
         if (result.success) {
           showToast('策略配置保存成功', 'success')
           emit('saved', submitData)

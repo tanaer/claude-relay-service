@@ -5375,15 +5375,18 @@ router.post(
 // 获取智能限流配置信息
 router.get('/intelligent-rate-limit/config', authenticateAdmin, async (req, res) => {
   try {
+    // 添加防御性检查
+    const rateLimitConfig = config.intelligentRateLimit || {}
+
     const configInfo = {
-      enabled: config.intelligentRateLimit.enabled,
-      triggerOnAnyError: config.intelligentRateLimit.triggerOnAnyError,
-      recoveryTestInterval: config.intelligentRateLimit.recoveryTestInterval,
-      recoveryTestTimeout: config.intelligentRateLimit.recoveryTestTimeout,
-      maxFaultLogs: config.intelligentRateLimit.maxFaultLogs,
-      faultLogRetentionDays: config.intelligentRateLimit.faultLogRetentionDays,
-      errorCategories: config.intelligentRateLimit.errorCategories,
-      alerting: config.intelligentRateLimit.alerting
+      enabled: rateLimitConfig.enabled || false,
+      triggerOnAnyError: rateLimitConfig.triggerOnAnyError || false,
+      recoveryTestInterval: rateLimitConfig.recoveryTestInterval || 300000,
+      recoveryTestTimeout: rateLimitConfig.recoveryTestTimeout || 30000,
+      maxFaultLogs: rateLimitConfig.maxFaultLogs || 1000,
+      faultLogRetentionDays: rateLimitConfig.faultLogRetentionDays || 7,
+      errorCategories: rateLimitConfig.errorCategories || {},
+      alerting: rateLimitConfig.alerting || {}
     }
 
     res.json({ success: true, data: configInfo })

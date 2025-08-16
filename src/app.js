@@ -243,7 +243,7 @@ class Application {
           if (result.success) {
             try {
               const baseUrl = `${req.protocol}://${req.get('host')}`
-              const downloadUrl = `${baseUrl}/download/muskapi_com_setup.ps1?apiKey=${encodeURIComponent(
+              const downloadUrl = `${baseUrl}/download/muskapi_com_setup.cmd?apiKey=${encodeURIComponent(
                 result.data.apiKey
               )}`
               return res.json({
@@ -273,8 +273,8 @@ class Application {
         }
       })
 
-      // 📥 动态生成并下载安装脚本（muskapi_com_setup.ps1），将兑换得到的 API Key 注入脚本
-      this.app.get('/download/muskapi_com_setup.ps1', async (req, res) => {
+      // 📥 动态生成并下载安装脚本（muskapi_com_setup.cmd），将兑换得到的 API Key 注入脚本
+      this.app.get('/download/muskapi_com_setup.cmd', async (req, res) => {
         try {
           const { apiKey = '' } = req.query
 
@@ -283,24 +283,25 @@ class Application {
             '..',
             'resources',
             'scripts',
-            'muskapi_com_setup.ps1'
+            'muskapi_com_setup.cmd'
           )
 
           if (!fs.existsSync(templatePath)) {
-            return res.status(404).send('muskapi_com_setup.ps1 template not found')
+            return res.status(404).send('muskapi_com_setup.cmd template not found')
           }
 
           let content = fs.readFileSync(templatePath, 'utf8')
 
-          // 保护性转义双引号，避免破坏 PowerShell 字面量
-          const safeApiKey = String(apiKey).replace(/`/g, '``').replace(/"/g, '`"')
+          // 对 CMD 变量赋值做基础转义：百分号与感叹号
+          // 注意：令牌一般为 cr_ 开头的字母数字，不含特殊字符，此处为防御性处理
+          const safeApiKey = String(apiKey).replace(/%/g, '%%').replace(/!/g, '^^!')
           content = content.replace(/__API_TOKEN__/g, safeApiKey)
 
           res.setHeader('Content-Type', 'application/octet-stream')
-          res.setHeader('Content-Disposition', 'attachment; filename="muskapi_com_setup.ps1"')
+          res.setHeader('Content-Disposition', 'attachment; filename="muskapi_com_setup.cmd"')
           return res.status(200).send(content)
         } catch (error) {
-          logger.error('❌ Failed to generate muskapi_com_setup.ps1:', error)
+          logger.error('❌ Failed to generate muskapi_com_setup.cmd:', error)
           return res.status(500).send('Failed to generate setup script')
         }
       })

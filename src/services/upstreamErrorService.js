@@ -191,6 +191,12 @@ class UpstreamErrorService {
       const client = redis.getClientSafe()
       const key = `upstream_error_messages:${accountId}`
       const map = await client.hgetall(key)
+      // 读取即维护索引：有则加入索引集合，无则移除
+      if (map && Object.keys(map).length > 0) {
+        await client.sadd(this.CUSTOM_MESSAGES_INDEX_KEY, accountId)
+      } else {
+        await client.srem(this.CUSTOM_MESSAGES_INDEX_KEY, accountId)
+      }
       return map || {}
     } catch (err) {
       logger.error('Failed to get custom upstream error messages:', err.message)

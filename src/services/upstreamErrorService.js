@@ -2,29 +2,31 @@ const redis = require('../models/redis')
 const logger = require('../utils/logger')
 
 /**
- * 上游错误记录与自定义文案服务（按账户维度）
- * - 错误明细存储：list key upstream_errors:{accountId}
- * - 自定义文案存储：hash key upstream_error_custom_messages:{accountId}
+ * 错误记录与自定义文案服务（按账户维度）
+ * - 错误明细存储：list key upstream_error_logs:{accountId}
+ * - 自定义文案存储：hash key upstream_error_messages:{accountId}
+ * - 账户索引集合：set key upstream_error_messages_accounts
  */
 class UpstreamErrorService {
   constructor() {
     this.MAX_LOGS_PER_ACCOUNT = 500
     this.DEFAULT_MESSAGES = {
-      rate_limit: '当前上游服务繁忙，请稍后再试。',
-      authentication: '上游认证失败，请联系管理员检查配置。',
-      forbidden: '上游拒绝访问，请联系管理员。',
-      bad_request: '请求参数不被上游接受，请检查后重试。',
-      server_error: '上游服务出现异常，请稍后再试。',
-      network_error: '与上游通讯异常，请稍后重试。',
-      timeout: '与上游通讯超时，请稍后重试。',
-      not_found: '上游资源不存在。',
+      rate_limit: '当前服务繁忙，请稍后再试。',
+      authentication: '认证失败，请联系管理员检查配置。',
+      forbidden: '拒绝访问，请联系管理员。',
+      bad_request: '请求参数不被接受，请检查后重试。',
+      server_error: '服务出现异常，请稍后再试。',
+      network_error: '通讯异常，请稍后重试。',
+      timeout: '与通讯超时，请稍后重试。',
+      not_found: '资源不存在。',
       unsupported_model: '当前模型暂不可用，请更换模型后重试。',
       unknown: '服务暂时不可用，请稍后再试。'
     }
+    this.CUSTOM_MESSAGES_INDEX_KEY = 'upstream_error_messages_accounts'
   }
 
   /**
-   * 分类上游错误到统一的 errorType
+   * 分类错误到统一的 errorType
    */
   classifyError({ status, code, message, data }) {
     // 优先按 HTTP 状态码
@@ -63,7 +65,7 @@ class UpstreamErrorService {
       return 'network_error'
     }
 
-    // 从上游内容中尝试判断
+    // 从内容中尝试判断
     const text = typeof data === 'string' ? data : JSON.stringify(data || {})
     if (/model.*not.*supported|unsupported.*model/i.test(text)) {
       return 'unsupported_model'
@@ -99,7 +101,7 @@ class UpstreamErrorService {
   }
 
   /**
-   * 记录一条上游错误
+   * 记录一条错误
    */
   async recordError({
     accountId,
@@ -214,6 +216,11 @@ class UpstreamErrorService {
 
       if (Object.keys(validMessages).length > 0) {
         await client.hset(key, validMessages)
+        // 维护索引集合
+        await client.sadd(this.CUSTOM_MESSAGES_INDEX_KEY, accountId)
+      } else {
+        // 没有自定义文案时，从索引集合移除
+        await client.srem(this.CUSTOM_MESSAGES_INDEX_KEY, accountId)
       }
       return { success: true }
     } catch (err) {
@@ -295,21 +302,45 @@ class UpstreamErrorService {
   async getAccountsWithCustomMessages() {
     try {
       const client = redis.getClientSafe()
+
+      // 优先使用索引集合，避免使用 KEYS（在集群/大数据量下更安全）
+      const indexedIds = await client.smembers(this.CUSTOM_MESSAGES_INDEX_KEY)
+      const accountsWithMessages = []
+
+      if (indexedIds && indexedIds.length > 0) {
+        for (const accountId of indexedIds) {
+          const key = `upstream_error_messages:${accountId}`
+          const messages = await client.hgetall(key)
+          const messageCount = Object.keys(messages || {}).length
+          if (messageCount > 0) {
+            accountsWithMessages.push({
+              accountId,
+              messageCount,
+              errorTypes: Object.keys(messages)
+            })
+          } else {
+            // 清理索引中已空的账户
+            await client.srem(this.CUSTOM_MESSAGES_INDEX_KEY, accountId)
+          }
+        }
+        return { success: true, data: accountsWithMessages }
+      }
+
+      // 兼容：索引为空时，回退扫描（仅用于初始化或兼容老数据）
       const pattern = 'upstream_error_messages:*'
       const keys = await client.keys(pattern)
-
-      const accountsWithMessages = []
       for (const key of keys) {
         const accountId = key.replace('upstream_error_messages:', '')
         const messages = await client.hgetall(key)
         const messageCount = Object.keys(messages || {}).length
-
         if (messageCount > 0) {
           accountsWithMessages.push({
             accountId,
             messageCount,
             errorTypes: Object.keys(messages)
           })
+          // 同步写入索引
+          await client.sadd(this.CUSTOM_MESSAGES_INDEX_KEY, accountId)
         }
       }
 
@@ -317,6 +348,31 @@ class UpstreamErrorService {
     } catch (err) {
       logger.error('Failed to get accounts with custom messages:', err)
       return { success: false, data: [] }
+    }
+  }
+
+  /**
+   * 重建账户索引集合（从现有 key 扫描）
+   */
+  async rebuildAccountsWithCustomMessagesIndex() {
+    try {
+      const client = redis.getClientSafe()
+      const pattern = 'upstream_error_messages:*'
+      const keys = await client.keys(pattern)
+      // 清空旧索引
+      await client.del(this.CUSTOM_MESSAGES_INDEX_KEY)
+
+      for (const key of keys) {
+        const accountId = key.replace('upstream_error_messages:', '')
+        const count = await client.hlen(key)
+        if (count > 0) {
+          await client.sadd(this.CUSTOM_MESSAGES_INDEX_KEY, accountId)
+        }
+      }
+      return { success: true }
+    } catch (err) {
+      logger.error('Failed to rebuild custom messages index:', err)
+      return { success: false, message: err.message }
     }
   }
 

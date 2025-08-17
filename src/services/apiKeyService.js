@@ -355,6 +355,27 @@ class ApiKeyService {
     }
   }
 
+  // 📝 从动态策略引擎更新API Key（专用方法）
+  async updateApiKeyFromDynamicPolicy(keyId, updates) {
+    try {
+      // 添加更新来源标记
+      const updatesWithSource = {
+        ...updates,
+        updatedBy: 'dynamic_policy_engine'
+      }
+
+      // 调用标准更新方法
+      const result = await this.updateApiKey(keyId, updatesWithSource)
+
+      logger.info(`📝 [动态策略] 更新 API Key: ${keyId}，模板: ${updates.rateTemplateId || 'N/A'}`)
+
+      return result
+    } catch (error) {
+      logger.error(`❌ [动态策略] 更新 API Key 失败: ${keyId}`, error)
+      throw error
+    }
+  }
+
   // 🗑️ 删除API Key
   async deleteApiKey(keyId) {
     try {

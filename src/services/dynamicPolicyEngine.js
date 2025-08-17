@@ -215,8 +215,8 @@ class DynamicPolicyEngine {
    */
   async updateApiKeyTemplate(apiKeyId, templateId) {
     try {
-      // 使用apiKeyService的标准方法更新模板
-      await apiKeyService.updateApiKey(apiKeyId, {
+      // 使用apiKeyService的专用方法更新模板
+      await apiKeyService.updateApiKeyFromDynamicPolicy(apiKeyId, {
         rateTemplateId: templateId
       })
 

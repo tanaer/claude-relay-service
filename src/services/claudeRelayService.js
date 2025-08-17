@@ -313,7 +313,7 @@ class ClaudeRelayService {
       const processedBody = JSON.parse(JSON.stringify(body))
 
       // 验证并限制max_tokens参数
-      this._validateAndLimitMaxTokens(processedBody)
+      this._validateMaxTokens(processedBody)
 
       // 移除cache_control中的ttl字段
       this._stripTtlFromCacheControl(processedBody)
@@ -419,44 +419,67 @@ class ClaudeRelayService {
   // 验证 max_tokens（仅日志翻译）
   _validateMaxTokens(body) {
     try {
-      // 读取模型定价配置文件
-      const pricingFilePath = path.join(__dirname, '../../data/model_pricing.json')
-
-      if (!fs.existsSync(pricingFilePath)) {
-        logger.warn('[警告] 模型定价文件未找到，跳过 max_tokens 验证')
+      // 如果没有设置 max_tokens，跳过验证
+      if (body.max_tokens === undefined || body.max_tokens === null) {
         return
       }
 
-      const pricingData = JSON.parse(fs.readFileSync(pricingFilePath, 'utf8'))
-      const model = body.model || 'claude-sonnet-4-20250514'
-
-      // 查找对应模型的配置
-      const modelConfig = pricingData[model]
-
-      if (!modelConfig) {
-        logger.debug(`[调试] 模型 ${model} 未在定价文件中找到，跳过 max_tokens 验证`)
+      // 确保 max_tokens 是数字
+      if (typeof body.max_tokens !== 'number' || isNaN(body.max_tokens)) {
+        logger.warn('[警告] max_tokens 不是有效数字，使用默认值')
+        body.max_tokens = config.claude?.maxTokens || 4096
         return
       }
 
-      // 获取模型的最大token限制
-      const maxLimit = modelConfig.max_tokens || modelConfig.max_output_tokens
+      // 从配置获取最大限制，默认 4096
+      const configMaxTokens = config.claude?.maxTokens || 4096
 
-      if (!maxLimit) {
-        logger.debug(`[调试] 模型 ${model} 未找到 max_tokens 限制，跳过验证`)
-        return
+      // 尝试从定价文件获取更精确的限制
+      let modelMaxLimit = configMaxTokens
+      try {
+        const pricingFilePath = path.join(__dirname, '../../data/model_pricing.json')
+        if (fs.existsSync(pricingFilePath)) {
+          const pricingData = JSON.parse(fs.readFileSync(pricingFilePath, 'utf8'))
+          const model = body.model || 'claude-sonnet-4-20250514'
+          const modelConfig = pricingData[model]
+
+          if (modelConfig) {
+            const pricingLimit = modelConfig.max_tokens || modelConfig.max_output_tokens
+            if (pricingLimit && typeof pricingLimit === 'number') {
+              modelMaxLimit = pricingLimit
+            }
+          }
+        }
+      } catch (error) {
+        logger.debug('[调试] 无法从定价文件读取限制，使用配置默认值：', error.message)
       }
+
+      // 使用两个限制中的较小值
+      const effectiveMaxLimit = Math.min(configMaxTokens, modelMaxLimit)
 
       // 检查并调整max_tokens
-      if (body.max_tokens > maxLimit) {
+      if (body.max_tokens > effectiveMaxLimit) {
         logger.warn(
-          `[警告] max_tokens ${body.max_tokens} 超出模型 ${model} 限制 ${maxLimit}，调整为 ${maxLimit}`
+          `[警告] max_tokens ${body.max_tokens} 超出限制 ${effectiveMaxLimit}，调整为 ${effectiveMaxLimit}`
         )
-        body.max_tokens = maxLimit
+        body.max_tokens = effectiveMaxLimit
+      } else if (body.max_tokens <= 0) {
+        logger.warn('[警告] max_tokens 必须大于 0，使用默认值')
+        body.max_tokens = effectiveMaxLimit
       }
     } catch (error) {
-      logger.error('[错误] 从定价文件验证 max_tokens 失败：', error)
-      // 如果文件读取失败，不进行校验，让请求继续处理
+      logger.error('[错误] 验证 max_tokens 失败：', error)
+      // 如果验证失败，设置安全的默认值
+      if (body.max_tokens && typeof body.max_tokens === 'number' && body.max_tokens > 0) {
+        // 保持用户的值，但限制在安全范围内
+        body.max_tokens = Math.min(body.max_tokens, 4096)
+      }
     }
+  }
+
+  // 兼容性别名方法（防止其他地方可能调用）
+  _validateAndLimitMaxTokens(body) {
+    return this._validateMaxTokens(body)
   }
 
   // 🧹 移除TTL字段

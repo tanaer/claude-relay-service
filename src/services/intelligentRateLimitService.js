@@ -11,6 +11,7 @@ class IntelligentRateLimitService {
     this.RECOVERY_TEST_PREFIX = 'recovery_test:'
     this.FAULT_LOG_PREFIX = 'fault_log:'
     this.ERROR_COUNT_PREFIX = 'error_count:'
+    this._recoveryTimer = null // 恢复测试计时器引用
 
     // 从配置读取参数，添加防护措施
     const rateLimitConfig = config.intelligentRateLimit || {}
@@ -30,34 +31,34 @@ class IntelligentRateLimitService {
     try {
       const rateLimitConfig = config.intelligentRateLimit || {}
       const errorCategories = rateLimitConfig.errorCategories || {
-        immediate: ['rate_limit', 'server_error'],
-        accumulative: ['authentication', 'network_error'],
+        immediate: [],
+        accumulative: [],
         accumulativeThreshold: 3
       }
 
-      const errorType = this._categorizeError(errorInfo)
-      const { immediate, accumulative, accumulativeThreshold } = errorCategories
+      const category = this._categorizeError(errorInfo)
+      const { accumulativeThreshold } = errorCategories
 
-      // 立即触发限流的错误类型
-      if (immediate.includes(errorType)) {
+      // 立即触发类：立刻限流
+      if (category === 'immediate') {
         return true
       }
 
-      // 累积型错误需要检查计数
-      if (accumulative.includes(errorType)) {
-        const errorCount = await this._incrementErrorCount(accountId, accountType, errorType)
-        logger.debug(`[调试] 错误计数 ${accountType}:${accountId}:${errorType} = ${errorCount}`)
+      // 累积类：计数并判断是否达到阈值
+      if (category === 'accumulative') {
+        const errorCount = await this._incrementErrorCount(accountId, accountType, 'accumulative')
+        logger.debug(`[调试] 累积错误计数 ${accountType}:${accountId}:accumulative = ${errorCount}`)
 
         if (errorCount >= accumulativeThreshold) {
           logger.warn(
-            `[警告] ${accountType} 账户 ${accountId} 达到累积阈值，错误类型：${errorType}（${errorCount}/${accumulativeThreshold}）`
+            `[警告] ${accountType} 账户 ${accountId} 达到累积阈值（${errorCount}/${accumulativeThreshold}）`
           )
           return true
         }
         return false
       }
 
-      // 如果配置为对任何错误都进行限流
+      // 关键字未命中：可选对任何错误限流
       if (rateLimitConfig.triggerOnAnyError) {
         return true
       }
@@ -253,7 +254,18 @@ class IntelligentRateLimitService {
 
   // 启动定期恢复测试循环
   startRecoveryTestingLoop() {
-    setInterval(async () => {
+    // 若已有定时器，先清理避免重复
+    if (this._recoveryTimer) {
+      try {
+        clearInterval(this._recoveryTimer)
+      } catch (err) {
+        // 忽略清理定时器时的异常，避免影响服务运行
+        logger.debug('[调试] 清理恢复测试定时器时忽略的错误：', err)
+      }
+      this._recoveryTimer = null
+    }
+
+    this._recoveryTimer = setInterval(async () => {
       try {
         await this._runRecoveryTests()
       } catch (error) {
@@ -261,7 +273,48 @@ class IntelligentRateLimitService {
       }
     }, this.RECOVERY_TEST_INTERVAL)
 
-    logger.info('[信息] 智能限流恢复测试循环已启动')
+    logger.info(`[信息] 智能限流恢复测试循环已启动，间隔：${this.RECOVERY_TEST_INTERVAL}ms`)
+  }
+
+  // 重新加载配置（动态配置更新）
+  async reloadConfig() {
+    try {
+      const rateLimitConfig = config.intelligentRateLimit || {}
+
+      // 更新实例配置
+      this.RECOVERY_TEST_INTERVAL = (rateLimitConfig.recoveryTestInterval || 5) * 60 * 1000
+      this.RECOVERY_TEST_TIMEOUT = (rateLimitConfig.recoveryTestTimeout || 30) * 1000
+      this.MAX_FAULT_LOGS = rateLimitConfig.maxFaultLogs || 1000
+      this.FAULT_LOG_RETENTION_DAYS = rateLimitConfig.faultLogRetentionDays || 30
+
+      // 重启/停止恢复测试循环
+      if (this._recoveryTimer) {
+        try {
+          clearInterval(this._recoveryTimer)
+        } catch (err) {
+          // 忽略重新加载配置时清理定时器的异常
+          logger.debug('[调试] 重新加载配置时清理定时器的错误（已忽略）：', err)
+        }
+        this._recoveryTimer = null
+      }
+      if (rateLimitConfig.enabled) {
+        this.startRecoveryTestingLoop()
+      }
+
+      logger.info('[智能限流] 配置已重新加载：', {
+        recoveryTestInterval: this.RECOVERY_TEST_INTERVAL,
+        recoveryTestTimeout: this.RECOVERY_TEST_TIMEOUT,
+        maxFaultLogs: this.MAX_FAULT_LOGS,
+        faultLogRetentionDays: this.FAULT_LOG_RETENTION_DAYS,
+        errorCategories: rateLimitConfig.errorCategories,
+        enabled: !!rateLimitConfig.enabled
+      })
+
+      return { success: true, message: '配置重新加载成功' }
+    } catch (error) {
+      logger.error('[错误] 重新加载智能限流配置失败：', error)
+      throw error
+    }
   }
 
   // 执行所有受限账户的恢复测试
@@ -308,11 +361,36 @@ class IntelligentRateLimitService {
     }
   }
 
-  // 错误分类
+  // 错误分类 - 支持关键字匹配
   _categorizeError(errorInfo) {
-    const error = errorInfo.error || errorInfo.message || ''
+    const rateLimitConfig = config.intelligentRateLimit || {}
+    const errorCategories = rateLimitConfig.errorCategories || {
+      immediate: ['rate_limit', 'server_error'],
+      accumulative: ['authentication', 'network_error']
+    }
+
+    const error = (errorInfo.error || errorInfo.message || '').toLowerCase()
     const statusCode = errorInfo.statusCode || errorInfo.status
 
+    // 检查立即触发限流的关键字（优先级高）
+    if (Array.isArray(errorCategories.immediate)) {
+      for (const keyword of errorCategories.immediate) {
+        if (error.includes(keyword.toLowerCase())) {
+          return 'immediate'
+        }
+      }
+    }
+
+    // 检查累积触发限流的关键字
+    if (Array.isArray(errorCategories.accumulative)) {
+      for (const keyword of errorCategories.accumulative) {
+        if (error.includes(keyword.toLowerCase())) {
+          return 'accumulative'
+        }
+      }
+    }
+
+    // 如果没有匹配到关键字，则使用默认分类逻辑（保持兼容性）
     if (statusCode === 429 || error.includes('rate limit')) {
       return 'rate_limit'
     } else if (statusCode === 401 || error.includes('unauthorized') || error.includes('token')) {

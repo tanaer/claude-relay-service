@@ -137,6 +137,17 @@ export function useRedemptionPolicyApi() {
   const toggleScheduler = (enabled) =>
     api.post('/admin/redemption-policies/toggle-scheduler', { enabled })
 
+  // 🎯 新增：基于标签的策略应用
+  // 批量应用兑换码策略
+  const applyPoliciesByTags = () => api.post('/admin/redemption-policies/apply-by-tags')
+
+  // 根据指定标签应用策略
+  const applyPolicyByTag = (tagName, policyType) =>
+    api.post(`/admin/redemption-policies/apply-tag/${tagName}/${policyType}`)
+
+  // 获取策略应用统计信息
+  const getApplicationStats = () => api.get('/admin/redemption-policies/application-stats')
+
   return {
     getGlobalPolicy,
     setGlobalPolicy,
@@ -155,7 +166,11 @@ export function useRedemptionPolicyApi() {
     triggerDailyReset,
     triggerCleanup,
     togglePolicyEngine,
-    toggleScheduler
+    toggleScheduler,
+    // 新增的方法
+    applyPoliciesByTags,
+    applyPolicyByTag,
+    getApplicationStats
   }
 }
 

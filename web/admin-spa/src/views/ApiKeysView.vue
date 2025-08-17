@@ -1030,6 +1030,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
+import { APP_CONFIG } from '@/config/app'
 import { useClientsStore } from '@/stores/clients'
 import CreateApiKeyModal from '@/components/apikeys/CreateApiKeyModal.vue'
 import EditApiKeyModal from '@/components/apikeys/EditApiKeyModal.vue'
@@ -1631,7 +1632,7 @@ const deleteApiKey = async (keyId) => {
 const copyApiStatsLink = (apiKey) => {
   // 构建统计页面的完整URL
   const baseUrl = window.location.origin
-  const statsUrl = `${baseUrl}/admin-next/api-stats?apiId=${apiKey.id}`
+  const statsUrl = `${baseUrl}${APP_CONFIG.basePath}api-stats?apiId=${apiKey.id}`
 
   // 使用传统的textarea方法复制到剪贴板
   const textarea = document.createElement('textarea')

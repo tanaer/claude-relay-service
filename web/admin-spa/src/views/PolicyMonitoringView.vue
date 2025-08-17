@@ -150,6 +150,15 @@
             <i :class="['fas fa-broom', { 'fa-spin': triggeringCleanup }]"></i>
             清理数据
           </button>
+          <!-- 🎯 新增：批量应用策略按钮 -->
+          <button
+            class="btn btn-info flex items-center gap-2"
+            :disabled="applyingPolicies"
+            @click="applyPoliciesByTags"
+          >
+            <i :class="['fas fa-tags', { 'fa-spin': applyingPolicies }]"></i>
+            批量应用策略
+          </button>
         </div>
       </div>
 
@@ -325,7 +334,7 @@
         <div v-if="activeTab === 'stats'" class="space-y-6">
           <h4 class="text-lg font-semibold text-gray-900">系统统计信息</h4>
 
-          <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             <!-- 策略引擎状态 -->
             <div class="rounded-lg border border-gray-200 p-4">
               <h5 class="mb-3 text-base font-medium text-gray-900">策略引擎状态</h5>
@@ -364,6 +373,73 @@
                   <span class="text-gray-900">{{
                     schedulerStatus?.activeTasks?.join(', ') || '无'
                   }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 🎯 新增：策略应用统计 -->
+            <div class="rounded-lg border border-gray-200 p-4">
+              <h5 class="mb-3 text-base font-medium text-gray-900">策略应用统计</h5>
+              <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                  <span class="text-gray-500">日卡覆盖率：</span>
+                  <span class="text-blue-600">{{ applicationStats?.coverage?.daily || '0' }}%</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-gray-500">月卡覆盖率：</span>
+                  <span class="text-purple-600"
+                    >{{ applicationStats?.coverage?.monthly || '0' }}%</span
+                  >
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-gray-500">待绑定数量：</span>
+                  <span class="text-orange-600">{{
+                    (applicationStats?.taggedApiKeys?.dailyCard || 0) +
+                    (applicationStats?.taggedApiKeys?.monthlyCard || 0) -
+                    ((applicationStats?.activePolicies?.daily || 0) +
+                      (applicationStats?.activePolicies?.monthly || 0))
+                  }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 🎯 新增：详细统计信息 -->
+          <div v-if="applicationStats" class="rounded-lg border border-gray-200 p-4">
+            <h5 class="mb-3 text-base font-medium text-gray-900">策略绑定详情</h5>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <h6 class="mb-2 text-sm font-medium text-gray-700">日卡策略</h6>
+                <div class="space-y-1 text-sm">
+                  <div class="flex justify-between">
+                    <span class="text-gray-500">带标签API Key：</span>
+                    <span class="text-gray-900">{{
+                      applicationStats.taggedApiKeys?.dailyCard || 0
+                    }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-500">已绑定策略：</span>
+                    <span class="text-blue-600">{{
+                      applicationStats.activePolicies?.daily || 0
+                    }}</span>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <h6 class="mb-2 text-sm font-medium text-gray-700">月卡策略</h6>
+                <div class="space-y-1 text-sm">
+                  <div class="flex justify-between">
+                    <span class="text-gray-500">带标签API Key：</span>
+                    <span class="text-gray-900">{{
+                      applicationStats.taggedApiKeys?.monthlyCard || 0
+                    }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-500">已绑定策略：</span>
+                    <span class="text-purple-600">{{
+                      applicationStats.activePolicies?.monthly || 0
+                    }}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -412,6 +488,7 @@ export default {
     const triggeringCleanup = ref(false)
     const toggleEngineLoading = ref(false)
     const toggleSchedulerLoading = ref(false)
+    const applyingPolicies = ref(false) // 🎯 新增：批量应用策略状态
     const activeTab = ref('active')
     const searchQuery = ref('')
 
@@ -421,6 +498,7 @@ export default {
     const activePolicies = ref([])
     const resetHistory = ref([])
     const rateTemplates = ref([])
+    const applicationStats = ref(null) // 🎯 新增：策略应用统计
 
     let refreshTimer = null
 
@@ -517,6 +595,19 @@ export default {
       }
     }
 
+    // 🎯 新增：加载策略应用统计
+    const loadApplicationStats = async () => {
+      try {
+        const result = await policyApi.getApplicationStats()
+        if (result.success) {
+          applicationStats.value = result.data
+        }
+      } catch (error) {
+        console.error('Failed to load application stats:', error)
+        applicationStats.value = null
+      }
+    }
+
     const refreshData = async () => {
       loading.value = true
       try {
@@ -524,7 +615,8 @@ export default {
           loadEngineStatus(),
           loadSchedulerStatus(),
           loadActivePolicies(),
-          loadResetHistory()
+          loadResetHistory(),
+          loadApplicationStats() // 🎯 新增：加载策略应用统计
         ])
       } finally {
         loading.value = false
@@ -604,6 +696,27 @@ export default {
         showToast('切换调度服务状态失败', 'error')
       } finally {
         toggleSchedulerLoading.value = false
+      }
+    }
+
+    // 🎯 新增：批量应用策略
+    const applyPoliciesByTags = async () => {
+      try {
+        applyingPolicies.value = true
+        const result = await policyApi.applyPoliciesByTags()
+
+        if (result.success) {
+          showToast(result.message || '批量策略应用成功', 'success')
+          // 刷新数据以显示最新状态
+          await Promise.all([loadActivePolicies(), loadApplicationStats()])
+        } else {
+          showToast(result.error || '批量策略应用失败', 'error')
+        }
+      } catch (error) {
+        console.error('Failed to apply policies by tags:', error)
+        showToast('批量应用策略失败', 'error')
+      } finally {
+        applyingPolicies.value = false
       }
     }
 
@@ -703,12 +816,14 @@ export default {
       triggeringCleanup,
       toggleEngineLoading,
       toggleSchedulerLoading,
+      applyingPolicies, // 🎯 新增
       activeTab,
       searchQuery,
       engineStatus,
       schedulerStatus,
       activePolicies,
       resetHistory,
+      applicationStats, // 🎯 新增
       detailModal,
       tabs,
       activePoliciesCount,
@@ -719,6 +834,7 @@ export default {
       triggerCleanup,
       togglePolicyEngine,
       toggleScheduler,
+      applyPoliciesByTags, // 🎯 新增
       viewPolicyDetails,
       closeDetailModal,
       configurePolicy,
@@ -748,6 +864,10 @@ export default {
 
 .btn-warning {
   @apply bg-yellow-600 text-white hover:bg-yellow-700 focus:ring-yellow-500;
+}
+
+.btn-info {
+  @apply bg-blue-500 text-white hover:bg-blue-600 focus:ring-blue-400;
 }
 
 .card {

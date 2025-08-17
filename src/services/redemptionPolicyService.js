@@ -484,6 +484,199 @@ class RedemptionPolicyService {
       logger.error(`[策略服务] 清理使用量数据失败: ${error.message}`)
     }
   }
+
+  // ==================== 基于标签的策略自动应用 ====================
+
+  /**
+   * 根据标签查找API Key并应用相应策略
+   */
+  async applyPolicyByTags(tagName, policyType) {
+    try {
+      // 1. 查找所有带有指定标签的API Key
+      const apiKeysWithTag = await this._findApiKeysByTag(tagName)
+
+      if (apiKeysWithTag.length === 0) {
+        logger.info(`[策略服务] 未找到带有标签 ${tagName} 的API Key`)
+        return { success: true, processed: 0, bound: 0, skipped: 0 }
+      }
+
+      let boundCount = 0
+      let skippedCount = 0
+
+      // 2. 为每个API Key检查并应用策略
+      for (const apiKeyData of apiKeysWithTag) {
+        try {
+          // 检查是否已绑定策略
+          const existingBinding = await this.getApiKeyPolicy(apiKeyData.id)
+          if (existingBinding && existingBinding.isActive === 'true') {
+            skippedCount++
+            logger.debug(`[策略服务] API Key ${apiKeyData.id} 已绑定策略，跳过`)
+            continue
+          }
+
+          // 应用策略
+          await this.bindApiKeyPolicy(apiKeyData.id, {
+            codeId: `auto-${policyType}-${Date.now()}`,
+            codeType: policyType,
+            templateId: null, // 使用策略配置中的初始模板
+            groupId: null
+          })
+
+          boundCount++
+          logger.info(`[策略服务] API Key ${apiKeyData.id} 策略绑定成功`)
+        } catch (bindError) {
+          logger.error(`[策略服务] API Key ${apiKeyData.id} 策略绑定失败: ${bindError.message}`)
+          skippedCount++
+        }
+      }
+
+      const result = {
+        success: true,
+        processed: apiKeysWithTag.length,
+        bound: boundCount,
+        skipped: skippedCount,
+        message: `处理了 ${apiKeysWithTag.length} 个API Key，成功绑定 ${boundCount} 个，跳过 ${skippedCount} 个`
+      }
+
+      // 记录操作日志
+      await keyLogsService.logSystemEvent(`批量策略应用完成`, 'info', {
+        operation: 'batch_policy_apply',
+        tagName,
+        policyType,
+        result
+      })
+
+      logger.info(`[策略服务] 标签 ${tagName} 策略批量应用完成: ${result.message}`)
+      return result
+    } catch (error) {
+      logger.error(`[策略服务] 根据标签应用策略失败: ${error.message}`)
+      throw error
+    }
+  }
+
+  /**
+   * 根据标签查找API Key
+   */
+  async _findApiKeysByTag(tagName) {
+    try {
+      const apiKeyService = require('./apiKeyService')
+
+      // 获取所有API Key
+      const allApiKeys = await apiKeyService.getAllApiKeys()
+
+      // 筛选带有指定标签的API Key
+      const apiKeysWithTag = allApiKeys.filter((apiKey) => {
+        if (!apiKey.tags) {
+          return false
+        }
+
+        // 解析标签（可能是字符串或数组）
+        let tags = []
+        if (typeof apiKey.tags === 'string') {
+          try {
+            tags = JSON.parse(apiKey.tags)
+          } catch {
+            tags = apiKey.tags.split(',').map((tag) => tag.trim())
+          }
+        } else if (Array.isArray(apiKey.tags)) {
+          tags = [...apiKey.tags]
+        }
+
+        return tags.includes(tagName)
+      })
+
+      logger.debug(`[策略服务] 找到 ${apiKeysWithTag.length} 个带有标签 ${tagName} 的API Key`)
+      return apiKeysWithTag
+    } catch (error) {
+      logger.error(`[策略服务] 查找带标签API Key失败: ${error.message}`)
+      throw error
+    }
+  }
+
+  /**
+   * 批量应用日卡和月卡策略
+   */
+  async applyRedemptionPolicies() {
+    try {
+      const results = {}
+
+      // 应用日卡策略
+      try {
+        results.daily = await this.applyPolicyByTags('daily-card', 'daily')
+      } catch (error) {
+        results.daily = { success: false, error: error.message }
+      }
+
+      // 应用月卡策略
+      try {
+        results.monthly = await this.applyPolicyByTags('monthly-card', 'monthly')
+      } catch (error) {
+        results.monthly = { success: false, error: error.message }
+      }
+
+      const summary = {
+        success: true,
+        daily: results.daily,
+        monthly: results.monthly,
+        totalProcessed: (results.daily.processed || 0) + (results.monthly.processed || 0),
+        totalBound: (results.daily.bound || 0) + (results.monthly.bound || 0),
+        totalSkipped: (results.daily.skipped || 0) + (results.monthly.skipped || 0)
+      }
+
+      logger.info(
+        `[策略服务] 批量策略应用完成: 处理 ${summary.totalProcessed} 个，绑定 ${summary.totalBound} 个`
+      )
+      return summary
+    } catch (error) {
+      logger.error(`[策略服务] 批量应用兑换码策略失败: ${error.message}`)
+      throw error
+    }
+  }
+
+  /**
+   * 获取策略应用统计信息
+   */
+  async getPolicyApplicationStats() {
+    try {
+      // 获取活跃策略数量
+      const activePolicies = await this._getRedis().smembers(this.ACTIVE_POLICIES_INDEX)
+
+      // 按类型分组统计
+      const dailyPolicies = await this._getRedis().smembers(`${this.TYPE_INDEX_PREFIX}daily`)
+      const monthlyPolicies = await this._getRedis().smembers(`${this.TYPE_INDEX_PREFIX}monthly`)
+
+      // 获取带标签的API Key统计
+      const dailyCardApiKeys = await this._findApiKeysByTag('daily-card')
+      const monthlyCardApiKeys = await this._findApiKeysByTag('monthly-card')
+
+      const stats = {
+        activePolicies: {
+          total: activePolicies.length,
+          daily: dailyPolicies.length,
+          monthly: monthlyPolicies.length
+        },
+        taggedApiKeys: {
+          dailyCard: dailyCardApiKeys.length,
+          monthlyCard: monthlyCardApiKeys.length
+        },
+        coverage: {
+          daily:
+            dailyCardApiKeys.length > 0
+              ? ((dailyPolicies.length / dailyCardApiKeys.length) * 100).toFixed(1)
+              : '0.0',
+          monthly:
+            monthlyCardApiKeys.length > 0
+              ? ((monthlyPolicies.length / monthlyCardApiKeys.length) * 100).toFixed(1)
+              : '0.0'
+        }
+      }
+
+      return stats
+    } catch (error) {
+      logger.error(`[策略服务] 获取策略应用统计失败: ${error.message}`)
+      throw error
+    }
+  }
 }
 
 module.exports = new RedemptionPolicyService()

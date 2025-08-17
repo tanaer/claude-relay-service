@@ -37,6 +37,21 @@ class RedisClient {
 
   async connect() {
     try {
+      // 开发模式：允许使用内存版 Redis 以便无外部依赖启动
+      if (process.env.USE_REDIS_MOCK === '1') {
+        let RedisMock
+        try {
+          RedisMock = require('ioredis-mock')
+        } catch (e) {
+          logger.error('❌ ioredis-mock 未安装，请运行: npm i ioredis-mock')
+          throw e
+        }
+        this.client = new RedisMock()
+        this.isConnected = true
+        logger.warn('🧪 使用 ioredis-mock (内存 Redis)，数据仅在进程生命周期内有效')
+        return this.client
+      }
+
       this.client = new Redis({
         host: config.redis.host,
         port: config.redis.port,
@@ -63,10 +78,25 @@ class RedisClient {
         logger.warn('⚠️  Redis connection closed')
       })
 
-      await this.client.connect()
+      if (typeof this.client.connect === 'function') {
+        await this.client.connect()
+      }
       return this.client
     } catch (error) {
       logger.error('💥 Failed to connect to Redis:', error)
+
+      // 连接失败时的回退逻辑（仅当显式允许）
+      if (process.env.USE_REDIS_MOCK === '1') {
+        try {
+          const RedisMock = require('ioredis-mock')
+          this.client = new RedisMock()
+          this.isConnected = true
+          logger.warn('🧪 Redis 连接失败，已回退到 ioredis-mock (内存 Redis)')
+          return this.client
+        } catch (e) {
+          logger.error('❌ 回退初始化 ioredis-mock 失败：', e)
+        }
+      }
       throw error
     }
   }
@@ -1311,6 +1341,157 @@ class RedisClient {
       logger.error('❌ Failed to get concurrency:', error)
       return 0
     }
+  }
+
+  // ================== 透传常用的 Redis 原生命令 ==================
+  async hset(key, ...args) {
+    const client = this.getClientSafe()
+    return await client.hset(key, ...args)
+  }
+
+  async hget(key, field) {
+    const client = this.getClientSafe()
+    return await client.hget(key, field)
+  }
+
+  async hgetall(key) {
+    const client = this.getClientSafe()
+    return await client.hgetall(key)
+  }
+
+  async hdel(key, ...fields) {
+    const client = this.getClientSafe()
+    return await client.hdel(key, ...fields)
+  }
+
+  async zadd(key, ...args) {
+    const client = this.getClientSafe()
+    return await client.zadd(key, ...args)
+  }
+
+  async zrange(key, start, stop, ...args) {
+    const client = this.getClientSafe()
+    return await client.zrange(key, start, stop, ...args)
+  }
+
+  async zrevrange(key, start, stop, ...args) {
+    const client = this.getClientSafe()
+    return await client.zrevrange(key, start, stop, ...args)
+  }
+
+  async zrangebyscore(key, min, max, ...args) {
+    const client = this.getClientSafe()
+    return await client.zrangebyscore(key, min, max, ...args)
+  }
+
+  async zremrangebyscore(key, min, max) {
+    const client = this.getClientSafe()
+    return await client.zremrangebyscore(key, min, max)
+  }
+
+  async zremrangebyrank(key, start, stop) {
+    const client = this.getClientSafe()
+    return await client.zremrangebyrank(key, start, stop)
+  }
+
+  async zcard(key) {
+    const client = this.getClientSafe()
+    return await client.zcard(key)
+  }
+
+  async zcount(key, min, max) {
+    const client = this.getClientSafe()
+    return await client.zcount(key, min, max)
+  }
+
+  async zrem(key, ...members) {
+    const client = this.getClientSafe()
+    return await client.zrem(key, ...members)
+  }
+
+  async lpush(key, ...values) {
+    const client = this.getClientSafe()
+    return await client.lpush(key, ...values)
+  }
+
+  async lrange(key, start, stop) {
+    const client = this.getClientSafe()
+    return await client.lrange(key, start, stop)
+  }
+
+  async ltrim(key, start, stop) {
+    const client = this.getClientSafe()
+    return await client.ltrim(key, start, stop)
+  }
+
+  async smembers(key) {
+    const client = this.getClientSafe()
+    return await client.smembers(key)
+  }
+
+  async sadd(key, ...members) {
+    const client = this.getClientSafe()
+    return await client.sadd(key, ...members)
+  }
+
+  async srem(key, ...members) {
+    const client = this.getClientSafe()
+    return await client.srem(key, ...members)
+  }
+
+  async del(...keys) {
+    const client = this.getClientSafe()
+    return await client.del(...keys)
+  }
+
+  async expire(key, seconds) {
+    const client = this.getClientSafe()
+    return await client.expire(key, seconds)
+  }
+
+  async exists(...keys) {
+    const client = this.getClientSafe()
+    return await client.exists(...keys)
+  }
+
+  async incr(key) {
+    const client = this.getClientSafe()
+    return await client.incr(key)
+  }
+
+  async incrby(key, increment) {
+    const client = this.getClientSafe()
+    return await client.incrby(key, increment)
+  }
+
+  async decr(key) {
+    const client = this.getClientSafe()
+    return await client.decr(key)
+  }
+
+  async decrby(key, decrement) {
+    const client = this.getClientSafe()
+    return await client.decrby(key, decrement)
+  }
+
+  async get(key) {
+    const client = this.getClientSafe()
+    return await client.get(key)
+  }
+
+  async set(key, value, ...args) {
+    const client = this.getClientSafe()
+    return await client.set(key, value, ...args)
+  }
+
+  async setex(key, seconds, value) {
+    const client = this.getClientSafe()
+    return await client.setex(key, seconds, value)
+  }
+
+  async keys(pattern) {
+    const client = this.getClientSafe()
+    return await client.keys(pattern)
   }
 }
 

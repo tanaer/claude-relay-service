@@ -5093,6 +5093,65 @@ router.post('/redemption-policies/trigger-cleanup', authenticateAdmin, async (re
   }
 })
 
+// 🎯 基于标签的策略批量应用
+
+// 批量应用兑换码策略（日卡和月卡）
+router.post('/redemption-policies/apply-by-tags', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await redemptionPolicyService.applyRedemptionPolicies()
+    return res.json({
+      success: true,
+      data: result,
+      message: `批量策略应用完成: 处理 ${result.totalProcessed} 个API Key，成功绑定 ${result.totalBound} 个`
+    })
+  } catch (error) {
+    logger.error('[错误] 批量应用策略失败：', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to apply policies by tags', message: error.message })
+  }
+})
+
+// 根据指定标签应用策略
+router.post(
+  '/redemption-policies/apply-tag/:tagName/:policyType',
+  authenticateAdmin,
+  async (req, res) => {
+    try {
+      const { tagName, policyType } = req.params
+
+      if (!['daily', 'monthly'].includes(policyType)) {
+        return res.status(400).json({ error: 'Invalid policy type. Must be daily or monthly' })
+      }
+
+      const result = await redemptionPolicyService.applyPolicyByTags(tagName, policyType)
+      return res.json({
+        success: true,
+        data: result,
+        message: result.message
+      })
+    } catch (error) {
+      logger.error(`[错误] 应用标签 ${req.params.tagName} 策略失败：`, error)
+      return res
+        .status(500)
+        .json({ error: 'Failed to apply policy by tag', message: error.message })
+    }
+  }
+)
+
+// 获取策略应用统计信息
+router.get('/redemption-policies/application-stats', authenticateAdmin, async (req, res) => {
+  try {
+    const stats = await redemptionPolicyService.getPolicyApplicationStats()
+    return res.json({ success: true, data: stats })
+  } catch (error) {
+    logger.error('[错误] 获取策略应用统计失败：', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to get application stats', message: error.message })
+  }
+})
+
 // 获取策略调度服务状态
 router.get('/redemption-policies/scheduler-status', authenticateAdmin, async (req, res) => {
   try {

@@ -1102,90 +1102,54 @@
               <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>
                   <label class="mb-2 block text-sm font-medium text-gray-700"
-                    >立即触发限流的错误类型</label
+                    >立即触发限流的错误关键字</label
                   >
-                  <div class="space-y-2">
-                    <div class="flex items-center">
-                      <input
-                        id="immediate-rate-limit"
-                        :checked="
-                          rateLimitConfig.errorCategories?.immediate?.includes('rate_limit')
-                        "
-                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        type="checkbox"
-                        @change="
-                          toggleErrorCategory('immediate', 'rate_limit', $event.target.checked)
-                        "
-                      />
-                      <label class="ml-2 text-sm text-gray-700" for="immediate-rate-limit"
-                        >限流错误</label
-                      >
-                    </div>
-                    <div class="flex items-center">
-                      <input
-                        id="immediate-server-error"
-                        :checked="
-                          rateLimitConfig.errorCategories?.immediate?.includes('server_error')
-                        "
-                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        type="checkbox"
-                        @change="
-                          toggleErrorCategory('immediate', 'server_error', $event.target.checked)
-                        "
-                      />
-                      <label class="ml-2 text-sm text-gray-700" for="immediate-server-error"
-                        >服务器错误</label
-                      >
-                    </div>
-                  </div>
+                  <el-select
+                    v-model="rateLimitConfig.errorCategories.immediate"
+                    allow-create
+                    class="w-full"
+                    default-first-option
+                    filterable
+                    multiple
+                    placeholder="输入关键字回车确认（如 rate limit, server error）"
+                    reserve-keyword
+                  >
+                    <el-option
+                      v-for="item in commonImmediateKeywords"
+                      :key="item"
+                      :label="item"
+                      :value="item"
+                    />
+                  </el-select>
+                  <p class="mt-1 text-xs text-gray-500">
+                    支持自定义输入，错误信息包含任一关键字将立即触发限流
+                  </p>
                 </div>
 
                 <div>
                   <label class="mb-2 block text-sm font-medium text-gray-700"
-                    >累积触发限流的错误类型</label
+                    >累积触发限流的错误关键字</label
                   >
-                  <div class="space-y-2">
-                    <div class="flex items-center">
-                      <input
-                        id="accumulative-auth"
-                        :checked="
-                          rateLimitConfig.errorCategories?.accumulative?.includes('authentication')
-                        "
-                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        type="checkbox"
-                        @change="
-                          toggleErrorCategory(
-                            'accumulative',
-                            'authentication',
-                            $event.target.checked
-                          )
-                        "
-                      />
-                      <label class="ml-2 text-sm text-gray-700" for="accumulative-auth"
-                        >认证错误</label
-                      >
-                    </div>
-                    <div class="flex items-center">
-                      <input
-                        id="accumulative-network"
-                        :checked="
-                          rateLimitConfig.errorCategories?.accumulative?.includes('network_error')
-                        "
-                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        type="checkbox"
-                        @change="
-                          toggleErrorCategory(
-                            'accumulative',
-                            'network_error',
-                            $event.target.checked
-                          )
-                        "
-                      />
-                      <label class="ml-2 text-sm text-gray-700" for="accumulative-network"
-                        >网络错误</label
-                      >
-                    </div>
-                  </div>
+                  <el-select
+                    v-model="rateLimitConfig.errorCategories.accumulative"
+                    allow-create
+                    class="w-full"
+                    default-first-option
+                    filterable
+                    multiple
+                    placeholder="输入关键字回车确认（如 unauthorized, network）"
+                    reserve-keyword
+                  >
+                    <el-option
+                      v-for="item in commonAccumulativeKeywords"
+                      :key="item"
+                      :label="item"
+                      :value="item"
+                    />
+                  </el-select>
+                  <p class="mt-1 text-xs text-gray-500">
+                    错误信息包含关键字时累积计数，达到阈值后触发限流
+                  </p>
 
                   <div class="mt-4">
                     <label class="mb-2 block text-sm font-medium text-gray-700">累积错误阈值</label>
@@ -1324,6 +1288,22 @@ const showGroupManagementModal = ref(false)
 const showRateLimitConfigModal = ref(false)
 const editingAccount = ref(null)
 const rateLimitConfig = ref({})
+// 常用关键字建议（用于快速选择，可自由新增输入）
+const commonImmediateKeywords = [
+  'rate limit',
+  'server error',
+  'internal error',
+  'overloaded',
+  '5xx'
+]
+const commonAccumulativeKeywords = [
+  'unauthorized',
+  'token',
+  'authentication',
+  'network',
+  'timeout',
+  'connection'
+]
 
 // 计算排序后的账户列表
 const sortedAccounts = computed(() => {
@@ -1943,12 +1923,57 @@ const showTestRecoveryDialog = async () => {
   }
 }
 
+// 智能限流配置单位转换器
+const convertRateLimitConfigForDisplay = (serverConfig) => {
+  if (!serverConfig) return {}
+
+  return {
+    ...serverConfig,
+    // 从毫秒转换为分钟和秒
+    recoveryTestInterval: Math.round((serverConfig.recoveryTestInterval || 300000) / 60000),
+    recoveryTestTimeout: Math.round((serverConfig.recoveryTestTimeout || 30000) / 1000),
+    // 保持错误类型配置不变
+    errorCategories: {
+      immediate: serverConfig.errorCategories?.immediate || [],
+      accumulative: serverConfig.errorCategories?.accumulative || [],
+      accumulativeThreshold: serverConfig.errorCategories?.accumulativeThreshold || 3
+    }
+  }
+}
+
+const convertRateLimitConfigForSave = (displayConfig) => {
+  if (!displayConfig) return {}
+
+  // 清理和标准化关键词
+  const cleanKeywords = (keywords) => {
+    if (!Array.isArray(keywords)) return []
+    return keywords
+      .map((keyword) => (keyword || '').toString().trim().toLowerCase())
+      .filter((keyword) => keyword.length > 0)
+      .filter((keyword, index, arr) => arr.indexOf(keyword) === index) // 去重
+  }
+
+  return {
+    ...displayConfig,
+    // 从分钟和秒转换为毫秒
+    recoveryTestInterval: Math.max(1, displayConfig.recoveryTestInterval || 5) * 60000,
+    recoveryTestTimeout: Math.max(5, displayConfig.recoveryTestTimeout || 30) * 1000,
+    // 清理错误类型关键词
+    errorCategories: {
+      immediate: cleanKeywords(displayConfig.errorCategories?.immediate),
+      accumulative: cleanKeywords(displayConfig.errorCategories?.accumulative),
+      accumulativeThreshold: Math.max(1, displayConfig.errorCategories?.accumulativeThreshold || 3)
+    }
+  }
+}
+
 // 打开智能限流配置编辑模态框
 const openRateLimitConfigModal = async () => {
   try {
     const response = await apiClient.get('/admin/intelligent-rate-limit/config')
     if (response.success) {
-      rateLimitConfig.value = response.data
+      // 转换服务器配置为显示格式
+      rateLimitConfig.value = convertRateLimitConfigForDisplay(response.data)
       showRateLimitConfigModal.value = true
     } else {
       ElMessage.error('获取配置失败: ' + (response.message || '未知错误'))
@@ -1961,8 +1986,11 @@ const openRateLimitConfigModal = async () => {
 // 保存智能限流配置
 const saveRateLimitConfig = async () => {
   try {
+    // 转换显示配置为服务器格式
+    const configForSave = convertRateLimitConfigForSave(rateLimitConfig.value)
+
     const response = await apiClient.post('/admin/intelligent-rate-limit/config', {
-      configData: rateLimitConfig.value
+      configData: configForSave
     })
     if (response.success) {
       ElMessage.success('配置保存成功')
@@ -2308,29 +2336,7 @@ const getRateTemplateName = (account) => {
 //   await toggleSchedulable(account)
 // }
 
-// 切换错误类型配置
-const toggleErrorCategory = (categoryType, errorType, checked) => {
-  if (!rateLimitConfig.value.errorCategories) {
-    rateLimitConfig.value.errorCategories = {
-      immediate: [],
-      accumulative: [],
-      accumulativeThreshold: 3
-    }
-  }
-
-  if (!rateLimitConfig.value.errorCategories[categoryType]) {
-    rateLimitConfig.value.errorCategories[categoryType] = []
-  }
-
-  const category = rateLimitConfig.value.errorCategories[categoryType]
-  const index = category.indexOf(errorType)
-
-  if (checked && index === -1) {
-    category.push(errorType)
-  } else if (!checked && index > -1) {
-    category.splice(index, 1)
-  }
-}
+// 已移除 toggleErrorCategory 函数，因为新的 UI 使用 el-select 组件直接绑定数组
 
 // 监听排序选择变化
 watch(accountSortBy, (newVal) => {

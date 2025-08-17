@@ -1477,6 +1477,11 @@ class RedisClient {
     return await client.expire(key, seconds)
   }
 
+  async ttl(key) {
+    const client = this.getClientSafe()
+    return await client.ttl(key)
+  }
+
   async exists(...keys) {
     const client = this.getClientSafe()
     return await client.exists(...keys)

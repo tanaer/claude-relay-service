@@ -581,6 +581,20 @@
                     <span class="ml-1">{{ account.schedulable ? '调度' : '停用' }}</span>
                   </button>
                   <button
+                    :class="[
+                      'rounded px-2.5 py-1 text-xs font-medium transition-colors',
+                      account.isTesting
+                        ? 'cursor-not-allowed bg-gray-100 text-gray-400'
+                        : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                    ]"
+                    :disabled="account.isTesting"
+                    :title="account.isTesting ? '测试中...' : '测试账户连通性'"
+                    @click="testAccount(account)"
+                  >
+                    <i :class="['fas fa-vial', account.isTesting ? 'animate-pulse' : '']" />
+                    <span class="ml-1">{{ account.isTesting ? '测试中' : '测试' }}</span>
+                  </button>
+                  <button
                     class="rounded bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200"
                     :title="'编辑账户'"
                     @click="editAccount(account)"
@@ -774,6 +788,20 @@
             >
               <i :class="['fas', account.schedulable ? 'fa-pause' : 'fa-play']" />
               {{ account.schedulable ? '暂停' : '启用' }}
+            </button>
+
+            <button
+              class="flex flex-1 items-center justify-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors"
+              :class="
+                account.isTesting
+                  ? 'bg-gray-50 text-gray-400'
+                  : 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100'
+              "
+              :disabled="account.isTesting"
+              @click="testAccount(account)"
+            >
+              <i :class="['fas fa-vial', { 'animate-pulse': account.isTesting }]" />
+              {{ account.isTesting ? '测试中' : '测试' }}
             </button>
 
             <button
@@ -1620,6 +1648,86 @@ const toggleSchedulable = async (account) => {
     showToast('切换调度状态失败', 'error')
   } finally {
     account.isTogglingSchedulable = false
+  }
+}
+
+// 测试账户连通性
+const testAccount = async (account) => {
+  if (account.isTesting) return
+
+  account.isTesting = true
+
+  try {
+    let endpoint = ''
+
+    // 根据账户平台选择对应的测试端点
+    if (account.platform === 'claude') {
+      endpoint = `/admin/claude-accounts/${account.id}/test`
+    } else if (account.platform === 'bedrock') {
+      endpoint = `/admin/bedrock-accounts/${account.id}/test`
+    } else if (account.platform === 'gemini') {
+      endpoint = `/admin/gemini-accounts/${account.id}/test`
+    } else {
+      showToast('不支持的账户类型', 'error')
+      return
+    }
+
+    const { data } = await apiClient.post(endpoint)
+
+    if (data.success) {
+      // 构建成功消息
+      let successMessage = `账户测试成功`
+      if (data.data) {
+        if (data.data.model) {
+          successMessage += ` - 模型: ${data.data.model}`
+        }
+        if (data.data.status) {
+          successMessage += ` - 状态: ${data.data.status}`
+        }
+        if (data.data.tokenValid !== undefined) {
+          successMessage += ` - Token有效: ${data.data.tokenValid ? '是' : '否'}`
+        }
+      }
+
+      showToast(successMessage, 'success')
+
+      // 刷新账户列表以获取最新状态
+      loadAccounts()
+    } else {
+      showToast('账户测试失败', 'error')
+    }
+  } catch (error) {
+    console.error('测试账户失败:', error)
+
+    // 构建详细错误消息
+    let errorMessage = '账户测试失败'
+
+    if (error.response?.data) {
+      const errorData = error.response.data
+      if (errorData.details) {
+        if (errorData.details.isRateLimit) {
+          errorMessage += ' - 账户被限流'
+        } else if (errorData.details.isUnauthorized) {
+          errorMessage += ' - 账户未授权'
+        } else if (errorData.details.networkError) {
+          errorMessage += ' - 网络错误'
+        } else if (errorData.details.timeout) {
+          errorMessage += ' - 请求超时'
+        } else if (errorData.details.statusCode) {
+          errorMessage += ` - HTTP ${errorData.details.statusCode}`
+        }
+      }
+
+      if (errorData.message) {
+        errorMessage += `: ${errorData.message}`
+      }
+    } else {
+      errorMessage += `: ${error.message}`
+    }
+
+    showToast(errorMessage, 'error')
+  } finally {
+    account.isTesting = false
   }
 }
 

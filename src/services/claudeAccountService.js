@@ -15,6 +15,7 @@ const {
   logRefreshSkipped
 } = require('../utils/tokenRefreshLogger')
 const tokenRefreshService = require('./tokenRefreshService')
+const keyLogsService = require('./keyLogsService')
 
 class ClaudeAccountService {
   constructor() {
@@ -870,6 +871,20 @@ class ClaudeAccountService {
 
       await redis.setClaudeAccount(accountId, updatedAccountData)
 
+      // 记录关键日志
+      const rateLimitEndTime = updatedAccountData.rateLimitEndAt
+      const minutesUntilEnd = rateLimitEndTime
+        ? Math.ceil((new Date(rateLimitEndTime) - new Date()) / (1000 * 60))
+        : 60
+
+      await keyLogsService.logRateLimit(accountId, 'claude-oauth', 'triggered', {
+        accountName: accountData.name,
+        reason: rateLimitResetTimestamp ? '权限拒绝: API响应限流' : '权限拒绝: 多次403错误',
+        duration: minutesUntilEnd * 60, // 转换为秒
+        rateLimitEndAt: rateLimitEndTime,
+        source: rateLimitResetTimestamp ? 'api_header' : 'session_window'
+      })
+
       // 如果有会话哈希，删除粘性会话映射
       if (sessionHash) {
         await redis.deleteSessionAccountMapping(sessionHash)
@@ -884,7 +899,7 @@ class ClaudeAccountService {
   }
 
   // ✅ 移除账号的限流状态
-  async removeAccountRateLimit(accountId) {
+  async removeAccountRateLimit(accountId, reason = 'manually_removed') {
     try {
       const accountData = await redis.getClaudeAccount(accountId)
       if (!accountData || Object.keys(accountData).length === 0) {
@@ -896,6 +911,12 @@ class ClaudeAccountService {
       delete accountData.rateLimitStatus
       delete accountData.rateLimitEndAt // 清除限流结束时间
       await redis.setClaudeAccount(accountId, accountData)
+
+      // 记录关键日志
+      await keyLogsService.logRateLimit(accountId, 'claude-oauth', 'removed', {
+        accountName: accountData.name,
+        reason
+      })
 
       logger.success(`[成功] 已移除账户限流：${accountData.name}（${accountId}）`)
       return { success: true }
@@ -923,7 +944,7 @@ class ClaudeAccountService {
 
           // 如果当前时间超过限流结束时间，自动解除
           if (now >= rateLimitEndAt) {
-            await this.removeAccountRateLimit(accountId)
+            await this.removeAccountRateLimit(accountId, 'auto_expired')
             return false
           }
 
@@ -935,7 +956,7 @@ class ClaudeAccountService {
 
           // 如果限流超过1小时，自动解除
           if (hoursSinceRateLimit >= 1) {
-            await this.removeAccountRateLimit(accountId)
+            await this.removeAccountRateLimit(accountId, 'auto_expired_1hour')
             return false
           }
 

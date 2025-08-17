@@ -5155,7 +5155,25 @@ router.get('/redemption-policies/application-stats', authenticateAdmin, async (r
 // 清理策略数据
 router.post('/redemption-policies/cleanup-data', authenticateAdmin, async (req, res) => {
   try {
-    const PolicyDataCleanup = require('../../scripts/cleanup-policy-data')
+    const projectRoot = path.resolve(__dirname, '../..')
+    const cleanupScriptPath = path.join(projectRoot, 'scripts', 'cleanup-policy-data')
+
+    // Try to require the module with better error handling
+    let PolicyDataCleanup
+    try {
+      PolicyDataCleanup = require(cleanupScriptPath)
+    } catch (requireError) {
+      logger.error('[错误] 无法加载清理脚本：', requireError)
+      logger.error('[错误] 尝试的路径：', cleanupScriptPath)
+
+      // Fallback to direct path require for compatibility
+      try {
+        PolicyDataCleanup = require('../../scripts/cleanup-policy-data')
+      } catch (fallbackError) {
+        throw new Error(`无法加载清理脚本: ${requireError.message}`)
+      }
+    }
+
     const cleanup = new PolicyDataCleanup()
     const stats = await cleanup.run()
 

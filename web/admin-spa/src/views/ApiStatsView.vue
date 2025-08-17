@@ -386,7 +386,7 @@ const handleRedeem = async () => {
 // 生成带 apiKey 的安装脚本下载链接
 const getSetupUrl = (key) => {
   if (!key) return '#'
-  const url = new URL('/download/muskapi_com_setup.ps1', window.location.origin)
+  const url = new URL('/download/muskapi_com_setup.cmd', window.location.origin)
   url.searchParams.set('apiKey', key)
   return url.toString()
 }

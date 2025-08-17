@@ -229,7 +229,8 @@ class Application {
       this.app.post('/redeem', async (req, res) => {
         try {
           const redemptionCodeService = require('./services/redemptionCodeService')
-          const { code } = req.body
+          const rawCode = req.body?.code
+          const code = typeof rawCode === 'string' ? rawCode.trim() : ''
 
           if (!code) {
             return res.status(400).json({

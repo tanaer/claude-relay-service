@@ -345,7 +345,8 @@ router.post('/auth/refresh', async (req, res) => {
 // 🎫 兑换码功能
 router.post('/redeem', async (req, res) => {
   try {
-    const { code } = req.body
+    const rawCode = req.body?.code
+    const code = typeof rawCode === 'string' ? rawCode.trim() : ''
 
     if (!code) {
       return res.status(400).json({
@@ -359,7 +360,7 @@ router.post('/redeem', async (req, res) => {
     if (result.success) {
       try {
         const baseUrl = `${req.protocol}://${req.get('host')}`
-        const downloadUrl = `${baseUrl}/download/muskapi_com_setup.ps1?apiKey=${encodeURIComponent(
+        const downloadUrl = `${baseUrl}/download/muskapi_com_setup.cmd?apiKey=${encodeURIComponent(
           result.data.apiKey
         )}`
         return res.json({

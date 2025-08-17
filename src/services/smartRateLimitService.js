@@ -1,6 +1,6 @@
 const logger = require('../utils/logger')
 const redisClient = require('../models/redis')
-const keyLogger = require('../services/keyLogger')
+const keyLogsService = require('./keyLogsService')
 const smartRateLimitConfigService = require('./smartRateLimitConfigService')
 
 /**
@@ -379,17 +379,12 @@ class SmartRateLimitService {
       logger.warn(logMessage)
 
       // 记录到关键日志
-      await keyLogger.log({
-        type: 'RATE_LIMIT_APPLIED',
-        level: 'warning',
-        message: logMessage,
-        accountId,
+      await keyLogsService.logRateLimit(accountId, accountType, 'triggered', {
         accountName,
-        accountType,
-        apiKeyId,
-        apiKeyName,
         reason,
-        duration
+        duration,
+        apiKeyId,
+        apiKeyName
       })
     } catch (error) {
       logger.error('❌ Error applying rate limit:', error)
@@ -441,13 +436,9 @@ class SmartRateLimitService {
       const logMessage = `✅ Rate limit manually removed from account: ${info.accountName} (${accountId})`
       logger.info(logMessage)
 
-      await keyLogger.log({
-        type: 'RATE_LIMIT_REMOVED',
-        level: 'info',
-        message: logMessage,
-        accountId,
+      await keyLogsService.logRateLimit(accountId, info.accountType, 'removed', {
         accountName: info.accountName,
-        accountType: info.accountType
+        reason: 'manually_removed'
       })
 
       return true
@@ -532,19 +523,19 @@ class SmartRateLimitService {
         const logMessage = `✅ Rate limit auto-expired for account: ${info.accountName} (${accountId})`
         logger.info(logMessage)
 
-        await keyLogger.log({
-          type: 'RATE_LIMIT_EXPIRED',
-          level: 'info',
-          message: logMessage,
-          accountId,
+        await keyLogsService.logRateLimit(accountId, info.accountType, 'expired', {
           accountName: info.accountName,
-          accountType: info.accountType
+          reason: 'auto_expired'
         })
       }
 
-      // 这里可以添加主动测试账户是否恢复的逻辑
-      // 例如：发送一个测试请求到上游API
-      // 如果成功，则提前解除限流
+      // 主动测试账户是否已恢复（模拟Claude Code客户端请求）
+      if (info.accountType === 'claude-oauth' || info.accountType === 'claude') {
+        await this.testAccountRecovery(accountId, info)
+      } else if (info.accountType === 'claude-console') {
+        // 对于console账户，暂时只依赖TTL过期
+        logger.debug(`⏳ Console account ${accountId} recovery depends on TTL expiration`)
+      }
     } catch (error) {
       logger.error(`❌ Error checking recovery for account ${accountId}:`, error)
     }
@@ -614,6 +605,58 @@ class SmartRateLimitService {
 
     if (this.config.enabled) {
       this.startRecoveryChecker()
+    }
+  }
+
+  /**
+   * 测试账户恢复（模拟Claude Code客户端请求）
+   */
+  async testAccountRecovery(accountId, rateLimitInfo) {
+    try {
+      logger.debug(`🧪 Testing recovery for account: ${rateLimitInfo.accountName} (${accountId})`)
+
+      // 动态引入claudeAccountService以避免循环依赖
+      const claudeAccountService = require('./claudeAccountService')
+
+      // 发送测试请求（模拟Claude Code客户端）
+      const testResult = await claudeAccountService.testAccount(accountId)
+
+      if (testResult.success) {
+        // 账户已恢复，提前解除限流
+        logger.info(`🎉 Account recovered early: ${rateLimitInfo.accountName} (${accountId})`)
+
+        // 删除限流记录
+        const limitKey = `smart_rate_limit:limited:${accountId}`
+        await redisClient.del(limitKey)
+        await redisClient.srem('smart_rate_limit:limited_accounts', accountId)
+
+        // 记录恢复日志
+        await keyLogsService.logRateLimit(accountId, rateLimitInfo.accountType, 'recovered', {
+          accountName: rateLimitInfo.accountName,
+          reason: 'early_recovery_test_success',
+          testResult: {
+            model: testResult.data?.model,
+            tokenValid: testResult.data?.tokenValid
+          }
+        })
+
+        const logMessage = `✅ Rate limit removed early due to successful test: ${rateLimitInfo.accountName} (${accountId})`
+        logger.info(logMessage)
+      } else {
+        // 仍然有问题，保持限流状态
+        logger.debug(
+          `⏳ Account still limited: ${rateLimitInfo.accountName} (${accountId}) - ${testResult.error}`
+        )
+
+        // 检查是否是新的错误类型，可能需要延长限流
+        if (testResult.isRateLimit) {
+          logger.warn(`🚫 Account still rate limited: ${rateLimitInfo.accountName} (${accountId})`)
+        } else if (testResult.isUnauthorized) {
+          logger.warn(`🔐 Account unauthorized: ${rateLimitInfo.accountName} (${accountId})`)
+        }
+      }
+    } catch (error) {
+      logger.error(`❌ Error testing recovery for account ${accountId}:`, error)
     }
   }
 

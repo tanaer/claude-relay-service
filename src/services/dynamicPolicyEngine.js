@@ -3,7 +3,7 @@ const logger = require('../utils/logger')
 const keyLogsService = require('./keyLogsService')
 const redemptionPolicyService = require('./redemptionPolicyService')
 const rateTemplateService = require('./rateTemplateService')
-const apiKeyService = require('./apiKeyService')
+// apiKeyService 将在需要时动态引入，以避免循环依赖
 
 class DynamicPolicyEngine {
   constructor() {
@@ -215,6 +215,8 @@ class DynamicPolicyEngine {
    */
   async updateApiKeyTemplate(apiKeyId, templateId) {
     try {
+      // 动态引入 apiKeyService 以避免循环依赖
+      const apiKeyService = require('./apiKeyService')
       // 使用apiKeyService的专用方法更新模板
       await apiKeyService.updateApiKeyFromDynamicPolicy(apiKeyId, {
         rateTemplateId: templateId

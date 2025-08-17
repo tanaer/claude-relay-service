@@ -34,9 +34,12 @@
         </div>
         <!-- 新增：套餐类型与余额显示 -->
         <div class="flex items-start justify-between">
-          <span class="mt-1 flex-shrink-0 text-sm text-gray-600 md:text-base">套餐类型</span>
+          <span class="mt-1 flex-shrink-0 text-sm text-gray-600 md:text-base">套餐</span>
           <div class="text-right text-sm font-medium md:text-base">
-            <div v-if="statsData.planType === 'lifetime'" class="flex items-center justify-end gap-2">
+            <div
+              v-if="statsData && (statsData.expiresAt === null || (statsData.lifetimeTokenBalance || 0) > 0)"
+              class="flex items-center justify-end gap-2"
+            >
               <span class="inline-flex items-center rounded bg-emerald-100 px-2 py-0.5 text-emerald-700">
                 <i class="fas fa-bolt mr-1 text-xs" /> 无时限
               </span>
@@ -45,7 +48,10 @@
             <div v-else class="text-gray-700">按窗口限速</div>
           </div>
         </div>
-        <div v-if="statsData.planType === 'lifetime'" class="flex items-center justify-between">
+        <div
+          v-if="statsData && (statsData.expiresAt === null || (statsData.lifetimeTokenBalance || 0) > 0)"
+          class="flex items-center justify-between"
+        >
           <span class="text-sm text-gray-600 md:text-base">无时限充值</span>
           <button
             class="rounded-lg bg-gradient-to-r from-purple-500 to-purple-600 px-3 py-1.5 text-xs font-medium text-white shadow hover:from-purple-600 hover:to-purple-700 md:text-sm"

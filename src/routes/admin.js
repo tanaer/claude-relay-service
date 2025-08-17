@@ -20,6 +20,7 @@ const path = require('path')
 const config = require('../../config/config')
 const { SocksProxyAgent } = require('socks-proxy-agent')
 const { HttpsProxyAgent } = require('https-proxy-agent')
+const couponService = require('../services/couponService')
 
 const router = express.Router()
 
@@ -4970,5 +4971,50 @@ router.put(
     }
   }
 )
+
+// 兑换码：创建无时限卡（管理员）
+router.post('/coupons/lifetime', authenticateAdmin, async (req, res) => {
+  try {
+    const { tokens, code } = req.body
+    const amount = Number(tokens)
+    if (!Number.isInteger(amount) || amount <= 0) {
+      return res.status(400).json({ success: false, message: '余额必须为正整数 tokens' })
+    }
+    if (code && typeof code === 'string' && !code.trim().toUpperCase().startsWith('U')) {
+      return res.status(400).json({ success: false, message: '无时限卡券码需以 U 开头' })
+    }
+    const result = await couponService.createLifetimeCoupon(amount, code)
+    return res.json({ success: true, data: result })
+  } catch (error) {
+    logger.error('❌ Failed to create lifetime coupon:', error)
+    return res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// 兑换码：列表（管理员）
+router.get('/coupons', authenticateAdmin, async (req, res) => {
+  try {
+    const list = await couponService.listCoupons()
+    return res.json({ success: true, data: list })
+  } catch (error) {
+    logger.error('❌ Failed to list coupons:', error)
+    return res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// 兑换码：兑换为新的 API Key（公开/或管理员调用）
+router.post('/coupons/redeem', async (req, res) => {
+  try {
+    const { code, namePrefix } = req.body
+    if (!code || typeof code !== 'string') {
+      return res.status(400).json({ success: false, message: '缺少兑换码' })
+    }
+    const newKey = await couponService.redeemToApiKey(code, { namePrefix })
+    return res.json({ success: true, data: newKey })
+  } catch (error) {
+    logger.error('❌ Failed to redeem coupon:', error)
+    return res.status(400).json({ success: false, message: error.message })
+  }
+})
 
 module.exports = router

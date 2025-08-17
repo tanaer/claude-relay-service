@@ -180,20 +180,18 @@ const authenticateApiKey = async (req, res, next) => {
     }
 
     // 在进入时间窗口限流前检查无时限余额
-    if (validation.keyData.planType === 'lifetime') {
-      const balance = parseInt(validation.keyData.lifetimeTokenBalance || 0)
-      if (isNaN(balance) || balance <= 0) {
-        logger.security(
-          `🚫 Lifetime balance exhausted for key: ${validation.keyData.id} (${validation.keyData.name})`
-        )
-        return res.status(402).json({
-          error: 'Insufficient lifetime balance',
-          message:
-            '无时限套餐的 Token 余额已用尽，请在统计查询页面使用兑换码为此 API Key 充值后再试',
-          planType: 'lifetime',
-          lifetimeTokenBalance: 0
-        })
-      }
+    const lifetimeBalance = parseInt(validation.keyData.lifetimeTokenBalance)
+    const hasLifetimeBalance = !isNaN(lifetimeBalance)
+    if (hasLifetimeBalance && lifetimeBalance <= 0) {
+      logger.security(
+        `🚫 Lifetime balance exhausted for key: ${validation.keyData.id} (${validation.keyData.name})`
+      )
+      return res.status(402).json({
+        error: 'Insufficient lifetime balance',
+        message:
+          '无时限套餐的 Token 余额已用尽，请在统计查询页面使用兑换码为此 API Key 充值后再试',
+        lifetimeTokenBalance: 0
+      })
     }
 
     // 检查时间窗口限流
@@ -253,8 +251,8 @@ const authenticateApiKey = async (req, res, next) => {
         })
       }
 
-      // 如果是无时限计划，跳过 token 窗口限制检查
-      if (validation.keyData.planType !== 'lifetime') {
+      // 如果是无时限模式（存在一次性余额），跳过 token 窗口限制检查
+      if (!hasLifetimeBalance) {
         // 检查Token使用量限制
         const tokenLimit = parseInt(validation.keyData.tokenLimit)
         if (tokenLimit > 0 && currentTokens >= tokenLimit) {
@@ -288,7 +286,7 @@ const authenticateApiKey = async (req, res, next) => {
         currentRequests: currentRequests + 1,
         currentTokens,
         rateLimitRequests,
-        tokenLimit: validation.keyData.planType === 'lifetime' ? 0 : parseInt(validation.keyData.tokenLimit)
+        tokenLimit: hasLifetimeBalance ? 0 : parseInt(validation.keyData.tokenLimit)
       }
     }
 

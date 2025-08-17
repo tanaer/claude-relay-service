@@ -172,6 +172,7 @@
 <script>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { apiClient } from '@/config/api'
+import { calculateUsagePercentage, formatNumber as formatNumberUtil } from '@/utils/usage'
 
 export default {
   name: 'PolicyStatusMonitor',
@@ -205,7 +206,9 @@ export default {
     })
 
     const currentPercentage = computed(() => {
-      return parseFloat(usageData.value?.currentPercentage || 0)
+      if (!usageData.value) return 0
+      // 使用统一的计算方法
+      return calculateUsagePercentage(usageData.value.totalTokens, usageData.value.dailyLimit)
     })
 
     // 方法
@@ -301,8 +304,7 @@ export default {
     }
 
     const formatNumber = (num) => {
-      const number = parseInt(num) || 0
-      return number.toLocaleString()
+      return formatNumberUtil(num)
     }
 
     const getSourceTypeName = (type) => {
@@ -322,7 +324,7 @@ export default {
 
     const getCurrentTemplateName = (templateId) => {
       const name = getTemplateName(templateId)
-      return name === '无' ? '未设置' : name
+      return name === '无' ? '未绑定动态策略' : name
     }
 
     const getInitialTemplateName = (templateId) => {

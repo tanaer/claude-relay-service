@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { apiStatsClient } from '@/config/apiStats'
+import { calculateUsagePercentage, formatCost as formatCostUtil } from '@/utils/usage'
 
 export const useApiStatsStore = defineStore('apistats', () => {
   // 状态
@@ -54,14 +55,9 @@ export const useApiStatsStore = defineStore('apistats', () => {
     const limits = statsData.value.limits
 
     return {
-      tokenUsage:
-        limits.tokenLimit > 0 ? Math.min((current.allTokens / limits.tokenLimit) * 100, 100) : 0,
-      costUsage:
-        limits.dailyCostLimit > 0 ? Math.min((current.cost / limits.dailyCostLimit) * 100, 100) : 0,
-      requestUsage:
-        limits.rateLimitRequests > 0
-          ? Math.min((current.requests / limits.rateLimitRequests) * 100, 100)
-          : 0
+      tokenUsage: calculateUsagePercentage(current.allTokens, limits.tokenLimit),
+      costUsage: calculateUsagePercentage(current.cost, limits.dailyCostLimit),
+      requestUsage: calculateUsagePercentage(current.requests, limits.rateLimitRequests)
     }
   })
 
@@ -273,20 +269,9 @@ export const useApiStatsStore = defineStore('apistats', () => {
 
   // 工具函数
 
-  // 格式化费用
+  // 格式化费用 - 使用共享工具函数
   function formatCost(cost) {
-    if (typeof cost !== 'number' || cost === 0) {
-      return '$0.000000'
-    }
-
-    // 根据数值大小选择精度
-    if (cost >= 1) {
-      return '$' + cost.toFixed(2)
-    } else if (cost >= 0.01) {
-      return '$' + cost.toFixed(4)
-    } else {
-      return '$' + cost.toFixed(6)
-    }
+    return formatCostUtil(cost)
   }
 
   // 更新 URL

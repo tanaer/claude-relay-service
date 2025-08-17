@@ -829,7 +829,7 @@ export default {
     }
 
     const getCurrentTemplateName = (templateId) => {
-      if (!templateId) return '未设置'
+      if (!templateId) return '未绑定动态策略'
       const template = rateTemplates.value.find((t) => t.id === templateId)
       return template?.name || templateId
     }

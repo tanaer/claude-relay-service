@@ -48,6 +48,7 @@ const tabs = [
   { key: 'accounts', name: '账户管理', shortName: '账户', icon: 'fas fa-user-circle' },
   { key: 'redemption-codes', name: '兑换码', shortName: '兑换码', icon: 'fas fa-ticket-alt' },
   { key: 'rate-templates', name: '计费倍率', shortName: '倍率', icon: 'fas fa-percentage' },
+  { key: 'smart-rate-limit', name: '智能限流', shortName: '限流', icon: 'fas fa-brain' },
   { key: 'policy-monitoring', name: '策略监控', shortName: '策略', icon: 'fas fa-chart-line' },
   { key: 'key-logs', name: '关键日志', shortName: '日志', icon: 'fas fa-clipboard-list' },
   { key: 'settings', name: '其他设置', shortName: '设置', icon: 'fas fa-cogs' }

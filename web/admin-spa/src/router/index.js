@@ -14,6 +14,7 @@ const ApiStatsView = () => import('@/views/ApiStatsView.vue')
 const RedemptionCodesView = () => import('@/views/RedemptionCodesView.vue')
 const RateTemplatesView = () => import('@/views/RateTemplates.vue')
 const PolicyMonitoringView = () => import('@/views/PolicyMonitoringView.vue')
+const SmartRateLimitView = () => import('@/views/SmartRateLimitView.vue')
 
 const routes = [
   {
@@ -125,6 +126,18 @@ const routes = [
         path: '',
         name: 'PolicyMonitoring',
         component: PolicyMonitoringView
+      }
+    ]
+  },
+  {
+    path: '/smart-rate-limit',
+    component: MainLayout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'SmartRateLimit',
+        component: SmartRateLimitView
       }
     ]
   },

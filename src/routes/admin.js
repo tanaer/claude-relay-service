@@ -10,7 +10,8 @@ const redemptionPolicyService = require('../services/redemptionPolicyService')
 const dynamicPolicyEngine = require('../services/dynamicPolicyEngine')
 const policySchedulerService = require('../services/policySchedulerService')
 const rateTemplateService = require('../services/rateTemplateService')
-const intelligentRateLimitService = require('../services/intelligentRateLimitService')
+const smartRateLimitService = require('../services/smartRateLimitService')
+const smartRateLimitConfigService = require('../services/smartRateLimitConfigService')
 const keyLogsService = require('../services/keyLogsService')
 const redis = require('../models/redis')
 const { authenticateAdmin } = require('../middleware/auth')
@@ -21,7 +22,7 @@ const pricingService = require('../services/pricingService')
 const claudeCodeHeadersService = require('../services/claudeCodeHeadersService')
 const axios = require('axios')
 const crypto = require('crypto')
-const upstreamErrorService = require('../services/upstreamErrorService')
+// const upstreamErrorService = require('../services/upstreamErrorService') // Removed - no longer needed
 const path = require('path')
 const config = require('../../config/config')
 const { v4: uuidv4 } = require('uuid')
@@ -1700,122 +1701,7 @@ router.put(
 )
 
 // ================ 上游错误聚合与自定义文案 ================
-
-// 获取所有有自定义错误信息的账户列表（用于复制功能选择源账户）
-// 注意：这个路由必须在参数化路由之前定义，否则会被错误匹配
-router.get('/upstream-errors/accounts-with-messages', authenticateAdmin, async (req, res) => {
-  try {
-    const result = await upstreamErrorService.getAccountsWithCustomMessages()
-    return res.json(result)
-  } catch (error) {
-    logger.error('Failed to get accounts with custom messages:', error)
-    return res.status(500).json({ success: false, message: error.message })
-  }
-})
-
-// 获取某账户的上游错误聚合（每种仅返回1条示例）
-router.get('/upstream-errors/:accountId', authenticateAdmin, async (req, res) => {
-  try {
-    const { accountId } = req.params
-    const result = await upstreamErrorService.getAggregatedErrors(accountId, 1)
-    return res.json({ success: true, data: result.data })
-  } catch (error) {
-    logger.error('Failed to get upstream errors:', error)
-    return res.status(500).json({ success: false, message: error.message })
-  }
-})
-
-// 获取/设置某账户自定义错误文案
-router.get('/upstream-errors/:accountId/custom-messages', authenticateAdmin, async (req, res) => {
-  try {
-    const { accountId } = req.params
-    const data = await upstreamErrorService.getCustomMessages(accountId)
-    return res.json({ success: true, data })
-  } catch (error) {
-    logger.error('Failed to get custom messages:', error)
-    return res.status(500).json({ success: false, message: error.message })
-  }
-})
-
-router.post('/upstream-errors/:accountId/custom-messages', authenticateAdmin, async (req, res) => {
-  try {
-    const { accountId } = req.params
-    const { messages } = req.body || {}
-    const result = await upstreamErrorService.setCustomMessages(accountId, messages || {})
-    if (!result.success) {
-      return res.status(500).json({ success: false, message: result.message || 'save failed' })
-    }
-
-    // 保存成功后，触发一次索引维护（确保索引集合是最新的）
-    try {
-      await upstreamErrorService.getAccountsWithCustomMessages()
-    } catch (indexError) {
-      logger.warn('Failed to maintain index after saving custom messages:', indexError)
-    }
-
-    return res.json({ success: true })
-  } catch (error) {
-    logger.error('Failed to set custom messages:', error)
-    return res.status(500).json({ success: false, message: error.message })
-  }
-})
-
-// 复制错误信息：从源账户复制到目标账户
-router.post(
-  '/upstream-errors/:targetAccountId/copy-messages',
-  authenticateAdmin,
-  async (req, res) => {
-    try {
-      const { targetAccountId } = req.params
-      const { sourceAccountId, overwrite = false } = req.body
-
-      if (!sourceAccountId) {
-        return res.status(400).json({
-          success: false,
-          message: '缺少源账户ID参数'
-        })
-      }
-
-      if (sourceAccountId === targetAccountId) {
-        return res.status(400).json({
-          success: false,
-          message: '源账户和目标账户不能相同'
-        })
-      }
-
-      const result = await upstreamErrorService.copyCustomMessages(
-        sourceAccountId,
-        targetAccountId,
-        overwrite
-      )
-      return res.json(result)
-    } catch (error) {
-      logger.error('Failed to copy upstream error messages:', error)
-      return res.status(500).json({ success: false, message: error.message })
-    }
-  }
-)
-
-// 重建自定义错误信息账户索引（用于修复索引丢失问题）
-router.post('/upstream-errors/rebuild-messages-index', authenticateAdmin, async (req, res) => {
-  try {
-    const result = await upstreamErrorService.rebuildAccountsWithCustomMessagesIndex()
-    if (result.success) {
-      // 重建后立即返回账户列表
-      const accounts = await upstreamErrorService.getAccountsWithCustomMessages()
-      return res.json({
-        success: true,
-        message: '索引重建成功',
-        data: accounts.data || []
-      })
-    } else {
-      return res.status(500).json(result)
-    }
-  } catch (error) {
-    logger.error('Failed to rebuild custom messages index:', error)
-    return res.status(500).json({ success: false, message: error.message })
-  }
-})
+// 注意：upstreamErrorService 相关功能已被移除，这些路由已不再使用
 
 // ☁️ Bedrock 账户管理
 
@@ -5334,214 +5220,158 @@ router.put('/system-groups/:accountType/rate-template', authenticateAdmin, async
 
 // 🧠 智能限流管理端点
 
-// 获取智能限流统计信息
-router.get('/intelligent-rate-limit/stats', authenticateAdmin, async (req, res) => {
+// 获取智能限流配置
+router.get('/smart-rate-limit/config', authenticateAdmin, async (req, res) => {
   try {
-    const stats = await intelligentRateLimitService.getRateLimitStats()
-    res.json({ success: true, data: stats })
+    const result = await smartRateLimitConfigService.getConfig()
+    res.json(result)
   } catch (error) {
-    logger.error('❌ Failed to get intelligent rate limit stats:', error)
-    res.status(500).json({ error: 'Failed to get rate limit stats', message: error.message })
+    logger.error('获取智能限流配置失败:', error)
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 
-// 获取故障日志
-router.get('/intelligent-rate-limit/fault-logs', authenticateAdmin, async (req, res) => {
+// 更新智能限流配置
+router.post('/smart-rate-limit/config', authenticateAdmin, async (req, res) => {
   try {
-    const { accountId, accountType, limit = 50 } = req.query
-    const logs = await intelligentRateLimitService.getFaultLogs(
-      accountId,
-      accountType,
-      parseInt(limit)
-    )
-    res.json({ success: true, data: logs })
+    const result = await smartRateLimitConfigService.saveConfig(req.body)
+    res.json(result)
   } catch (error) {
-    logger.error('❌ Failed to get fault logs:', error)
-    res.status(500).json({ error: 'Failed to get fault logs', message: error.message })
+    logger.error('更新智能限流配置失败:', error)
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 
-// 手动移除账户的智能限流状态
-router.post(
-  '/intelligent-rate-limit/remove/:accountType/:accountId',
+// 添加立即限流规则
+router.post('/smart-rate-limit/rules/instant', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await smartRateLimitConfigService.addInstantRule(req.body)
+    res.json(result)
+  } catch (error) {
+    logger.error('添加立即限流规则失败:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 添加累计触发限流规则
+router.post('/smart-rate-limit/rules/cumulative', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await smartRateLimitConfigService.addCumulativeRule(req.body)
+    res.json(result)
+  } catch (error) {
+    logger.error('添加累计触发限流规则失败:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 更新规则
+router.put('/smart-rate-limit/rules/:ruleType/:ruleId', authenticateAdmin, async (req, res) => {
+  try {
+    const { ruleType, ruleId } = req.params
+    const result = await smartRateLimitConfigService.updateRule(ruleId, req.body, ruleType)
+    res.json(result)
+  } catch (error) {
+    logger.error('更新规则失败:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 删除规则
+router.delete('/smart-rate-limit/rules/:ruleType/:ruleId', authenticateAdmin, async (req, res) => {
+  try {
+    const { ruleType, ruleId } = req.params
+    const result = await smartRateLimitConfigService.deleteRule(ruleId, ruleType)
+    res.json(result)
+  } catch (error) {
+    logger.error('删除规则失败:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 更新全局设置
+router.put('/smart-rate-limit/global-settings', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await smartRateLimitConfigService.updateGlobalSettings(req.body)
+    res.json(result)
+  } catch (error) {
+    logger.error('更新全局设置失败:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 获取限流统计
+router.get('/smart-rate-limit/statistics', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await smartRateLimitConfigService.getStatistics()
+    res.json(result)
+  } catch (error) {
+    logger.error('获取限流统计失败:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 获取当前被限流的账户列表
+router.get('/smart-rate-limit/limited-accounts', authenticateAdmin, async (req, res) => {
+  try {
+    const accounts = await smartRateLimitService.getAllRateLimitedAccounts()
+    res.json({ success: true, data: accounts })
+  } catch (error) {
+    logger.error('获取被限流账户失败:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 手动解除账户限流
+router.delete(
+  '/smart-rate-limit/limited-accounts/:accountId',
   authenticateAdmin,
   async (req, res) => {
     try {
-      const { accountType, accountId } = req.params
-      const { reason = 'manual_removal' } = req.body
+      const { accountId } = req.params
+      const result = await smartRateLimitService.removeRateLimit(accountId)
 
-      const result = await intelligentRateLimitService.removeIntelligentRateLimit(
-        accountId,
-        accountType,
-        reason
-      )
-
-      if (result.success) {
-        logger.success(
-          `✅ Admin removed intelligent rate limit: ${accountType} account ${accountId}`
-        )
-        res.json({ success: true, message: 'Intelligent rate limit removed' })
+      if (result) {
+        res.json({ success: true, message: '限流已解除' })
       } else {
-        res.status(500).json({ error: 'Failed to remove intelligent rate limit' })
+        res.status(404).json({ success: false, error: '账户未被限流' })
       }
     } catch (error) {
-      logger.error('[错误] 手动移除智能限流状态失败：', error)
-      res
-        .status(500)
-        .json({ error: 'Failed to remove intelligent rate limit', message: error.message })
+      logger.error('解除限流失败:', error)
+      res.status(500).json({ success: false, error: error.message })
     }
   }
 )
 
-// 手动测试账户恢复状态
-router.post(
-  '/intelligent-rate-limit/test-recovery/:accountType/:accountId',
-  authenticateAdmin,
-  async (req, res) => {
-    try {
-      const { accountType, accountId } = req.params
-
-      const result = await intelligentRateLimitService.testAccountRecovery(accountId, accountType)
-
-      logger.info(
-        `🧪 Admin triggered recovery test: ${accountType} account ${accountId} - ${result.recovered ? 'recovered' : 'still limited'}`
-      )
-      res.json({ success: true, data: result })
-    } catch (error) {
-      logger.error('[错误] 手动测试账户恢复状态失败：', error)
-      res.status(500).json({ error: 'Failed to test account recovery', message: error.message })
-    }
-  }
-)
-
-// 获取智能限流配置信息
-router.get('/intelligent-rate-limit/config', authenticateAdmin, async (req, res) => {
+// 清除所有限流
+router.post('/smart-rate-limit/clear-all', authenticateAdmin, async (req, res) => {
   try {
-    // 添加防御性检查
-    const rateLimitConfig = config.intelligentRateLimit || {}
-
-    const configInfo = {
-      enabled: rateLimitConfig.enabled || false,
-      triggerOnAnyError: rateLimitConfig.triggerOnAnyError || false,
-      recoveryTestInterval: rateLimitConfig.recoveryTestInterval || 300000,
-      recoveryTestTimeout: rateLimitConfig.recoveryTestTimeout || 30000,
-      maxFaultLogs: rateLimitConfig.maxFaultLogs || 1000,
-      faultLogRetentionDays: rateLimitConfig.faultLogRetentionDays || 7,
-      errorCategories: rateLimitConfig.errorCategories || {
-        immediate: [],
-        accumulative: [],
-        accumulativeThreshold: 3
-      },
-      alerting: rateLimitConfig.alerting || {
-        enabled: false,
-        webhookUrl: null,
-        emailNotification: false
-      }
-    }
-
-    res.json({ success: true, data: configInfo })
+    const result = await smartRateLimitConfigService.clearAllRateLimits()
+    res.json(result)
   } catch (error) {
-    logger.error('❌ Failed to get intelligent rate limit config:', error)
-    res.status(500).json({ error: 'Failed to get config', message: error.message })
+    logger.error('清除所有限流失败:', error)
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 
-// 更新智能限流配置信息
-router.post('/intelligent-rate-limit/config', authenticateAdmin, async (req, res) => {
+// 导出配置
+router.get('/smart-rate-limit/export', authenticateAdmin, async (req, res) => {
   try {
-    const { configData } = req.body
-
-    // 验证必要字段
-    if (!configData || typeof configData !== 'object') {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid config data'
-      })
-    }
-
-    // 验证数据格式
-    const {
-      enabled,
-      triggerOnAnyError,
-      recoveryTestInterval,
-      recoveryTestTimeout,
-      maxFaultLogs,
-      faultLogRetentionDays,
-      errorCategories,
-      alerting
-    } = configData
-
-    // 处理关键字数组：去除空白、转小写、去重
-    const processKeywords = (keywords) => {
-      if (!Array.isArray(keywords)) {
-        return []
-      }
-      return [
-        ...new Set(
-          keywords
-            .filter((k) => k && typeof k === 'string' && k.trim())
-            .map((k) => k.trim().toLowerCase())
-        )
-      ]
-    }
-
-    // 构建新配置
-    const newConfig = {
-      enabled: Boolean(enabled),
-      triggerOnAnyError: Boolean(triggerOnAnyError),
-      recoveryTestInterval: (parseInt(recoveryTestInterval) || 5) * 60 * 1000, // 分钟转毫秒
-      recoveryTestTimeout: (parseInt(recoveryTestTimeout) || 30) * 1000, // 秒转毫秒
-      maxFaultLogs: Math.max(100, Math.min(10000, parseInt(maxFaultLogs) || 1000)), // 限制范围
-      faultLogRetentionDays: Math.max(1, Math.min(365, parseInt(faultLogRetentionDays) || 7)), // 限制范围
-      errorCategories: {
-        immediate: processKeywords(errorCategories?.immediate),
-        accumulative: processKeywords(errorCategories?.accumulative),
-        accumulativeThreshold: Math.max(1, parseInt(errorCategories?.accumulativeThreshold) || 3)
-      },
-      alerting: {
-        enabled: Boolean(alerting?.enabled),
-        webhookUrl: alerting?.webhookUrl || null,
-        emailNotification: Boolean(alerting?.emailNotification)
-      }
-    }
-
-    // 更新运行时配置
-    config.intelligentRateLimit = { ...config.intelligentRateLimit, ...newConfig }
-
-    // 如果智能限流服务正在运行，需要重新加载配置
-    try {
-      if (intelligentRateLimitService.reloadConfig) {
-        await intelligentRateLimitService.reloadConfig()
-        logger.info('[智能限流] 配置已重新加载')
-      }
-    } catch (serviceError) {
-      logger.warn('[智能限流] 服务配置重载失败，但配置已更新：', serviceError.message)
-    }
-
-    logger.info('[管理员] 智能限流配置已更新：', {
-      enabled: newConfig.enabled,
-      triggerOnAnyError: newConfig.triggerOnAnyError,
-      recoveryTestIntervalMs: newConfig.recoveryTestInterval,
-      recoveryTestIntervalMin: newConfig.recoveryTestInterval / 60000,
-      recoveryTestTimeoutMs: newConfig.recoveryTestTimeout,
-      recoveryTestTimeoutSec: newConfig.recoveryTestTimeout / 1000,
-      immediateKeywords: newConfig.errorCategories.immediate,
-      accumulativeKeywords: newConfig.errorCategories.accumulative,
-      accumulativeThreshold: newConfig.errorCategories.accumulativeThreshold
-    })
-
-    res.json({
-      success: true,
-      message: '智能限流配置更新成功',
-      data: newConfig
-    })
+    const result = await smartRateLimitConfigService.exportConfig()
+    res.json(result)
   } catch (error) {
-    logger.error('❌ Failed to update intelligent rate limit config:', error)
-    res.status(500).json({
-      success: false,
-      error: 'Failed to update config',
-      message: error.message
-    })
+    logger.error('导出配置失败:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 导入配置
+router.post('/smart-rate-limit/import', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await smartRateLimitConfigService.importConfig(req.body)
+    res.json(result)
+  } catch (error) {
+    logger.error('导入配置失败:', error)
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 

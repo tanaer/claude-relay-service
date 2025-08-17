@@ -2,7 +2,7 @@ const claudeAccountService = require('./claudeAccountService')
 const claudeConsoleAccountService = require('./claudeConsoleAccountService')
 const bedrockAccountService = require('./bedrockAccountService')
 const accountGroupService = require('./accountGroupService')
-const intelligentRateLimitService = require('./intelligentRateLimitService')
+const smartRateLimitService = require('./smartRateLimitService')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
@@ -718,12 +718,9 @@ class UnifiedClaudeScheduler {
   async _isAccountRateLimitedAny(accountId, accountType) {
     try {
       // 检查智能限流状态
-      if (config.intelligentRateLimit?.enabled) {
-        const isIntelligentRateLimited = await intelligentRateLimitService.isIntelligentRateLimited(
-          accountId,
-          accountType
-        )
-        if (isIntelligentRateLimited) {
+      if (config.smartRateLimit?.enabled) {
+        const isSmartRateLimited = await smartRateLimitService.isRateLimited(accountId)
+        if (isSmartRateLimited) {
           return true
         }
       }

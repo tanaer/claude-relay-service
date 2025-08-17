@@ -437,7 +437,11 @@ class ApiKeyService {
           try {
             const client = redis.getClientSafe()
             // 使用 HINCRBY 原子扣减
-            await client.hincrby(`apikey:${keyId}`, 'lifetimeTokenBalance', -Math.max(0, totalTokens))
+            await client.hincrby(
+              `apikey:${keyId}`,
+              'lifetimeTokenBalance',
+              -Math.max(0, totalTokens)
+            )
           } catch (e) {
             logger.error(`Failed to decrement lifetimeTokenBalance for ${keyId}:`, e)
           }

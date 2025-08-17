@@ -532,12 +532,12 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       enableModelRestriction,
       restrictedModels,
       enableClientRestriction,
-            allowedClients,
+      allowedClients,
       dailyCostLimit,
       tags,
       planType,
       lifetimeTokenBalance
-     } = req.body
+    } = req.body
 
     // 输入验证
     if (!baseName || typeof baseName !== 'string' || baseName.trim().length === 0) {
@@ -792,10 +792,16 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       updates.planType = planType
     }
 
-    if (lifetimeTokenBalance !== undefined && lifetimeTokenBalance !== null && lifetimeTokenBalance !== '') {
+    if (
+      lifetimeTokenBalance !== undefined &&
+      lifetimeTokenBalance !== null &&
+      lifetimeTokenBalance !== ''
+    ) {
       const num = Number(lifetimeTokenBalance)
       if (!Number.isInteger(num) || num < 0) {
-        return res.status(400).json({ error: 'lifetimeTokenBalance must be a non-negative integer' })
+        return res
+          .status(400)
+          .json({ error: 'lifetimeTokenBalance must be a non-negative integer' })
       }
       updates.lifetimeTokenBalance = num
     }

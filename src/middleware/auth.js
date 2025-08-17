@@ -188,8 +188,7 @@ const authenticateApiKey = async (req, res, next) => {
       )
       return res.status(402).json({
         error: 'Insufficient lifetime balance',
-        message:
-          '无时限套餐的 Token 余额已用尽，请在统计查询页面使用兑换码为此 API Key 充值后再试',
+        message: '无时限套餐的 Token 余额已用尽，请在统计查询页面使用兑换码为此 API Key 充值后再试',
         lifetimeTokenBalance: 0
       })
     }

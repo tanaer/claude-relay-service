@@ -96,7 +96,12 @@ router.post('/api/topup-lifetime', async (req, res) => {
       return res.status(400).json({ success: false, message: '兑换码格式不正确' })
     }
 
-    if (!payload || payload.type !== 'lifetime' || !Number.isInteger(payload.tokens) || payload.tokens <= 0) {
+    if (
+      !payload ||
+      payload.type !== 'lifetime' ||
+      !Number.isInteger(payload.tokens) ||
+      payload.tokens <= 0
+    ) {
       return res.status(400).json({ success: false, message: '兑换码无效或不支持的类型' })
     }
 

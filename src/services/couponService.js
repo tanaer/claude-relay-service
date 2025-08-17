@@ -23,7 +23,8 @@ class CouponService {
     }
 
     const client = redis.getClientSafe()
-    let finalCode = code && code.trim().toUpperCase().startsWith('U') ? code.trim().toUpperCase() : null
+    let finalCode =
+      code && code.trim().toUpperCase().startsWith('U') ? code.trim().toUpperCase() : null
 
     // 生成唯一code
     for (let i = 0; i < 5 && !finalCode; i++) {

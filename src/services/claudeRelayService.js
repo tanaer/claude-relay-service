@@ -269,7 +269,7 @@ class ClaudeRelayService {
         await this.clearUnauthorizedErrors(accountId)
 
         // 如果请求成功，检查并移除限流状态（智能限流或传统限流）
-        if (config.intelligentRateLimit.enabled) {
+        if (config.intelligentRateLimit?.enabled) {
           const isIntelligentRateLimited =
             await intelligentRateLimitService.isIntelligentRateLimited(accountId, accountType)
           if (isIntelligentRateLimited) {
@@ -940,7 +940,7 @@ class ClaudeRelayService {
             }
 
             // 应用智能限流或传统限流逻辑
-            if (config.intelligentRateLimit.enabled) {
+            if (config.intelligentRateLimit?.enabled) {
               const shouldTriggerIntelligentRateLimit =
                 await intelligentRateLimitService.shouldApplyIntelligentRateLimit(
                   accountId,
@@ -1129,7 +1129,7 @@ class ClaudeRelayService {
             }
 
             // 根据配置选择限流策略
-            if (config.intelligentRateLimit.enabled) {
+            if (config.intelligentRateLimit?.enabled) {
               const errorInfo = {
                 statusCode: 429,
                 error: 'Rate limit detected in stream',
@@ -1152,7 +1152,7 @@ class ClaudeRelayService {
             }
           } else if (res.statusCode === 200) {
             // 如果请求成功，检查并移除限流状态
-            if (config.intelligentRateLimit.enabled) {
+            if (config.intelligentRateLimit?.enabled) {
               const isIntelligentRateLimited =
                 await intelligentRateLimitService.isIntelligentRateLimited(accountId, accountType)
               if (isIntelligentRateLimited) {

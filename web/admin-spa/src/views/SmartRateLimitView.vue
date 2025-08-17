@@ -1,353 +1,464 @@
 <template>
-  <div class="smart-rate-limit-view">
-    <!-- 页面标题 -->
-    <div class="page-header">
-      <h1 class="page-title">
-        <span class="icon">🧠</span>
-        智能限流配置
-      </h1>
-      <p class="page-description">基于上游错误关键词智能触发限流，保护账户安全</p>
-    </div>
+  <div class="tab-content">
+    <div class="card p-4 sm:p-6">
+      <!-- 页面标题 -->
+      <div class="mb-4 flex flex-col gap-4 sm:mb-6">
+        <div>
+          <h3 class="mb-1 text-lg font-bold text-gray-900 sm:mb-2 sm:text-xl">🧠 智能限流配置</h3>
+          <p class="text-sm text-gray-600 sm:text-base">
+            基于上游错误关键词智能触发限流，保护账户安全
+          </p>
+        </div>
+      </div>
 
-    <!-- 全局设置卡片 -->
-    <n-card :bordered="false" class="settings-card" title="全局设置">
-      <n-form label-placement="left" label-width="140" :model="config.globalSettings">
-        <n-grid :cols="4" :x-gap="24" :y-gap="16">
-          <n-grid-item>
-            <n-form-item label="限流默认时长">
-              <n-input-number
-                v-model:value="config.globalSettings.defaultDuration"
-                :max="86400"
-                :min="60"
-                @update:value="updateGlobalSettings"
-              >
-                <template #suffix>秒</template>
-              </n-input-number>
-            </n-form-item>
-          </n-grid-item>
-          <n-grid-item>
-            <n-form-item label="恢复检查间隔">
-              <n-input-number
-                v-model:value="config.globalSettings.recoveryCheckInterval"
-                :max="600"
-                :min="30"
-                @update:value="updateGlobalSettings"
-              >
-                <template #suffix>秒</template>
-              </n-input-number>
-            </n-form-item>
-          </n-grid-item>
-          <n-grid-item>
-            <n-form-item label="最大重试次数">
-              <n-input-number
-                v-model:value="config.globalSettings.maxRetries"
-                :max="10"
-                :min="1"
-                @update:value="updateGlobalSettings"
-              />
-            </n-form-item>
-          </n-grid-item>
-          <n-grid-item>
-            <n-form-item label="启用智能限流">
-              <n-switch
-                v-model:value="config.globalSettings.enabled"
-                @update:value="updateGlobalSettings"
-              />
-            </n-form-item>
-          </n-grid-item>
-        </n-grid>
-      </n-form>
-    </n-card>
+      <!-- 全局设置卡片 -->
+      <el-card class="mb-6" header="全局设置">
+        <el-form label-position="left" label-width="140px" :model="config.globalSettings">
+          <el-row :gutter="24">
+            <el-col :span="6">
+              <el-form-item label="启用智能限流">
+                <el-switch v-model="config.globalSettings.enabled" @change="updateGlobalSettings" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="限流默认时长">
+                <el-input-number
+                  v-model="config.globalSettings.defaultDuration"
+                  :max="86400"
+                  :min="60"
+                  @change="updateGlobalSettings"
+                />
+                <span class="ml-2 text-gray-500">秒</span>
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="恢复检查间隔">
+                <el-input-number
+                  v-model="config.globalSettings.recoveryCheckInterval"
+                  :max="600"
+                  :min="30"
+                  @change="updateGlobalSettings"
+                />
+                <span class="ml-2 text-gray-500">秒</span>
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="最大重试次数">
+                <el-input-number
+                  v-model="config.globalSettings.maxRetries"
+                  :max="10"
+                  :min="1"
+                  @change="updateGlobalSettings"
+                />
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </el-form>
+      </el-card>
 
-    <!-- 选项卡 -->
-    <n-tabs v-model:value="activeTab" class="tabs-container" type="card">
-      <n-tab-pane name="instant" :tab="`⚡ 立即限流规则 (${config.instantRules.length})`">
-        <div class="tab-content">
+      <!-- 选项卡 -->
+      <el-tabs v-model="activeTab" class="smart-tabs" type="card">
+        <el-tab-pane :label="`⚡ 立即限流规则 (${config.instantRules.length})`" name="instant">
           <!-- 工具栏 -->
-          <div class="toolbar">
-            <n-button type="primary" @click="showAddInstantRule = true">
-              <template #icon>
-                <n-icon><AddIcon /></n-icon>
-              </template>
+          <div class="mb-4 flex gap-3">
+            <el-button type="primary" @click="showAddInstantRule">
+              <i class="fas fa-plus mr-2"></i>
               添加规则
-            </n-button>
-            <n-button @click="exportConfig">
-              <template #icon>
-                <n-icon><DownloadIcon /></n-icon>
-              </template>
+            </el-button>
+            <el-button @click="exportConfig">
+              <i class="fas fa-download mr-2"></i>
               导出配置
-            </n-button>
-            <n-button @click="showImportDialog = true">
-              <template #icon>
-                <n-icon><UploadIcon /></n-icon>
-              </template>
+            </el-button>
+            <el-button @click="showImportDialog = true">
+              <i class="fas fa-upload mr-2"></i>
               导入配置
-            </n-button>
+            </el-button>
           </div>
 
           <!-- 规则表格 -->
-          <n-data-table
-            :bordered="false"
-            :columns="instantRuleColumns"
-            :data="config.instantRules"
-            :pagination="false"
-            striped
-          />
-        </div>
-      </n-tab-pane>
-
-      <n-tab-pane name="cumulative" :tab="`📊 累计触发规则 (${config.cumulativeRules.length})`">
-        <div class="tab-content">
-          <!-- 工具栏 -->
-          <div class="toolbar">
-            <n-button type="primary" @click="showAddCumulativeRule = true">
-              <template #icon>
-                <n-icon><AddIcon /></n-icon>
+          <el-table border :data="config.instantRules" stripe>
+            <el-table-column align="center" label="启用" width="80">
+              <template #default="{ row }">
+                <el-switch v-model="row.enabled" @change="updateRule('instant', row)" />
               </template>
+            </el-table-column>
+            <el-table-column label="规则名称" prop="name" />
+            <el-table-column label="关键词" width="200">
+              <template #default="{ row }">
+                <code class="text-xs">{{ row.keywords.join(', ') }}</code>
+              </template>
+            </el-table-column>
+            <el-table-column align="center" label="匹配模式" width="100">
+              <template #default="{ row }">
+                <el-tag size="small" :type="getMatchModeTagType(row.matchMode)">
+                  {{ getMatchModeText(row.matchMode) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column align="center" label="区分大小写" width="120">
+              <template #default="{ row }">
+                <el-tag size="small" :type="row.caseSensitive ? 'warning' : 'info'">
+                  {{ row.caseSensitive ? '是' : '否' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column align="center" label="限流时长(秒)" width="120">
+              <template #default="{ row }">
+                {{ row.duration || config.globalSettings.defaultDuration }}
+              </template>
+            </el-table-column>
+            <el-table-column align="center" label="优先级" prop="priority" width="80" />
+            <el-table-column align="center" label="触发次数" width="100">
+              <template #default="{ row }">
+                {{ getStatistics('instant', row.id) }}
+              </template>
+            </el-table-column>
+            <el-table-column align="center" label="操作" width="150">
+              <template #default="{ row }">
+                <el-button size="small" @click="editRule('instant', row)"> 编辑 </el-button>
+                <el-button size="small" type="danger" @click="deleteRule('instant', row.id)">
+                  删除
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+
+        <el-tab-pane
+          :label="`📊 累计触发规则 (${config.cumulativeRules.length})`"
+          name="cumulative"
+        >
+          <!-- 工具栏 -->
+          <div class="mb-4 flex gap-3">
+            <el-button type="primary" @click="showAddCumulativeRule">
+              <i class="fas fa-plus mr-2"></i>
               添加规则
-            </n-button>
+            </el-button>
           </div>
 
           <!-- 规则表格 -->
-          <n-data-table
-            :bordered="false"
-            :columns="cumulativeRuleColumns"
-            :data="config.cumulativeRules"
-            :pagination="false"
-            striped
-          />
-        </div>
-      </n-tab-pane>
+          <el-table border :data="config.cumulativeRules" stripe>
+            <el-table-column align="center" label="启用" width="80">
+              <template #default="{ row }">
+                <el-switch v-model="row.enabled" @change="updateRule('cumulative', row)" />
+              </template>
+            </el-table-column>
+            <el-table-column label="规则名称" prop="name" />
+            <el-table-column label="关键词" width="200">
+              <template #default="{ row }">
+                <code class="text-xs">{{ row.keywords.join(', ') }}</code>
+              </template>
+            </el-table-column>
+            <el-table-column align="center" label="匹配模式" width="100">
+              <template #default="{ row }">
+                <el-tag size="small" :type="getMatchModeTagType(row.matchMode)">
+                  {{ getMatchModeText(row.matchMode) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column align="center" label="触发阈值" prop="threshold" width="100" />
+            <el-table-column align="center" label="时间窗口(秒)" prop="windowSeconds" width="120" />
+            <el-table-column align="center" label="限流时长(秒)" width="120">
+              <template #default="{ row }">
+                {{ row.duration || config.globalSettings.defaultDuration }}
+              </template>
+            </el-table-column>
+            <el-table-column align="center" label="优先级" prop="priority" width="80" />
+            <el-table-column align="center" label="触发次数" width="100">
+              <template #default="{ row }">
+                {{ getStatistics('cumulative', row.id) }}
+              </template>
+            </el-table-column>
+            <el-table-column align="center" label="操作" width="150">
+              <template #default="{ row }">
+                <el-button size="small" @click="editRule('cumulative', row)"> 编辑 </el-button>
+                <el-button size="small" type="danger" @click="deleteRule('cumulative', row.id)">
+                  删除
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
 
-      <n-tab-pane name="limited" :tab="`🚫 被限流账户 (${limitedAccounts.length})`">
-        <div class="tab-content">
+        <el-tab-pane :label="`🚫 被限流账户 (${limitedAccounts.length})`" name="limited">
           <!-- 工具栏 -->
-          <div class="toolbar">
-            <n-button
+          <div class="mb-4 flex gap-3">
+            <el-button
               :disabled="limitedAccounts.length === 0"
               type="warning"
               @click="clearAllRateLimits"
             >
-              <template #icon>
-                <n-icon><UnlockIcon /></n-icon>
-              </template>
+              <i class="fas fa-unlock mr-2"></i>
               解除所有限流
-            </n-button>
-            <n-button @click="refreshLimitedAccounts">
-              <template #icon>
-                <n-icon><RefreshIcon /></n-icon>
-              </template>
+            </el-button>
+            <el-button @click="refreshLimitedAccounts">
+              <i class="fas fa-refresh mr-2"></i>
               刷新
-            </n-button>
+            </el-button>
           </div>
 
           <!-- 账户表格 -->
-          <n-data-table
-            :bordered="false"
-            :columns="limitedAccountColumns"
-            :data="limitedAccounts"
-            :pagination="false"
-            striped
-          />
-        </div>
-      </n-tab-pane>
+          <el-table border :data="limitedAccounts" stripe>
+            <el-table-column label="账户ID" width="120">
+              <template #default="{ row }">
+                <code class="text-xs">{{ row.accountId.substring(0, 8) }}...</code>
+              </template>
+            </el-table-column>
+            <el-table-column label="账户名称">
+              <template #default="{ row }">
+                {{ row.accountName || '未知' }}
+              </template>
+            </el-table-column>
+            <el-table-column label="限流原因" prop="reason" />
+            <el-table-column align="center" label="触发规则" width="120">
+              <template #default="{ row }">
+                <el-tag size="small" type="info">
+                  {{ row.triggeredRule || '手动' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="限流时间" width="180">
+              <template #default="{ row }">
+                {{ formatDate(row.limitedAt) }}
+              </template>
+            </el-table-column>
+            <el-table-column align="center" label="剩余时间" width="120">
+              <template #default="{ row }">
+                <el-tag size="small" type="warning">
+                  {{ formatRemainingTime(row.expiresAt) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column align="center" label="操作" width="100">
+              <template #default="{ row }">
+                <el-button size="small" type="success" @click="removeRateLimit(row.accountId)">
+                  解除
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
 
-      <n-tab-pane name="statistics" tab="📈 统计信息">
-        <div class="tab-content">
+        <el-tab-pane label="📈 统计信息" name="statistics">
           <!-- 统计卡片 -->
-          <n-grid class="stats-grid" :cols="4" :x-gap="16" :y-gap="16">
-            <n-grid-item>
-              <n-statistic label="总触发次数" :value="statistics.totalTriggers || 0" />
-            </n-grid-item>
-            <n-grid-item>
-              <n-statistic label="立即限流触发" :value="statistics.instantTriggers || 0" />
-            </n-grid-item>
-            <n-grid-item>
-              <n-statistic label="累计限流触发" :value="statistics.cumulativeTriggers || 0" />
-            </n-grid-item>
-            <n-grid-item>
-              <n-statistic label="当前限流账户" :value="statistics.currentLimited || 0" />
-            </n-grid-item>
-          </n-grid>
+          <el-row class="mb-6" :gutter="16">
+            <el-col :span="6">
+              <el-statistic title="总触发次数" :value="statistics.totalTriggers || 0" />
+            </el-col>
+            <el-col :span="6">
+              <el-statistic title="立即限流触发" :value="statistics.instantTriggers || 0" />
+            </el-col>
+            <el-col :span="6">
+              <el-statistic title="累计限流触发" :value="statistics.cumulativeTriggers || 0" />
+            </el-col>
+            <el-col :span="6">
+              <el-statistic title="当前限流账户" :value="statistics.currentLimited || 0" />
+            </el-col>
+          </el-row>
 
           <!-- 规则触发排行 -->
-          <n-card :bordered="false" class="ranking-card" title="规则触发排行">
-            <n-data-table
-              :bordered="false"
-              :columns="topRulesColumns"
-              :data="topRules"
-              :pagination="false"
-              striped
+          <el-card header="规则触发排行">
+            <el-table border :data="topRules" stripe>
+              <el-table-column label="规则名称" prop="ruleName" />
+              <el-table-column align="center" label="类型" width="100">
+                <template #default="{ row }">
+                  <el-tag size="small" :type="row.type === 'instant' ? 'danger' : 'warning'">
+                    {{ row.type === 'instant' ? '立即' : '累计' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column align="center" label="触发次数" prop="triggerCount" width="120" />
+              <el-table-column label="最后触发" width="180">
+                <template #default="{ row }">
+                  {{ formatDate(row.lastTriggered) }}
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-card>
+        </el-tab-pane>
+      </el-tabs>
+
+      <!-- 添加立即限流规则对话框 -->
+      <el-dialog
+        v-model="showInstantRuleDialog"
+        :close-on-click-modal="false"
+        :title="editingRule ? '编辑立即限流规则' : '添加立即限流规则'"
+        width="700px"
+      >
+        <el-form label-width="120px" :model="instantRuleForm">
+          <el-form-item label="规则名称" required>
+            <el-input v-model="instantRuleForm.name" placeholder="例如：Token 过期错误" />
+          </el-form-item>
+          <el-form-item label="关键词列表" required>
+            <el-input
+              v-model="instantRuleForm.keywordsText"
+              placeholder="每行一个关键词，例如：&#10;token_expired&#10;invalid_token&#10;authentication_failed"
+              :rows="3"
+              type="textarea"
             />
-          </n-card>
-        </div>
-      </n-tab-pane>
-    </n-tabs>
-
-    <!-- 添加立即限流规则对话框 -->
-    <n-modal
-      v-model:show="showAddInstantRule"
-      :mask-closable="false"
-      preset="dialog"
-      style="width: 700px"
-      :title="editingRule ? '编辑立即限流规则' : '添加立即限流规则'"
-    >
-      <n-form label-placement="top" :model="instantRuleForm">
-        <n-form-item label="规则名称" required>
-          <n-input v-model:value="instantRuleForm.name" placeholder="例如：Token 过期错误" />
-        </n-form-item>
-        <n-form-item label="关键词列表" required>
-          <n-input
-            v-model:value="instantRuleForm.keywordsText"
-            placeholder="每行一个关键词，例如：&#10;token_expired&#10;invalid_token&#10;authentication_failed"
-            :rows="3"
-            type="textarea"
-          />
-        </n-form-item>
-        <n-grid :cols="3" :x-gap="16">
-          <n-grid-item>
-            <n-form-item label="匹配模式">
-              <n-select v-model:value="instantRuleForm.matchMode" :options="matchModeOptions" />
-            </n-form-item>
-          </n-grid-item>
-          <n-grid-item>
-            <n-form-item label="限流时长（秒）">
-              <n-input-number v-model:value="instantRuleForm.duration" :max="86400" :min="60" />
-            </n-form-item>
-          </n-grid-item>
-          <n-grid-item>
-            <n-form-item label="优先级">
-              <n-input-number v-model:value="instantRuleForm.priority" :max="100" :min="1" />
-            </n-form-item>
-          </n-grid-item>
-        </n-grid>
-        <n-space>
-          <n-checkbox v-model:checked="instantRuleForm.caseSensitive">区分大小写</n-checkbox>
-          <n-checkbox v-model:checked="instantRuleForm.enabled">立即启用规则</n-checkbox>
-        </n-space>
-      </n-form>
-      <template #action>
-        <n-space>
-          <n-button @click="closeInstantRuleDialog">取消</n-button>
-          <n-button type="primary" @click="saveInstantRule">
+          </el-form-item>
+          <el-row :gutter="16">
+            <el-col :span="8">
+              <el-form-item label="匹配模式">
+                <el-select v-model="instantRuleForm.matchMode" style="width: 100%">
+                  <el-option label="包含匹配" value="contains" />
+                  <el-option label="精确匹配" value="exact" />
+                  <el-option label="正则表达式" value="regex" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="限流时长（秒）">
+                <el-input-number
+                  v-model="instantRuleForm.duration"
+                  :max="86400"
+                  :min="60"
+                  style="width: 100%"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="优先级">
+                <el-input-number
+                  v-model="instantRuleForm.priority"
+                  :max="100"
+                  :min="1"
+                  style="width: 100%"
+                />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-form-item>
+            <el-checkbox v-model="instantRuleForm.caseSensitive">区分大小写</el-checkbox>
+            <el-checkbox v-model="instantRuleForm.enabled" class="ml-4">立即启用规则</el-checkbox>
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="closeInstantRuleDialog">取消</el-button>
+          <el-button type="primary" @click="saveInstantRule">
             {{ editingRule ? '更新' : '添加' }}
-          </n-button>
-        </n-space>
-      </template>
-    </n-modal>
+          </el-button>
+        </template>
+      </el-dialog>
 
-    <!-- 添加累计触发规则对话框 -->
-    <n-modal
-      v-model:show="showAddCumulativeRule"
-      :mask-closable="false"
-      preset="dialog"
-      style="width: 700px"
-      :title="editingRule ? '编辑累计触发规则' : '添加累计触发规则'"
-    >
-      <n-form label-placement="top" :model="cumulativeRuleForm">
-        <n-form-item label="规则名称" required>
-          <n-input v-model:value="cumulativeRuleForm.name" placeholder="例如：频繁限流错误" />
-        </n-form-item>
-        <n-form-item label="关键词列表" required>
-          <n-input
-            v-model:value="cumulativeRuleForm.keywordsText"
-            placeholder="每行一个关键词"
-            :rows="3"
-            type="textarea"
-          />
-        </n-form-item>
-        <n-grid :cols="4" :x-gap="16">
-          <n-grid-item>
-            <n-form-item label="匹配模式">
-              <n-select v-model:value="cumulativeRuleForm.matchMode" :options="matchModeOptions" />
-            </n-form-item>
-          </n-grid-item>
-          <n-grid-item>
-            <n-form-item label="触发阈值">
-              <n-input-number v-model:value="cumulativeRuleForm.threshold" :max="100" :min="2" />
-            </n-form-item>
-          </n-grid-item>
-          <n-grid-item>
-            <n-form-item label="时间窗口（秒）">
-              <n-input-number
-                v-model:value="cumulativeRuleForm.windowSeconds"
-                :max="3600"
-                :min="60"
-              />
-            </n-form-item>
-          </n-grid-item>
-          <n-grid-item>
-            <n-form-item label="限流时长（秒）">
-              <n-input-number v-model:value="cumulativeRuleForm.duration" :max="86400" :min="60" />
-            </n-form-item>
-          </n-grid-item>
-        </n-grid>
-        <n-form-item label="优先级">
-          <n-input-number
-            v-model:value="cumulativeRuleForm.priority"
-            :max="100"
-            :min="1"
-            style="width: 200px"
-          />
-        </n-form-item>
-        <n-space>
-          <n-checkbox v-model:checked="cumulativeRuleForm.caseSensitive">区分大小写</n-checkbox>
-          <n-checkbox v-model:checked="cumulativeRuleForm.enabled">立即启用规则</n-checkbox>
-        </n-space>
-      </n-form>
-      <template #action>
-        <n-space>
-          <n-button @click="closeCumulativeRuleDialog">取消</n-button>
-          <n-button type="primary" @click="saveCumulativeRule">
+      <!-- 添加累计触发规则对话框 -->
+      <el-dialog
+        v-model="showCumulativeRuleDialog"
+        :close-on-click-modal="false"
+        :title="editingRule ? '编辑累计触发规则' : '添加累计触发规则'"
+        width="700px"
+      >
+        <el-form label-width="120px" :model="cumulativeRuleForm">
+          <el-form-item label="规则名称" required>
+            <el-input v-model="cumulativeRuleForm.name" placeholder="例如：频繁限流错误" />
+          </el-form-item>
+          <el-form-item label="关键词列表" required>
+            <el-input
+              v-model="cumulativeRuleForm.keywordsText"
+              placeholder="每行一个关键词"
+              :rows="3"
+              type="textarea"
+            />
+          </el-form-item>
+          <el-row :gutter="16">
+            <el-col :span="6">
+              <el-form-item label="匹配模式">
+                <el-select v-model="cumulativeRuleForm.matchMode" style="width: 100%">
+                  <el-option label="包含匹配" value="contains" />
+                  <el-option label="精确匹配" value="exact" />
+                  <el-option label="正则表达式" value="regex" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="触发阈值">
+                <el-input-number
+                  v-model="cumulativeRuleForm.threshold"
+                  :max="100"
+                  :min="2"
+                  style="width: 100%"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="时间窗口（秒）">
+                <el-input-number
+                  v-model="cumulativeRuleForm.windowSeconds"
+                  :max="3600"
+                  :min="60"
+                  style="width: 100%"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="限流时长（秒）">
+                <el-input-number
+                  v-model="cumulativeRuleForm.duration"
+                  :max="86400"
+                  :min="60"
+                  style="width: 100%"
+                />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-form-item label="优先级">
+            <el-input-number
+              v-model="cumulativeRuleForm.priority"
+              :max="100"
+              :min="1"
+              style="width: 200px"
+            />
+          </el-form-item>
+          <el-form-item>
+            <el-checkbox v-model="cumulativeRuleForm.caseSensitive">区分大小写</el-checkbox>
+            <el-checkbox v-model="cumulativeRuleForm.enabled" class="ml-4"
+              >立即启用规则</el-checkbox
+            >
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="closeCumulativeRuleDialog">取消</el-button>
+          <el-button type="primary" @click="saveCumulativeRule">
             {{ editingRule ? '更新' : '添加' }}
-          </n-button>
-        </n-space>
-      </template>
-    </n-modal>
+          </el-button>
+        </template>
+      </el-dialog>
 
-    <!-- 导入配置对话框 -->
-    <n-modal
-      v-model:show="showImportDialog"
-      :mask-closable="false"
-      preset="dialog"
-      style="width: 700px"
-      title="导入配置"
-    >
-      <n-form>
-        <n-form-item label="配置JSON">
-          <n-input
-            v-model:value="importConfigText"
-            placeholder="粘贴导出的配置JSON"
-            :rows="10"
-            type="textarea"
-          />
-        </n-form-item>
-        <n-checkbox v-model:checked="mergeImport">合并现有配置（不勾选则覆盖）</n-checkbox>
-      </n-form>
-      <template #action>
-        <n-space>
-          <n-button @click="showImportDialog = false">取消</n-button>
-          <n-button type="primary" @click="importConfig">导入</n-button>
-        </n-space>
-      </template>
-    </n-modal>
+      <!-- 导入配置对话框 -->
+      <el-dialog
+        v-model="showImportDialog"
+        :close-on-click-modal="false"
+        title="导入配置"
+        width="700px"
+      >
+        <el-form>
+          <el-form-item label="配置JSON">
+            <el-input
+              v-model="importConfigText"
+              placeholder="粘贴导出的配置JSON"
+              :rows="10"
+              type="textarea"
+            />
+          </el-form-item>
+          <el-form-item>
+            <el-checkbox v-model="mergeImport">合并现有配置（不勾选则覆盖）</el-checkbox>
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="showImportDialog = false">取消</el-button>
+          <el-button type="primary" @click="importConfig">导入</el-button>
+        </template>
+      </el-dialog>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, h } from 'vue'
-import { useMessage } from 'naive-ui'
-import { NButton, NTag, NSwitch, NSpace } from 'naive-ui'
-import {
-  Add as AddIcon,
-  Download as DownloadIcon,
-  Upload as UploadIcon,
-  Refresh as RefreshIcon,
-  LockOpen as UnlockIcon
-} from '@vicons/ionicons5'
-import api from '@/api'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ElMessage } from 'element-plus'
+import { useApi } from '@/composables/useApi'
 
-const message = useMessage()
+const api = useApi()
 
 // 响应式数据
 const config = ref({
@@ -364,8 +475,8 @@ const config = ref({
 const statistics = ref({})
 const limitedAccounts = ref([])
 const activeTab = ref('instant')
-const showAddInstantRule = ref(false)
-const showAddCumulativeRule = ref(false)
+const showInstantRuleDialog = ref(false)
+const showCumulativeRuleDialog = ref(false)
 const showImportDialog = ref(false)
 const editingRule = ref(null)
 const refreshTimer = ref(null)
@@ -396,13 +507,6 @@ const cumulativeRuleForm = ref({
 const importConfigText = ref('')
 const mergeImport = ref(false)
 
-// 选项配置
-const matchModeOptions = [
-  { label: '包含匹配', value: 'contains' },
-  { label: '精确匹配', value: 'exact' },
-  { label: '正则表达式', value: 'regex' }
-]
-
 // 计算属性
 const topRules = computed(() => {
   if (!statistics.value.ruleStatistics) return []
@@ -419,548 +523,25 @@ const topRules = computed(() => {
     .slice(0, 10)
 })
 
-// 表格列配置
-const instantRuleColumns = [
-  {
-    title: '启用',
-    key: 'enabled',
-    width: 80,
-    render(row) {
-      return h(NSwitch, {
-        value: row.enabled,
-        onUpdateValue: (val) => {
-          row.enabled = val
-          updateRule('instant', row)
-        }
-      })
-    }
-  },
-  {
-    title: '规则名称',
-    key: 'name'
-  },
-  {
-    title: '关键词',
-    key: 'keywords',
-    render(row) {
-      return h('code', row.keywords.join(', '))
-    }
-  },
-  {
-    title: '匹配模式',
-    key: 'matchMode',
-    render(row) {
-      const typeMap = {
-        contains: { type: 'info', text: '包含' },
-        exact: { type: 'success', text: '精确' },
-        regex: { type: 'error', text: '正则' }
-      }
-      const info = typeMap[row.matchMode] || { type: 'default', text: row.matchMode }
-      return h(NTag, { type: info.type, size: 'small' }, () => info.text)
-    }
-  },
-  {
-    title: '区分大小写',
-    key: 'caseSensitive',
-    render(row) {
-      return h(
-        NTag,
-        {
-          type: row.caseSensitive ? 'warning' : 'default',
-          size: 'small'
-        },
-        () => (row.caseSensitive ? '是' : '否')
-      )
-    }
-  },
-  {
-    title: '限流时长(秒)',
-    key: 'duration',
-    render(row) {
-      return row.duration || config.value.globalSettings.defaultDuration
-    }
-  },
-  {
-    title: '优先级',
-    key: 'priority'
-  },
-  {
-    title: '触发次数',
-    key: 'triggerCount',
-    render(row) {
-      return getStatistics('instant', row.id)
-    }
-  },
-  {
-    title: '操作',
-    key: 'actions',
-    width: 150,
-    render(row) {
-      return h(NSpace, null, () => [
-        h(
-          NButton,
-          {
-            size: 'small',
-            onClick: () => editRule('instant', row)
-          },
-          () => '编辑'
-        ),
-        h(
-          NButton,
-          {
-            size: 'small',
-            type: 'error',
-            onClick: () => deleteRule('instant', row.id)
-          },
-          () => '删除'
-        )
-      ])
-    }
-  }
-]
-
-const cumulativeRuleColumns = [
-  {
-    title: '启用',
-    key: 'enabled',
-    width: 80,
-    render(row) {
-      return h(NSwitch, {
-        value: row.enabled,
-        onUpdateValue: (val) => {
-          row.enabled = val
-          updateRule('cumulative', row)
-        }
-      })
-    }
-  },
-  {
-    title: '规则名称',
-    key: 'name'
-  },
-  {
-    title: '关键词',
-    key: 'keywords',
-    render(row) {
-      return h('code', row.keywords.join(', '))
-    }
-  },
-  {
-    title: '匹配模式',
-    key: 'matchMode',
-    render(row) {
-      const typeMap = {
-        contains: { type: 'info', text: '包含' },
-        exact: { type: 'success', text: '精确' },
-        regex: { type: 'error', text: '正则' }
-      }
-      const info = typeMap[row.matchMode] || { type: 'default', text: row.matchMode }
-      return h(NTag, { type: info.type, size: 'small' }, () => info.text)
-    }
-  },
-  {
-    title: '触发阈值',
-    key: 'threshold'
-  },
-  {
-    title: '时间窗口(秒)',
-    key: 'windowSeconds'
-  },
-  {
-    title: '限流时长(秒)',
-    key: 'duration',
-    render(row) {
-      return row.duration || config.value.globalSettings.defaultDuration
-    }
-  },
-  {
-    title: '优先级',
-    key: 'priority'
-  },
-  {
-    title: '触发次数',
-    key: 'triggerCount',
-    render(row) {
-      return getStatistics('cumulative', row.id)
-    }
-  },
-  {
-    title: '操作',
-    key: 'actions',
-    width: 150,
-    render(row) {
-      return h(NSpace, null, () => [
-        h(
-          NButton,
-          {
-            size: 'small',
-            onClick: () => editRule('cumulative', row)
-          },
-          () => '编辑'
-        ),
-        h(
-          NButton,
-          {
-            size: 'small',
-            type: 'error',
-            onClick: () => deleteRule('cumulative', row.id)
-          },
-          () => '删除'
-        )
-      ])
-    }
-  }
-]
-
-const limitedAccountColumns = [
-  {
-    title: '账户ID',
-    key: 'accountId',
-    render(row) {
-      return h('code', row.accountId.substring(0, 8) + '...')
-    }
-  },
-  {
-    title: '账户名称',
-    key: 'accountName',
-    render(row) {
-      return row.accountName || '未知'
-    }
-  },
-  {
-    title: '限流原因',
-    key: 'reason'
-  },
-  {
-    title: '触发规则',
-    key: 'triggeredRule',
-    render(row) {
-      return h(NTag, { type: 'info', size: 'small' }, () => row.triggeredRule || '手动')
-    }
-  },
-  {
-    title: '限流时间',
-    key: 'limitedAt',
-    render(row) {
-      return formatDate(row.limitedAt)
-    }
-  },
-  {
-    title: '剩余时间',
-    key: 'expiresAt',
-    render(row) {
-      return h(NTag, { type: 'warning', size: 'small' }, () => formatRemainingTime(row.expiresAt))
-    }
-  },
-  {
-    title: '操作',
-    key: 'actions',
-    width: 100,
-    render(row) {
-      return h(
-        NButton,
-        {
-          size: 'small',
-          type: 'success',
-          onClick: () => removeRateLimit(row.accountId)
-        },
-        () => '解除'
-      )
-    }
-  }
-]
-
-const topRulesColumns = [
-  {
-    title: '规则名称',
-    key: 'ruleName'
-  },
-  {
-    title: '类型',
-    key: 'type',
-    render(row) {
-      return h(
-        NTag,
-        {
-          type: row.type === 'instant' ? 'error' : 'warning',
-          size: 'small'
-        },
-        () => (row.type === 'instant' ? '立即' : '累计')
-      )
-    }
-  },
-  {
-    title: '触发次数',
-    key: 'triggerCount'
-  },
-  {
-    title: '最后触发',
-    key: 'lastTriggered',
-    render(row) {
-      return formatDate(row.lastTriggered)
-    }
-  }
-]
-
-// API 方法
-async function loadConfig() {
-  try {
-    const response = await api.get('/smart-rate-limit/config')
-    config.value = response.data || config.value
-  } catch (error) {
-    console.error('Failed to load config:', error)
-    message.error('加载配置失败')
-  }
-}
-
-async function loadStatistics() {
-  try {
-    const response = await api.get('/smart-rate-limit/statistics')
-    statistics.value = response.data || {}
-  } catch (error) {
-    console.error('Failed to load statistics:', error)
-  }
-}
-
-async function loadLimitedAccounts() {
-  try {
-    const response = await api.get('/smart-rate-limit/limited-accounts')
-    limitedAccounts.value = response.data || []
-  } catch (error) {
-    console.error('Failed to load limited accounts:', error)
-  }
-}
-
-async function updateGlobalSettings() {
-  try {
-    await api.put('/smart-rate-limit/global-settings', config.value.globalSettings)
-    message.success('全局设置已更新')
-  } catch (error) {
-    console.error('Failed to update global settings:', error)
-    message.error('更新全局设置失败')
-  }
-}
-
-async function saveInstantRule() {
-  try {
-    const keywords = instantRuleForm.value.keywordsText
-      .split('\n')
-      .map((k) => k.trim())
-      .filter((k) => k)
-
-    if (!instantRuleForm.value.name || keywords.length === 0) {
-      message.error('请填写规则名称和关键词')
-      return
-    }
-
-    const ruleData = {
-      name: instantRuleForm.value.name,
-      keywords,
-      matchMode: instantRuleForm.value.matchMode,
-      caseSensitive: instantRuleForm.value.caseSensitive,
-      duration: instantRuleForm.value.duration,
-      priority: instantRuleForm.value.priority,
-      enabled: instantRuleForm.value.enabled
-    }
-
-    if (editingRule.value) {
-      await api.put(`/smart-rate-limit/rules/instant/${editingRule.value.id}`, ruleData)
-      message.success('规则已更新')
-    } else {
-      await api.post('/smart-rate-limit/rules/instant', ruleData)
-      message.success('规则已添加')
-    }
-
-    closeInstantRuleDialog()
-    await loadConfig()
-  } catch (error) {
-    console.error('Failed to save instant rule:', error)
-    message.error('保存规则失败')
-  }
-}
-
-async function saveCumulativeRule() {
-  try {
-    const keywords = cumulativeRuleForm.value.keywordsText
-      .split('\n')
-      .map((k) => k.trim())
-      .filter((k) => k)
-
-    if (!cumulativeRuleForm.value.name || keywords.length === 0) {
-      message.error('请填写规则名称和关键词')
-      return
-    }
-
-    const ruleData = {
-      name: cumulativeRuleForm.value.name,
-      keywords,
-      matchMode: cumulativeRuleForm.value.matchMode,
-      caseSensitive: cumulativeRuleForm.value.caseSensitive,
-      threshold: cumulativeRuleForm.value.threshold,
-      windowSeconds: cumulativeRuleForm.value.windowSeconds,
-      duration: cumulativeRuleForm.value.duration,
-      priority: cumulativeRuleForm.value.priority,
-      enabled: cumulativeRuleForm.value.enabled
-    }
-
-    if (editingRule.value) {
-      await api.put(`/smart-rate-limit/rules/cumulative/${editingRule.value.id}`, ruleData)
-      message.success('规则已更新')
-    } else {
-      await api.post('/smart-rate-limit/rules/cumulative', ruleData)
-      message.success('规则已添加')
-    }
-
-    closeCumulativeRuleDialog()
-    await loadConfig()
-  } catch (error) {
-    console.error('Failed to save cumulative rule:', error)
-    message.error('保存规则失败')
-  }
-}
-
-async function updateRule(type, rule) {
-  try {
-    await api.put(`/smart-rate-limit/rules/${type}/${rule.id}`, rule)
-  } catch (error) {
-    console.error('Failed to update rule:', error)
-    message.error('更新规则失败')
-    await loadConfig()
-  }
-}
-
-async function deleteRule(type, ruleId) {
-  try {
-    await api.delete(`/smart-rate-limit/rules/${type}/${ruleId}`)
-    message.success('规则已删除')
-    await loadConfig()
-  } catch (error) {
-    console.error('Failed to delete rule:', error)
-    message.error('删除规则失败')
-  }
-}
-
-function editRule(type, rule) {
-  editingRule.value = rule
-  if (type === 'instant') {
-    instantRuleForm.value = {
-      name: rule.name,
-      keywordsText: rule.keywords.join('\n'),
-      matchMode: rule.matchMode,
-      caseSensitive: rule.caseSensitive,
-      duration: rule.duration,
-      priority: rule.priority,
-      enabled: rule.enabled
-    }
-    showAddInstantRule.value = true
-  } else {
-    cumulativeRuleForm.value = {
-      name: rule.name,
-      keywordsText: rule.keywords.join('\n'),
-      matchMode: rule.matchMode,
-      caseSensitive: rule.caseSensitive,
-      threshold: rule.threshold,
-      windowSeconds: rule.windowSeconds,
-      duration: rule.duration,
-      priority: rule.priority,
-      enabled: rule.enabled
-    }
-    showAddCumulativeRule.value = true
-  }
-}
-
-async function removeRateLimit(accountId) {
-  try {
-    await api.delete(`/smart-rate-limit/limited-accounts/${accountId}`)
-    message.success('限流已解除')
-    await loadLimitedAccounts()
-  } catch (error) {
-    console.error('Failed to remove rate limit:', error)
-    message.error('解除限流失败')
-  }
-}
-
-async function clearAllRateLimits() {
-  try {
-    await api.post('/smart-rate-limit/clear-all')
-    message.success('所有限流已解除')
-    await loadLimitedAccounts()
-  } catch (error) {
-    console.error('Failed to clear all rate limits:', error)
-    message.error('清除限流失败')
-  }
-}
-
-async function exportConfig() {
-  try {
-    const response = await api.get('/smart-rate-limit/export')
-    const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `smart-rate-limit-config-${Date.now()}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-    message.success('配置已导出')
-  } catch (error) {
-    console.error('Failed to export config:', error)
-    message.error('导出配置失败')
-  }
-}
-
-async function importConfig() {
-  try {
-    const configData = JSON.parse(importConfigText.value)
-    await api.post('/smart-rate-limit/import', {
-      config: configData,
-      merge: mergeImport.value
-    })
-    message.success('配置已导入')
-    showImportDialog.value = false
-    importConfigText.value = ''
-    await loadConfig()
-  } catch (error) {
-    console.error('Failed to import config:', error)
-    message.error('导入配置失败：' + error.message)
-  }
-}
-
-function refreshLimitedAccounts() {
-  loadLimitedAccounts()
-  loadStatistics()
-}
-
-function closeInstantRuleDialog() {
-  showAddInstantRule.value = false
-  editingRule.value = null
-  instantRuleForm.value = {
-    name: '',
-    keywordsText: '',
-    matchMode: 'contains',
-    caseSensitive: false,
-    duration: 300,
-    priority: 50,
-    enabled: true
-  }
-}
-
-function closeCumulativeRuleDialog() {
-  showAddCumulativeRule.value = false
-  editingRule.value = null
-  cumulativeRuleForm.value = {
-    name: '',
-    keywordsText: '',
-    matchMode: 'contains',
-    caseSensitive: false,
-    threshold: 3,
-    windowSeconds: 300,
-    duration: 600,
-    priority: 50,
-    enabled: true
-  }
-}
-
 // 工具函数
+function getMatchModeTagType(mode) {
+  const typeMap = {
+    contains: 'info',
+    exact: 'success',
+    regex: 'danger'
+  }
+  return typeMap[mode] || 'info'
+}
+
+function getMatchModeText(mode) {
+  const textMap = {
+    contains: '包含',
+    exact: '精确',
+    regex: '正则'
+  }
+  return textMap[mode] || mode
+}
+
 function getStatistics(type, ruleId) {
   if (!statistics.value.ruleStatistics) return 0
   const key = `${type}:${ruleId}`
@@ -995,6 +576,279 @@ function formatRemainingTime(expiresAt) {
   }
 }
 
+// API 方法
+async function loadConfig() {
+  try {
+    const response = await api.get('/admin/intelligent-rate-limit/config')
+    if (response.data) {
+      config.value = response.data
+    }
+  } catch (error) {
+    console.error('Failed to load config:', error)
+    ElMessage.error('加载配置失败')
+  }
+}
+
+async function loadStatistics() {
+  try {
+    const response = await api.get('/admin/intelligent-rate-limit/statistics')
+    statistics.value = response.data || {}
+  } catch (error) {
+    console.error('Failed to load statistics:', error)
+  }
+}
+
+async function loadLimitedAccounts() {
+  try {
+    const response = await api.get('/admin/intelligent-rate-limit/limited-accounts')
+    limitedAccounts.value = response.data || []
+  } catch (error) {
+    console.error('Failed to load limited accounts:', error)
+  }
+}
+
+async function updateGlobalSettings() {
+  try {
+    await api.put('/admin/intelligent-rate-limit/global-settings', config.value.globalSettings)
+    ElMessage.success('全局设置已更新')
+  } catch (error) {
+    console.error('Failed to update global settings:', error)
+    ElMessage.error('更新全局设置失败')
+  }
+}
+
+async function updateRule(type, rule) {
+  try {
+    await api.put(`/admin/intelligent-rate-limit/rules/${type}/${rule.id}`, rule)
+  } catch (error) {
+    console.error('Failed to update rule:', error)
+    ElMessage.error('更新规则失败')
+    await loadConfig()
+  }
+}
+
+async function deleteRule(type, ruleId) {
+  try {
+    await api.delete(`/admin/intelligent-rate-limit/rules/${type}/${ruleId}`)
+    ElMessage.success('规则已删除')
+    await loadConfig()
+  } catch (error) {
+    console.error('Failed to delete rule:', error)
+    ElMessage.error('删除规则失败')
+  }
+}
+
+async function removeRateLimit(accountId) {
+  try {
+    await api.delete(`/admin/intelligent-rate-limit/limited-accounts/${accountId}`)
+    ElMessage.success('限流已解除')
+    await loadLimitedAccounts()
+  } catch (error) {
+    console.error('Failed to remove rate limit:', error)
+    ElMessage.error('解除限流失败')
+  }
+}
+
+async function clearAllRateLimits() {
+  try {
+    await api.post('/admin/intelligent-rate-limit/clear-all')
+    ElMessage.success('所有限流已解除')
+    await loadLimitedAccounts()
+  } catch (error) {
+    console.error('Failed to clear all rate limits:', error)
+    ElMessage.error('清除限流失败')
+  }
+}
+
+async function exportConfig() {
+  try {
+    const response = await api.get('/admin/intelligent-rate-limit/export')
+    const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `smart-rate-limit-config-${Date.now()}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('配置已导出')
+  } catch (error) {
+    console.error('Failed to export config:', error)
+    ElMessage.error('导出配置失败')
+  }
+}
+
+async function importConfig() {
+  try {
+    const configData = JSON.parse(importConfigText.value)
+    await api.post('/admin/intelligent-rate-limit/import', {
+      config: configData,
+      merge: mergeImport.value
+    })
+    ElMessage.success('配置已导入')
+    showImportDialog.value = false
+    importConfigText.value = ''
+    await loadConfig()
+  } catch (error) {
+    console.error('Failed to import config:', error)
+    ElMessage.error('导入配置失败：' + error.message)
+  }
+}
+
+function showAddInstantRule() {
+  editingRule.value = null
+  instantRuleForm.value = {
+    name: '',
+    keywordsText: '',
+    matchMode: 'contains',
+    caseSensitive: false,
+    duration: 300,
+    priority: 50,
+    enabled: true
+  }
+  showInstantRuleDialog.value = true
+}
+
+function showAddCumulativeRule() {
+  editingRule.value = null
+  cumulativeRuleForm.value = {
+    name: '',
+    keywordsText: '',
+    matchMode: 'contains',
+    caseSensitive: false,
+    threshold: 3,
+    windowSeconds: 300,
+    duration: 600,
+    priority: 50,
+    enabled: true
+  }
+  showCumulativeRuleDialog.value = true
+}
+
+function editRule(type, rule) {
+  editingRule.value = rule
+  if (type === 'instant') {
+    instantRuleForm.value = {
+      name: rule.name,
+      keywordsText: rule.keywords.join('\n'),
+      matchMode: rule.matchMode,
+      caseSensitive: rule.caseSensitive,
+      duration: rule.duration,
+      priority: rule.priority,
+      enabled: rule.enabled
+    }
+    showInstantRuleDialog.value = true
+  } else {
+    cumulativeRuleForm.value = {
+      name: rule.name,
+      keywordsText: rule.keywords.join('\n'),
+      matchMode: rule.matchMode,
+      caseSensitive: rule.caseSensitive,
+      threshold: rule.threshold,
+      windowSeconds: rule.windowSeconds,
+      duration: rule.duration,
+      priority: rule.priority,
+      enabled: rule.enabled
+    }
+    showCumulativeRuleDialog.value = true
+  }
+}
+
+async function saveInstantRule() {
+  try {
+    const keywords = instantRuleForm.value.keywordsText
+      .split('\n')
+      .map((k) => k.trim())
+      .filter((k) => k)
+
+    if (!instantRuleForm.value.name || keywords.length === 0) {
+      ElMessage.error('请填写规则名称和关键词')
+      return
+    }
+
+    const ruleData = {
+      name: instantRuleForm.value.name,
+      keywords,
+      matchMode: instantRuleForm.value.matchMode,
+      caseSensitive: instantRuleForm.value.caseSensitive,
+      duration: instantRuleForm.value.duration,
+      priority: instantRuleForm.value.priority,
+      enabled: instantRuleForm.value.enabled
+    }
+
+    if (editingRule.value) {
+      await api.put(`/admin/intelligent-rate-limit/rules/instant/${editingRule.value.id}`, ruleData)
+      ElMessage.success('规则已更新')
+    } else {
+      await api.post('/admin/intelligent-rate-limit/rules/instant', ruleData)
+      ElMessage.success('规则已添加')
+    }
+
+    closeInstantRuleDialog()
+    await loadConfig()
+  } catch (error) {
+    console.error('Failed to save instant rule:', error)
+    ElMessage.error('保存规则失败')
+  }
+}
+
+async function saveCumulativeRule() {
+  try {
+    const keywords = cumulativeRuleForm.value.keywordsText
+      .split('\n')
+      .map((k) => k.trim())
+      .filter((k) => k)
+
+    if (!cumulativeRuleForm.value.name || keywords.length === 0) {
+      ElMessage.error('请填写规则名称和关键词')
+      return
+    }
+
+    const ruleData = {
+      name: cumulativeRuleForm.value.name,
+      keywords,
+      matchMode: cumulativeRuleForm.value.matchMode,
+      caseSensitive: cumulativeRuleForm.value.caseSensitive,
+      threshold: cumulativeRuleForm.value.threshold,
+      windowSeconds: cumulativeRuleForm.value.windowSeconds,
+      duration: cumulativeRuleForm.value.duration,
+      priority: cumulativeRuleForm.value.priority,
+      enabled: cumulativeRuleForm.value.enabled
+    }
+
+    if (editingRule.value) {
+      await api.put(
+        `/admin/intelligent-rate-limit/rules/cumulative/${editingRule.value.id}`,
+        ruleData
+      )
+      ElMessage.success('规则已更新')
+    } else {
+      await api.post('/admin/intelligent-rate-limit/rules/cumulative', ruleData)
+      ElMessage.success('规则已添加')
+    }
+
+    closeCumulativeRuleDialog()
+    await loadConfig()
+  } catch (error) {
+    console.error('Failed to save cumulative rule:', error)
+    ElMessage.error('保存规则失败')
+  }
+}
+
+function closeInstantRuleDialog() {
+  showInstantRuleDialog.value = false
+  editingRule.value = null
+}
+
+function closeCumulativeRuleDialog() {
+  showCumulativeRuleDialog.value = false
+  editingRule.value = null
+}
+
+function refreshLimitedAccounts() {
+  loadLimitedAccounts()
+  loadStatistics()
+}
+
 // 自动刷新
 function startAutoRefresh() {
   refreshTimer.value = setInterval(() => {
@@ -1026,54 +880,35 @@ onUnmounted(() => {
 })
 </script>
 
-<style lang="scss" scoped>
-.smart-rate-limit-view {
-  padding: 24px;
+<style scoped>
+.smart-tabs :deep(.el-tabs__content) {
+  padding-top: 20px;
+}
 
-  .page-header {
-    margin-bottom: 24px;
+:deep(.el-statistic__content) {
+  font-size: 2rem;
+  font-weight: 600;
+}
 
-    .page-title {
-      font-size: 24px;
-      font-weight: 600;
-      margin-bottom: 8px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+:deep(.el-statistic__head) {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
 
-      .icon {
-        font-size: 28px;
-      }
-    }
+.ml-2 {
+  margin-left: 8px;
+}
 
-    .page-description {
-      color: var(--n-text-color-3);
-      font-size: 14px;
-    }
-  }
+.ml-4 {
+  margin-left: 16px;
+}
 
-  .settings-card {
-    margin-bottom: 24px;
-  }
+.mr-2 {
+  margin-right: 8px;
+}
 
-  .tabs-container {
-    .tab-content {
-      padding: 16px 0;
-
-      .toolbar {
-        display: flex;
-        gap: 12px;
-        margin-bottom: 16px;
-      }
-
-      .stats-grid {
-        margin-bottom: 24px;
-      }
-
-      .ranking-card {
-        margin-top: 24px;
-      }
-    }
-  }
+.text-xs {
+  font-size: 12px;
 }
 </style>

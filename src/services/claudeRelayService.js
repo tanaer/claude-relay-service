@@ -157,7 +157,8 @@ class ClaudeRelayService {
         (req) => {
           upstreamRequest = req
         },
-        options
+        options,
+        apiKeyData // 添加apiKeyData参数
       )
 
       // 移除监听器（请求成功完成）
@@ -287,7 +288,20 @@ class ClaudeRelayService {
 
       return response
     } catch (error) {
+      // 记录详细的错误信息到关键日志
+      const errorDetails = {
+        apiKeyName: apiKeyData.name || apiKeyData.id,
+        errorMessage: error.message,
+        errorCode: error.code,
+        upstream: this.claudeApiUrl,
+        timestamp: new Date().toISOString(),
+        requestDuration: Date.now() - (clientRequest?._startTime || Date.now()),
+        stackTrace: error.stack
+      }
+
       logger.error(`[错误] Claude 转发请求失败，Key: ${apiKeyData.name || apiKeyData.id}：`, error)
+      logger.error('❌  Claude relay error:', errorDetails)
+
       return {
         statusCode: 500,
         headers: { 'Content-Type': 'application/json' },
@@ -579,8 +593,10 @@ class ClaudeRelayService {
     clientHeaders,
     accountId,
     onRequest,
-    requestOptions = {}
+    requestOptions = {},
+    apiKeyData = {} // 添加apiKeyData参数
   ) {
+    const _requestStartTime = Date.now() // 标记为未使用但保留
     // 如该官方账户存在自定义官网 API 地址，则优先使用
     let baseUrl = this.claudeApiUrl
     try {
@@ -702,7 +718,10 @@ class ClaudeRelayService {
           errno: error.errno,
           syscall: error.syscall,
           address: error.address,
-          port: error.port
+          port: error.port,
+          upstream: baseUrl,
+          accountId,
+          apiKeyName: apiKeyData?.name || 'unknown'
         })
 
         // 根据错误类型提供更具体的错误信息
@@ -722,7 +741,13 @@ class ClaudeRelayService {
 
       req.on('timeout', () => {
         req.destroy()
-        logger.error('[错误] Claude API 请求超时')
+        logger.error('[错误] Claude API 请求超时', {
+          upstream: baseUrl,
+          timeout: config.proxy.timeout,
+          accountId,
+          apiKeyName: apiKeyData?.name || 'unknown',
+          timestamp: new Date().toISOString()
+        })
         reject(new Error('Request timeout'))
       })
 
@@ -845,6 +870,7 @@ class ClaudeRelayService {
     requestOptions = {},
     apiKeyData = {} // 接收API Key数据
   ) {
+    const requestStartTime = Date.now() // 被使用，保持原名
     // 获取过滤后的客户端 headers
     const filteredHeaders = this._filterClientHeaders(clientHeaders)
 
@@ -1222,7 +1248,17 @@ class ClaudeRelayService {
 
       req.on('timeout', () => {
         req.destroy()
-        logger.error('[错误] Claude 流式请求超时')
+        const timeoutDetails = {
+          upstream: baseUrl,
+          timeout: config.proxy.timeout,
+          accountId,
+          apiKeyName: apiKeyData?.name || 'unknown',
+          duration: Date.now() - requestStartTime,
+          timestamp: new Date().toISOString()
+        }
+        logger.error('[错误] Claude 流式请求超时', timeoutDetails)
+        logger.error('❌  Claude relay error: STREAM_TIMEOUT', timeoutDetails)
+
         if (!responseStream.headersSent) {
           responseStream.writeHead(504, {
             'Content-Type': 'text/event-stream',
@@ -1237,6 +1273,8 @@ class ClaudeRelayService {
             `data: ${JSON.stringify({
               error: 'Request timeout',
               code: 'TIMEOUT',
+              upstream: baseUrl,
+              duration: Date.now() - requestStartTime,
               timestamp: new Date().toISOString()
             })}\n\n`
           )

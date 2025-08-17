@@ -10,6 +10,21 @@ const redemptionCodeService = require('../services/redemptionCodeService')
 
 const router = express.Router()
 
+// 统一清洗兑换码：去除各种空白/零宽字符，规范连字符，并仅保留允许字符
+function sanitizeRedemptionCode(raw) {
+  if (typeof raw !== 'string') {
+    return ''
+  }
+  const normalized = raw.normalize('NFKC')
+  const withoutSpaces = normalized.replace(
+    /[\s\u00A0\u2000-\u200A\u202F\u205F\u3000\u200B-\u200D\u2060\uFEFF]/g,
+    ''
+  )
+  const unifiedDash = withoutSpaces.replace(/[\u2010-\u2015\u2212\uFE63\uFF0D]/g, '-')
+  const allowedOnly = unifiedDash.replace(/[^A-Za-z0-9-]/g, '')
+  return allowedOnly.trim()
+}
+
 // 🏠 服务静态文件
 router.use('/assets', express.static(path.join(__dirname, '../../web/assets')))
 
@@ -346,7 +361,7 @@ router.post('/auth/refresh', async (req, res) => {
 router.post('/redeem', async (req, res) => {
   try {
     const rawCode = req.body?.code
-    const code = typeof rawCode === 'string' ? rawCode.trim() : ''
+    const code = sanitizeRedemptionCode(rawCode)
 
     if (!code) {
       return res.status(400).json({

@@ -300,7 +300,7 @@ class RedemptionPolicyService {
       await this._getRedis().zadd(this.POLICY_CHECK_QUEUE, nextCheck, apiKeyId)
 
       // 记录日志
-      await keyLogsService.logRedemption(codeId, apiKeyId, codeType, true, {
+      await keyLogsService.logPolicyBinding(codeId, apiKeyId, codeType, true, {
         policyBound: true,
         template: binding.currentTemplate
       })

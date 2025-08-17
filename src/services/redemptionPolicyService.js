@@ -75,6 +75,10 @@ class RedemptionPolicyService {
       })
 
       logger.info(`[策略服务] 全局策略已更新`)
+
+      // 更新所有受影响的API Key
+      await this._syncPolicyUpdates('global', null, null)
+
       return true
     } catch (error) {
       logger.error(`[策略服务] 设置全局策略失败: ${error.message}`)
@@ -137,6 +141,10 @@ class RedemptionPolicyService {
       })
 
       logger.info(`[策略服务] ${type} 类型策略已更新`)
+
+      // 更新所有受影响的API Key
+      await this._syncPolicyUpdates('type', type, null)
+
       return true
     } catch (error) {
       logger.error(`[策略服务] 设置类型策略失败: ${error.message}`)
@@ -195,6 +203,10 @@ class RedemptionPolicyService {
       })
 
       logger.info(`[策略服务] 兑换码 ${codeId} 策略已更新`)
+
+      // 更新所有受影响的API Key
+      await this._syncPolicyUpdates('code', null, codeId)
+
       return true
     } catch (error) {
       logger.error(`[策略服务] 设置兑换码策略失败: ${error.message}`)
@@ -443,6 +455,80 @@ class RedemptionPolicyService {
   }
 
   // ==================== 工具方法 ====================
+
+  /**
+   * 同步策略更新到受影响的API Key
+   */
+  async _syncPolicyUpdates(level, type, codeId) {
+    try {
+      const dynamicPolicyEngine = require('./dynamicPolicyEngine')
+      const activeApiKeys = await this._getRedis().smembers(this.ACTIVE_POLICIES_INDEX)
+      const affectedKeys = []
+
+      for (const apiKeyId of activeApiKeys) {
+        const binding = await this.getApiKeyPolicy(apiKeyId)
+        if (!binding || !binding.metadata) {
+          continue
+        }
+
+        const { metadata } = binding
+
+        // 判断是否受影响
+        let isAffected = false
+
+        if (level === 'global') {
+          // 全局策略更新，所有Key都受影响
+          isAffected = true
+        } else if (level === 'type' && type) {
+          // 类型策略更新，检查类型匹配
+          isAffected = metadata.codeType === type
+        } else if (level === 'code' && codeId) {
+          // 兑换码策略更新，检查冁换码ID匹配
+          isAffected = metadata.originalCode === codeId
+        }
+
+        if (isAffected) {
+          affectedKeys.push(apiKeyId)
+
+          // 获取新的有效策略
+          const effectivePolicy = await this.getEffectivePolicy(
+            metadata.originalCode,
+            metadata.codeType
+          )
+
+          // 检查是否需要更新初始模板
+          if (
+            effectivePolicy.initialRateTemplate &&
+            effectivePolicy.initialRateTemplate !== binding.initialTemplate
+          ) {
+            // 更新初始模板
+            await this._getRedis().hset(`${this.API_KEY_POLICY_PREFIX}${apiKeyId}`, {
+              initialTemplate: effectivePolicy.initialRateTemplate
+            })
+
+            logger.info(
+              `[策略服务] API Key ${apiKeyId} 初始模板已更新为 ${effectivePolicy.initialRateTemplate}`
+            )
+          }
+
+          // 重新计算并检查阈值
+          const usageData = await this.getUsageMonitor(apiKeyId)
+          if (usageData) {
+            const currentPercentage = parseFloat(usageData.currentPercentage) || 0
+            await dynamicPolicyEngine.checkAndTriggerPolicy(apiKeyId, currentPercentage)
+          }
+        }
+      }
+
+      if (affectedKeys.length > 0) {
+        logger.info(`[策略服务] 已同步更新 ${affectedKeys.length} 个受影响的API Key`)
+      }
+
+      return affectedKeys
+    } catch (error) {
+      logger.error(`[策略服务] 同步策略更新失败: ${error.message}`)
+    }
+  }
 
   /**
    * 获取默认全局策略

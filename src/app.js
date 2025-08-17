@@ -44,6 +44,15 @@ class Application {
       await redis.connect()
       logger.success('✅ Redis connected successfully')
 
+      // 🚦 初始化智能限流（依赖已连接的 Redis）
+      try {
+        const smartRateLimitService = require('./services/smartRateLimitService')
+        await smartRateLimitService.initialize()
+        logger.success('✅ Smart rate limit service initialized')
+      } catch (e) {
+        logger.error('❌ Failed to initialize smart rate limit service:', e)
+      }
+
       // 💰 初始化价格服务
       logger.info('🔄 Initializing pricing service...')
       await pricingService.initialize()

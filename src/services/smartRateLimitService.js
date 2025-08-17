@@ -16,9 +16,7 @@ class SmartRateLimitService {
     // 动态配置
     this.config = null
     this.configSubscriber = null
-
-    // 初始化
-    this.initialize()
+    this._initialized = false
   }
 
   /**
@@ -26,6 +24,9 @@ class SmartRateLimitService {
    */
   async initialize() {
     try {
+      if (this._initialized) {
+        return
+      }
       // 加载配置
       await this.loadConfig()
 
@@ -36,6 +37,7 @@ class SmartRateLimitService {
       if (this.config && this.config.enabled) {
         this.startRecoveryChecker()
       }
+      this._initialized = true
     } catch (error) {
       logger.error('智能限流服务初始化失败:', error)
     }

@@ -3,7 +3,6 @@ const { v4: uuidv4 } = require('uuid')
 const config = require('../../config/config')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
-const dynamicPolicyEngine = require('./dynamicPolicyEngine')
 
 class ApiKeyService {
   constructor() {
@@ -406,6 +405,7 @@ class ApiKeyService {
     apiKeyData = null // 新增参数：可选的API Key数据，避免重复查询
   ) {
     try {
+      const dynamicPolicyEngine = require('./dynamicPolicyEngine') // 在方法内部引入以避免循环依赖
       const totalTokens = inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
 
       // 计算费用

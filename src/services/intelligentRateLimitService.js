@@ -4,6 +4,7 @@ const config = require('../../config/config')
 const claudeAccountService = require('./claudeAccountService')
 const claudeConsoleAccountService = require('./claudeConsoleAccountService')
 const geminiAccountService = require('./geminiAccountService')
+const keyLogsService = require('./keyLogsService')
 
 class IntelligentRateLimitService {
   constructor() {
@@ -138,6 +139,20 @@ class IntelligentRateLimitService {
       // 记录故障日志
       await this._logFault(accountId, accountType, errorInfo)
 
+      // 记录到关键日志
+      await keyLogsService.logKeyEvent({
+        type: 'rate_limit',
+        level: 'warn',
+        title: '智能限流已触发',
+        message: `账户 ${accountId} (${accountType}) 因错误触发智能限流。`,
+        details: {
+          accountId,
+          accountType,
+          errorInfo,
+          matchedKeywords: categoryResult.matchedKeywords || []
+        }
+      })
+
       logger.warn(
         `[智能限流] 已对 ${accountType} 账户 ${accountId} 应用限流：${errorInfo.error || errorInfo.message}`
       )
@@ -166,6 +181,19 @@ class IntelligentRateLimitService {
 
         // 清理错误计数
         await this.clearErrorCounts(accountId, accountType)
+
+        // 记录到关键日志
+        await keyLogsService.logKeyEvent({
+          type: 'rate_limit',
+          level: 'info',
+          title: '智能限流已恢复',
+          message: `账户 ${accountId} (${accountType}) 已从智能限流中恢复。`,
+          details: {
+            accountId,
+            accountType,
+            reason
+          }
+        })
 
         logger.success(`[成功] 已移除 ${accountType} 账户 ${accountId} 的智能限流：${reason}`)
       }

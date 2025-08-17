@@ -33,9 +33,25 @@ class RedisClient {
   constructor() {
     this.client = null
     this.isConnected = false
+    this.isConnecting = false
+    this.connectionPromise = null
   }
 
   async connect() {
+    // 防止重复连接
+    if (this.isConnecting && this.connectionPromise) {
+      return this.connectionPromise
+    }
+    if (this.client && this.isConnected) {
+      return this.client
+    }
+
+    this.isConnecting = true
+    this.connectionPromise = this._internalConnect()
+    return this.connectionPromise
+  }
+
+  async _internalConnect() {
     try {
       // 开发模式：允许使用内存版 Redis 以便无外部依赖启动
       if (process.env.USE_REDIS_MOCK === '1') {
@@ -75,14 +91,21 @@ class RedisClient {
 
       this.client.on('close', () => {
         this.isConnected = false
-        logger.warn('⚠️  Redis connection closed')
+        this.isConnecting = false
+        this.connectionPromise = null
+        logger.warn('⚠️  Redis connection closed, will attempt to reconnect...')
+        // 自动重连
+        setTimeout(() => this.connect(), 5000)
       })
 
       if (typeof this.client.connect === 'function') {
         await this.client.connect()
       }
+      this.isConnecting = false
       return this.client
     } catch (error) {
+      this.isConnecting = false
+      this.connectionPromise = null
       logger.error('💥 Failed to connect to Redis:', error)
 
       // 连接失败时的回退逻辑（仅当显式允许）
@@ -120,6 +143,11 @@ class RedisClient {
   // 安全获取客户端（用于关键操作）
   getClientSafe() {
     if (!this.client || !this.isConnected) {
+      // 增加重试和等待连接的逻辑
+      if (!this.isConnecting) {
+        logger.warn('Redis client is not connected, attempting to reconnect...')
+        this.connect() // 触发重连
+      }
       throw new Error('Redis client is not connected')
     }
     return this.client

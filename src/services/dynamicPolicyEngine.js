@@ -128,28 +128,38 @@ class DynamicPolicyEngine {
    */
   async applyTemplateSwitch(apiKeyId, threshold, currentPercentage, policyBinding) {
     try {
-      const fromTemplate = policyBinding.currentTemplate
-      const toTemplate = threshold.templateId
+      const fromTemplateId = policyBinding.currentTemplate
+      const toTemplateId = threshold.templateId
 
-      if (fromTemplate === toTemplate) {
+      if (fromTemplateId === toTemplateId) {
         return // 模板相同，无需切换
       }
 
-      // 验证目标模板是否存在
-      const targetTemplate = await rateTemplateService.getTemplate(toTemplate)
-      if (!targetTemplate) {
-        logger.error(`[策略引擎] 目标模板 ${toTemplate} 不存在，跳过切换`)
+      // 获取源模板和目标模板的信息
+      const fromTemplate = await rateTemplateService.getTemplate(fromTemplateId)
+      const toTemplate = await rateTemplateService.getTemplate(toTemplateId)
+
+      if (!toTemplate) {
+        logger.error(`[策略引擎] 目标模板 ${toTemplateId} 不存在，跳过切换`)
         return
       }
 
+      // 获取模板名称用于日志
+      const fromTemplateName = fromTemplate ? fromTemplate.name : `未知模板(${fromTemplateId})`
+      const toTemplateName = toTemplate.name || `模板(${toTemplateId})`
+
       // 执行模板切换
-      await this.executeTemplateSwitch(apiKeyId, fromTemplate, toTemplate, {
+      await this.executeTemplateSwitch(apiKeyId, fromTemplateId, toTemplateId, {
         reason: `threshold_${threshold.percentage}_exceeded`,
         percentage: currentPercentage,
-        thresholdConfig: threshold
+        thresholdConfig: threshold,
+        fromTemplateName,
+        toTemplateName
       })
 
-      logger.info(`[策略引擎] API Key ${apiKeyId} 模板已从 ${fromTemplate} 切换到 ${toTemplate}`)
+      logger.info(
+        `[策略引擎] API Key ${apiKeyId} 模板已从 【${fromTemplateName}】 切换到 【${toTemplateName}】`
+      )
     } catch (error) {
       logger.error(`[策略引擎] 应用模板切换失败: ${error.message}`)
     }
@@ -163,7 +173,7 @@ class DynamicPolicyEngine {
       const timestamp = new Date().toISOString()
 
       // 更新API Key的模板绑定
-      await this.updateApiKeyTemplate(apiKeyId, toTemplate)
+      await this.updateApiKeyTemplate(apiKeyId, toTemplate, switchData.toTemplateName)
 
       // 更新策略绑定状态
       const policyBinding = await redemptionPolicyService.getApiKeyPolicy(apiKeyId)
@@ -172,6 +182,7 @@ class DynamicPolicyEngine {
         {
           percentage: switchData.thresholdConfig.percentage,
           templateId: toTemplate,
+          templateName: switchData.toTemplateName,
           triggeredAt: timestamp,
           usagePercentage: switchData.percentage
         }
@@ -183,10 +194,12 @@ class DynamicPolicyEngine {
         lastCheck: timestamp
       })
 
-      // 记录切换历史
+      // 记录切换历史（包含模板名称）
       await this.recordSwitchHistory(apiKeyId, {
         fromTemplate,
         toTemplate,
+        fromTemplateName: switchData.fromTemplateName,
+        toTemplateName: switchData.toTemplateName,
         reason: switchData.reason,
         triggeredAt: timestamp,
         usagePercentage: switchData.percentage,
@@ -201,7 +214,9 @@ class DynamicPolicyEngine {
         switchData.reason,
         {
           usagePercentage: switchData.percentage,
-          threshold: switchData.thresholdConfig.percentage
+          threshold: switchData.thresholdConfig.percentage,
+          fromTemplateName: switchData.fromTemplateName,
+          toTemplateName: switchData.toTemplateName
         }
       )
     } catch (error) {
@@ -213,7 +228,7 @@ class DynamicPolicyEngine {
   /**
    * 更新API Key的模板绑定（使用apiKeyService标准方法）
    */
-  async updateApiKeyTemplate(apiKeyId, templateId) {
+  async updateApiKeyTemplate(apiKeyId, templateId, templateName) {
     try {
       // 动态引入 apiKeyService 以避免循环依赖
       const apiKeyService = require('./apiKeyService')
@@ -222,7 +237,8 @@ class DynamicPolicyEngine {
         rateTemplateId: templateId
       })
 
-      logger.debug(`[策略引擎] 已更新 API Key ${apiKeyId} 的模板为 ${templateId}`)
+      const displayName = templateName || templateId
+      logger.debug(`[策略引擎] 已更新 API Key ${apiKeyId} 的模板为 【${displayName}】`)
     } catch (error) {
       logger.error(`[策略引擎] 更新API Key模板失败: ${error.message}`)
       throw error
@@ -333,10 +349,18 @@ class DynamicPolicyEngine {
 
       // 重置到初始模板
       if (policyBinding.currentTemplate !== initialTemplate) {
+        // 获取模板名称
+        const currentTemplate = await rateTemplateService.getTemplate(policyBinding.currentTemplate)
+        const initTemplate = await rateTemplateService.getTemplate(initialTemplate)
+
         await this.executeTemplateSwitch(apiKeyId, policyBinding.currentTemplate, initialTemplate, {
           reason: 'daily_reset',
           percentage: 0,
-          thresholdConfig: { description: '每日重置' }
+          thresholdConfig: { description: '每日重置' },
+          fromTemplateName: currentTemplate
+            ? currentTemplate.name
+            : `模板(${policyBinding.currentTemplate})`,
+          toTemplateName: initTemplate ? initTemplate.name : `模板(${initialTemplate})`
         })
       }
 

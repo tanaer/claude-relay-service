@@ -181,16 +181,15 @@ class ClaudeRelayService {
         // 检查是否启用智能限流
         if (config.intelligentRateLimit?.enabled) {
           // 智能限流逻辑：使用累积阈值检查是否应该触发限流
-          const shouldTriggerIntelligentRateLimit =
-            await intelligentRateLimitService.shouldApplyIntelligentRateLimit(
-              accountId,
-              accountType,
-              errorInfo
-            )
+          const rateLimitResult = await intelligentRateLimitService.shouldApplyIntelligentRateLimit(
+            accountId,
+            accountType,
+            errorInfo
+          )
 
-          if (shouldTriggerIntelligentRateLimit) {
+          if (rateLimitResult.shouldLimit) {
             logger.warn(
-              `[智能限流] 触发限流 - 账户 ${accountId}，状态: ${response.statusCode}，错误: ${errorInfo.error || errorInfo.message}`
+              `[智能限流] 触发限流 - 账户 ${accountId}，状态: ${response.statusCode}，类别: ${rateLimitResult.category}，关键字: ${rateLimitResult.matchedKeywords?.join(', ') || '无'}`
             )
             await intelligentRateLimitService.markAccountIntelligentRateLimit(
               accountId,
@@ -941,16 +940,16 @@ class ClaudeRelayService {
 
             // 应用智能限流或传统限流逻辑
             if (config.intelligentRateLimit?.enabled) {
-              const shouldTriggerIntelligentRateLimit =
+              const rateLimitResult =
                 await intelligentRateLimitService.shouldApplyIntelligentRateLimit(
                   accountId,
                   accountType,
                   errorInfo
                 )
 
-              if (shouldTriggerIntelligentRateLimit) {
+              if (rateLimitResult.shouldLimit) {
                 logger.warn(
-                  `[智能限流] 流式请求触发限流 - 账户 ${accountId}，状态: ${res.statusCode}`
+                  `[智能限流] 流式请求触发限流 - 账户 ${accountId}，状态: ${res.statusCode}，类别: ${rateLimitResult.category}，关键字: ${rateLimitResult.matchedKeywords?.join(', ') || '无'}`
                 )
                 await intelligentRateLimitService.markAccountIntelligentRateLimit(
                   accountId,

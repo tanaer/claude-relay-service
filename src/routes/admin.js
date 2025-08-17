@@ -5152,6 +5152,24 @@ router.get('/redemption-policies/application-stats', authenticateAdmin, async (r
   }
 })
 
+// 清理策略数据
+router.post('/redemption-policies/cleanup-data', authenticateAdmin, async (req, res) => {
+  try {
+    const PolicyDataCleanup = require('../../scripts/cleanup-policy-data')
+    const cleanup = new PolicyDataCleanup()
+    const stats = await cleanup.run()
+
+    return res.json({
+      success: true,
+      data: stats,
+      message: '策略数据清理完成'
+    })
+  } catch (error) {
+    logger.error('[错误] 清理策略数据失败：', error)
+    return res.status(500).json({ error: 'Failed to cleanup policy data', message: error.message })
+  }
+})
+
 // 获取策略调度服务状态
 router.get('/redemption-policies/scheduler-status', authenticateAdmin, async (req, res) => {
   try {

@@ -159,6 +159,15 @@
             <i :class="['fas fa-tags', { 'fa-spin': applyingPolicies }]"></i>
             批量应用策略
           </button>
+          <!-- 🎯 新增：数据清理按钮 -->
+          <button
+            class="btn btn-danger flex items-center gap-2"
+            :disabled="cleaningData"
+            @click="cleanupPolicyData"
+          >
+            <i :class="['fas fa-database', { 'fa-spin': cleaningData }]"></i>
+            清理策略数据
+          </button>
         </div>
       </div>
 
@@ -393,12 +402,7 @@
                 </div>
                 <div class="flex justify-between">
                   <span class="text-gray-500">待绑定数量：</span>
-                  <span class="text-orange-600">{{
-                    (applicationStats?.taggedApiKeys?.dailyCard || 0) +
-                    (applicationStats?.taggedApiKeys?.monthlyCard || 0) -
-                    ((applicationStats?.activePolicies?.daily || 0) +
-                      (applicationStats?.activePolicies?.monthly || 0))
-                  }}</span>
+                  <span class="text-orange-600">{{ applicationStats?.unbound?.total || 0 }}</span>
                 </div>
               </div>
             </div>
@@ -423,6 +427,10 @@
                       applicationStats.activePolicies?.daily || 0
                     }}</span>
                   </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-500">待绑定：</span>
+                    <span class="text-orange-600">{{ applicationStats.unbound?.daily || 0 }}</span>
+                  </div>
                 </div>
               </div>
               <div>
@@ -438,6 +446,12 @@
                     <span class="text-gray-500">已绑定策略：</span>
                     <span class="text-purple-600">{{
                       applicationStats.activePolicies?.monthly || 0
+                    }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-500">待绑定：</span>
+                    <span class="text-orange-600">{{
+                      applicationStats.unbound?.monthly || 0
                     }}</span>
                   </div>
                 </div>
@@ -489,6 +503,7 @@ export default {
     const toggleEngineLoading = ref(false)
     const toggleSchedulerLoading = ref(false)
     const applyingPolicies = ref(false) // 🎯 新增：批量应用策略状态
+    const cleaningData = ref(false) // 🎯 新增：数据清理状态
     const activeTab = ref('active')
     const searchQuery = ref('')
 
@@ -720,6 +735,34 @@ export default {
       }
     }
 
+    // 🎯 新增：清理策略数据
+    const cleanupPolicyData = async () => {
+      try {
+        // 确认对话框
+        if (
+          !confirm('确定要清理策略数据吗？这将清除无效的策略绑定和重建索引。建议在低峰时段执行。')
+        ) {
+          return
+        }
+
+        cleaningData.value = true
+        const result = await policyApi.cleanupPolicyData()
+
+        if (result.success) {
+          showToast(result.message || '策略数据清理成功', 'success')
+          // 刷新所有数据以显示最新状态
+          await refreshData()
+        } else {
+          showToast(result.error || '策略数据清理失败', 'error')
+        }
+      } catch (error) {
+        console.error('Failed to cleanup policy data:', error)
+        showToast('策略数据清理失败', 'error')
+      } finally {
+        cleaningData.value = false
+      }
+    }
+
     const viewPolicyDetails = (apiKeyId) => {
       detailModal.show = true
       detailModal.apiKeyId = apiKeyId
@@ -817,6 +860,7 @@ export default {
       toggleEngineLoading,
       toggleSchedulerLoading,
       applyingPolicies, // 🎯 新增
+      cleaningData, // 🎯 新增
       activeTab,
       searchQuery,
       engineStatus,
@@ -835,6 +879,7 @@ export default {
       togglePolicyEngine,
       toggleScheduler,
       applyPoliciesByTags, // 🎯 新增
+      cleanupPolicyData, // 🎯 新增
       viewPolicyDetails,
       closeDetailModal,
       configurePolicy,
@@ -868,6 +913,10 @@ export default {
 
 .btn-info {
   @apply bg-blue-500 text-white hover:bg-blue-600 focus:ring-blue-400;
+}
+
+.btn-danger {
+  @apply bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
 }
 
 .card {

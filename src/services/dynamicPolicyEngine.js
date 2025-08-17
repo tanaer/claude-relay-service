@@ -136,7 +136,7 @@ class DynamicPolicyEngine {
       }
 
       // 验证目标模板是否存在
-      const targetTemplate = await rateTemplateService.getRateTemplate(toTemplate)
+      const targetTemplate = await rateTemplateService.getTemplate(toTemplate)
       if (!targetTemplate) {
         logger.error(`[策略引擎] 目标模板 ${toTemplate} 不存在，跳过切换`)
         return

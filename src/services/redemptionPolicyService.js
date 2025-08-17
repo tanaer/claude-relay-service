@@ -506,26 +506,30 @@ class RedemptionPolicyService {
       // 2. 为每个API Key检查并应用策略
       for (const apiKeyData of apiKeysWithTag) {
         try {
+          // 使用实际的API Key（cr_格式），而不是UUID
+          const actualApiKey = apiKeyData.apiKey || apiKeyData.id
+
           // 检查是否已绑定策略
-          const existingBinding = await this.getApiKeyPolicy(apiKeyData.id)
+          const existingBinding = await this.getApiKeyPolicy(actualApiKey)
           if (existingBinding && existingBinding.isActive === 'true') {
             skippedCount++
-            logger.debug(`[策略服务] API Key ${apiKeyData.id} 已绑定策略，跳过`)
+            logger.debug(`[策略服务] API Key ${actualApiKey} 已绑定策略，跳过`)
             continue
           }
 
           // 应用策略
-          await this.bindApiKeyPolicy(apiKeyData.id, {
+          await this.bindApiKeyPolicy(actualApiKey, {
             codeId: `auto-${policyType}-${Date.now()}`,
             codeType: policyType,
-            templateId: null, // 使用策略配置中的初始模板
+            templateId: null, // 使用策略配置���的初始模板
             groupId: null
           })
 
           boundCount++
-          logger.info(`[策略服务] API Key ${apiKeyData.id} 策略绑定成功`)
+          logger.info(`[策略服务] API Key ${actualApiKey} 策略绑定成功`)
         } catch (bindError) {
-          logger.error(`[策略服务] API Key ${apiKeyData.id} 策略绑定失败: ${bindError.message}`)
+          const actualApiKey = apiKeyData.apiKey || apiKeyData.id
+          logger.error(`[策略服务] API Key ${actualApiKey} 策略绑定失败: ${bindError.message}`)
           skippedCount++
         }
       }
@@ -662,12 +666,22 @@ class RedemptionPolicyService {
         coverage: {
           daily:
             dailyCardApiKeys.length > 0
-              ? ((dailyPolicies.length / dailyCardApiKeys.length) * 100).toFixed(1)
+              ? Math.min(100, (dailyPolicies.length / dailyCardApiKeys.length) * 100).toFixed(1)
               : '0.0',
           monthly:
             monthlyCardApiKeys.length > 0
-              ? ((monthlyPolicies.length / monthlyCardApiKeys.length) * 100).toFixed(1)
+              ? Math.min(100, (monthlyPolicies.length / monthlyCardApiKeys.length) * 100).toFixed(1)
               : '0.0'
+        },
+        unbound: {
+          daily: Math.max(0, dailyCardApiKeys.length - dailyPolicies.length),
+          monthly: Math.max(0, monthlyCardApiKeys.length - monthlyPolicies.length),
+          total: Math.max(
+            0,
+            dailyCardApiKeys.length +
+              monthlyCardApiKeys.length -
+              (dailyPolicies.length + monthlyPolicies.length)
+          )
         }
       }
 

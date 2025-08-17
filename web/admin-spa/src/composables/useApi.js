@@ -148,6 +148,9 @@ export function useRedemptionPolicyApi() {
   // 获取策略应用统计信息
   const getApplicationStats = () => api.get('/admin/redemption-policies/application-stats')
 
+  // 清理策略数据
+  const cleanupPolicyData = () => api.post('/admin/redemption-policies/cleanup-data')
+
   return {
     getGlobalPolicy,
     setGlobalPolicy,
@@ -170,7 +173,8 @@ export function useRedemptionPolicyApi() {
     // 新增的方法
     applyPoliciesByTags,
     applyPolicyByTag,
-    getApplicationStats
+    getApplicationStats,
+    cleanupPolicyData
   }
 }
 

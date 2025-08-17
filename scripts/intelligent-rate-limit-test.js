@@ -177,7 +177,7 @@ function toArray(val) {
 }
 
 async function fetchConfig(base, token) {
-  const url = `${base}/admin/intelligent-rate-limit/config`
+  const url = `${base}/admin/smart-rate-limit/config`
   const resp = await axios.get(url, {
     headers: { Authorization: `Bearer ${token}` },
     timeout: 15000
@@ -215,7 +215,7 @@ function buildRecommendedTestConfig() {
 }
 
 async function updateConfig(base, token, configData) {
-  const url = `${base}/admin/intelligent-rate-limit/config`
+  const url = `${base}/admin/smart-rate-limit/config`
   const resp = await axios.post(
     url,
     { configData },

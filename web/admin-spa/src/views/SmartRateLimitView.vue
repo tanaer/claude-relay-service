@@ -579,7 +579,7 @@ function formatRemainingTime(expiresAt) {
 // API 方法
 async function loadConfig() {
   try {
-    const response = await api.get('/admin/intelligent-rate-limit/config')
+    const response = await api.get('/admin/smart-rate-limit/config')
     if (response.data) {
       config.value = response.data
     }
@@ -591,7 +591,7 @@ async function loadConfig() {
 
 async function loadStatistics() {
   try {
-    const response = await api.get('/admin/intelligent-rate-limit/statistics')
+    const response = await api.get('/admin/smart-rate-limit/statistics')
     statistics.value = response.data || {}
   } catch (error) {
     console.error('Failed to load statistics:', error)
@@ -600,7 +600,7 @@ async function loadStatistics() {
 
 async function loadLimitedAccounts() {
   try {
-    const response = await api.get('/admin/intelligent-rate-limit/limited-accounts')
+    const response = await api.get('/admin/smart-rate-limit/limited-accounts')
     limitedAccounts.value = response.data || []
   } catch (error) {
     console.error('Failed to load limited accounts:', error)
@@ -609,7 +609,7 @@ async function loadLimitedAccounts() {
 
 async function updateGlobalSettings() {
   try {
-    await api.put('/admin/intelligent-rate-limit/global-settings', config.value.globalSettings)
+    await api.put('/admin/smart-rate-limit/global-settings', config.value.globalSettings)
     ElMessage.success('全局设置已更新')
   } catch (error) {
     console.error('Failed to update global settings:', error)
@@ -619,7 +619,7 @@ async function updateGlobalSettings() {
 
 async function updateRule(type, rule) {
   try {
-    await api.put(`/admin/intelligent-rate-limit/rules/${type}/${rule.id}`, rule)
+    await api.put(`/admin/smart-rate-limit/rules/${type}/${rule.id}`, rule)
   } catch (error) {
     console.error('Failed to update rule:', error)
     ElMessage.error('更新规则失败')
@@ -629,7 +629,7 @@ async function updateRule(type, rule) {
 
 async function deleteRule(type, ruleId) {
   try {
-    await api.delete(`/admin/intelligent-rate-limit/rules/${type}/${ruleId}`)
+    await api.delete(`/admin/smart-rate-limit/rules/${type}/${ruleId}`)
     ElMessage.success('规则已删除')
     await loadConfig()
   } catch (error) {
@@ -640,7 +640,7 @@ async function deleteRule(type, ruleId) {
 
 async function removeRateLimit(accountId) {
   try {
-    await api.delete(`/admin/intelligent-rate-limit/limited-accounts/${accountId}`)
+    await api.delete(`/admin/smart-rate-limit/limited-accounts/${accountId}`)
     ElMessage.success('限流已解除')
     await loadLimitedAccounts()
   } catch (error) {
@@ -651,7 +651,7 @@ async function removeRateLimit(accountId) {
 
 async function clearAllRateLimits() {
   try {
-    await api.post('/admin/intelligent-rate-limit/clear-all')
+    await api.post('/admin/smart-rate-limit/clear-all')
     ElMessage.success('所有限流已解除')
     await loadLimitedAccounts()
   } catch (error) {
@@ -662,7 +662,7 @@ async function clearAllRateLimits() {
 
 async function exportConfig() {
   try {
-    const response = await api.get('/admin/intelligent-rate-limit/export')
+    const response = await api.get('/admin/smart-rate-limit/export')
     const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -680,7 +680,7 @@ async function exportConfig() {
 async function importConfig() {
   try {
     const configData = JSON.parse(importConfigText.value)
-    await api.post('/admin/intelligent-rate-limit/import', {
+    await api.post('/admin/smart-rate-limit/import', {
       config: configData,
       merge: mergeImport.value
     })
@@ -776,10 +776,10 @@ async function saveInstantRule() {
     }
 
     if (editingRule.value) {
-      await api.put(`/admin/intelligent-rate-limit/rules/instant/${editingRule.value.id}`, ruleData)
+      await api.put(`/admin/smart-rate-limit/rules/instant/${editingRule.value.id}`, ruleData)
       ElMessage.success('规则已更新')
     } else {
-      await api.post('/admin/intelligent-rate-limit/rules/instant', ruleData)
+      await api.post('/admin/smart-rate-limit/rules/instant', ruleData)
       ElMessage.success('规则已添加')
     }
 
@@ -816,13 +816,10 @@ async function saveCumulativeRule() {
     }
 
     if (editingRule.value) {
-      await api.put(
-        `/admin/intelligent-rate-limit/rules/cumulative/${editingRule.value.id}`,
-        ruleData
-      )
+      await api.put(`/admin/smart-rate-limit/rules/cumulative/${editingRule.value.id}`, ruleData)
       ElMessage.success('规则已更新')
     } else {
-      await api.post('/admin/intelligent-rate-limit/rules/cumulative', ruleData)
+      await api.post('/admin/smart-rate-limit/rules/cumulative', ruleData)
       ElMessage.success('规则已添加')
     }
 

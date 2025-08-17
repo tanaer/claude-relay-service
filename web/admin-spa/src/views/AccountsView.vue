@@ -1735,7 +1735,7 @@ const handleIntelligentRateLimitAction = async (action) => {
 // 显示智能限流统计
 const showIntelligentRateLimitStats = async () => {
   try {
-    const response = await apiClient.get('/admin/intelligent-rate-limit/stats')
+    const response = await apiClient.get('/admin/smart-rate-limit/stats')
     const stats = response.data
 
     let message = `📊 智能限流统计信息\n\n`
@@ -1787,7 +1787,7 @@ const showIntelligentRateLimitStats = async () => {
 // 显示故障日志
 const showFaultLogs = async () => {
   try {
-    const response = await apiClient.get('/admin/intelligent-rate-limit/fault-logs')
+    const response = await apiClient.get('/admin/smart-rate-limit/fault-logs')
     const logs = response.data
 
     if (!logs || logs.length === 0) {
@@ -1836,7 +1836,7 @@ const showFaultLogs = async () => {
 // 显示智能限流配置
 const showIntelligentRateLimitConfig = async () => {
   try {
-    const response = await apiClient.get('/admin/intelligent-rate-limit/config')
+    const response = await apiClient.get('/admin/smart-rate-limit/config')
     const config = response.data
 
     let message = `⚙️ 智能限流配置信息\n\n`
@@ -1885,7 +1885,7 @@ const showIntelligentRateLimitConfig = async () => {
 const showTestRecoveryDialog = async () => {
   try {
     // 获取当前受限的账户
-    const statsResponse = await apiClient.get('/admin/intelligent-rate-limit/stats')
+    const statsResponse = await apiClient.get('/admin/smart-rate-limit/stats')
     const stats = statsResponse.data
 
     if (stats.totalRateLimited === 0) {
@@ -1906,7 +1906,7 @@ const showTestRecoveryDialog = async () => {
         ElMessage.info('正在测试账户恢复，请稍候...')
 
         try {
-          await apiClient.post('/admin/intelligent-rate-limit/test-recovery')
+          await apiClient.post('/admin/smart-rate-limit/test-recovery')
           ElMessage.success('恢复测试已完成，请查看账户状态')
 
           // 刷新账户列表
@@ -1970,7 +1970,7 @@ const convertRateLimitConfigForSave = (displayConfig) => {
 // 打开智能限流配置编辑模态框
 const openRateLimitConfigModal = async () => {
   try {
-    const response = await apiClient.get('/admin/intelligent-rate-limit/config')
+    const response = await apiClient.get('/admin/smart-rate-limit/config')
     if (response.success) {
       // 转换服务器配置为显示格式
       rateLimitConfig.value = convertRateLimitConfigForDisplay(response.data)
@@ -1989,7 +1989,7 @@ const saveRateLimitConfig = async () => {
     // 转换显示配置为服务器格式
     const configForSave = convertRateLimitConfigForSave(rateLimitConfig.value)
 
-    const response = await apiClient.post('/admin/intelligent-rate-limit/config', {
+    const response = await apiClient.post('/admin/smart-rate-limit/config', {
       configData: configForSave
     })
     if (response.success) {

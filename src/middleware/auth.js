@@ -179,6 +179,21 @@ const authenticateApiKey = async (req, res, next) => {
       }
     }
 
+    // 在进入时间窗口限流前检查无时限余额
+    const lifetimeBalance = parseInt(validation.keyData.lifetimeTokenBalance)
+    const hasLifetimeBalance = !isNaN(lifetimeBalance)
+    if (hasLifetimeBalance && lifetimeBalance <= 0) {
+      logger.security(
+        `🚫 Lifetime balance exhausted for key: ${validation.keyData.id} (${validation.keyData.name})`
+      )
+      return res.status(402).json({
+        error: 'Insufficient lifetime balance',
+        message:
+          '无时限套餐的 Token 余额已用尽，请在统计查询页面使用兑换码为此 API Key 充值后再试',
+        lifetimeTokenBalance: 0
+      })
+    }
+
     // 检查时间窗口限流
     const rateLimitWindow = validation.keyData.rateLimitWindow || 0
     const rateLimitRequests = validation.keyData.rateLimitRequests || 0
@@ -236,24 +251,27 @@ const authenticateApiKey = async (req, res, next) => {
         })
       }
 
-      // 检查Token使用量限制
-      const tokenLimit = parseInt(validation.keyData.tokenLimit)
-      if (tokenLimit > 0 && currentTokens >= tokenLimit) {
-        const resetTime = new Date(windowStart + windowDuration)
-        const remainingMinutes = Math.ceil((resetTime - now) / 60000)
+      // 如果是无时限模式（存在一次性余额），跳过 token 窗口限制检查
+      if (!hasLifetimeBalance) {
+        // 检查Token使用量限制
+        const tokenLimit = parseInt(validation.keyData.tokenLimit)
+        if (tokenLimit > 0 && currentTokens >= tokenLimit) {
+          const resetTime = new Date(windowStart + windowDuration)
+          const remainingMinutes = Math.ceil((resetTime - now) / 60000)
 
-        logger.security(
-          `🚦 Rate limit exceeded (tokens) for key: ${validation.keyData.id} (${validation.keyData.name}), tokens: ${currentTokens}/${tokenLimit}`
-        )
+          logger.security(
+            `🚦 Rate limit exceeded (tokens) for key: ${validation.keyData.id} (${validation.keyData.name}), tokens: ${currentTokens}/${tokenLimit}`
+          )
 
-        return res.status(429).json({
-          error: 'Rate limit exceeded',
-          message: `已达到 Token 使用限制 (${tokenLimit} tokens)，将在 ${remainingMinutes} 分钟后重置`,
-          currentTokens,
-          tokenLimit,
-          resetAt: resetTime.toISOString(),
-          remainingMinutes
-        })
+          return res.status(429).json({
+            error: 'Rate limit exceeded',
+            message: `已达到 Token 使用限制 (${tokenLimit} tokens)，将在 ${remainingMinutes} 分钟后重置`,
+            currentTokens,
+            tokenLimit,
+            resetAt: resetTime.toISOString(),
+            remainingMinutes
+          })
+        }
       }
 
       // 增加请求计数
@@ -268,7 +286,7 @@ const authenticateApiKey = async (req, res, next) => {
         currentRequests: currentRequests + 1,
         currentTokens,
         rateLimitRequests,
-        tokenLimit
+        tokenLimit: hasLifetimeBalance ? 0 : parseInt(validation.keyData.tokenLimit)
       }
     }
 
@@ -314,7 +332,10 @@ const authenticateApiKey = async (req, res, next) => {
       allowedClients: validation.keyData.allowedClients,
       dailyCostLimit: validation.keyData.dailyCostLimit,
       dailyCost: validation.keyData.dailyCost,
-      usage: validation.keyData.usage
+      usage: validation.keyData.usage,
+      // 新增：无时限信息
+      planType: validation.keyData.planType,
+      lifetimeTokenBalance: validation.keyData.lifetimeTokenBalance
     }
     req.usage = validation.keyData.usage
 

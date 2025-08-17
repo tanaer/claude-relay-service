@@ -1701,6 +1701,18 @@ router.put(
 
 // ================ 上游错误聚合与自定义文案 ================
 
+// 获取所有有自定义错误信息的账户列表（用于复制功能选择源账户）
+// 注意：这个路由必须在参数化路由之前定义，否则会被错误匹配
+router.get('/upstream-errors/accounts-with-messages', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await upstreamErrorService.getAccountsWithCustomMessages()
+    return res.json(result)
+  } catch (error) {
+    logger.error('Failed to get accounts with custom messages:', error)
+    return res.status(500).json({ success: false, message: error.message })
+  }
+})
+
 // 获取某账户的上游错误聚合（每种仅返回1条示例）
 router.get('/upstream-errors/:accountId', authenticateAdmin, async (req, res) => {
   try {
@@ -1783,17 +1795,6 @@ router.post(
     }
   }
 )
-
-// 获取所有有自定义错误信息的账户列表（用于复制功能选择源账户）
-router.get('/upstream-errors/accounts-with-messages', authenticateAdmin, async (req, res) => {
-  try {
-    const result = await upstreamErrorService.getAccountsWithCustomMessages()
-    return res.json(result)
-  } catch (error) {
-    logger.error('Failed to get accounts with custom messages:', error)
-    return res.status(500).json({ success: false, message: error.message })
-  }
-})
 
 // 重建自定义错误信息账户索引（用于修复索引丢失问题）
 router.post('/upstream-errors/rebuild-messages-index', authenticateAdmin, async (req, res) => {
@@ -5470,20 +5471,32 @@ router.post('/intelligent-rate-limit/config', authenticateAdmin, async (req, res
       alerting
     } = configData
 
+    // 处理关键字数组：去除空白、转小写、去重
+    const processKeywords = (keywords) => {
+      if (!Array.isArray(keywords)) {
+        return []
+      }
+      return [
+        ...new Set(
+          keywords
+            .filter((k) => k && typeof k === 'string' && k.trim())
+            .map((k) => k.trim().toLowerCase())
+        )
+      ]
+    }
+
     // 构建新配置
     const newConfig = {
       enabled: Boolean(enabled),
       triggerOnAnyError: Boolean(triggerOnAnyError),
       recoveryTestInterval: (parseInt(recoveryTestInterval) || 5) * 60 * 1000, // 分钟转毫秒
       recoveryTestTimeout: (parseInt(recoveryTestTimeout) || 30) * 1000, // 秒转毫秒
-      maxFaultLogs: parseInt(maxFaultLogs) || 1000,
-      faultLogRetentionDays: parseInt(faultLogRetentionDays) || 7,
+      maxFaultLogs: Math.max(100, Math.min(10000, parseInt(maxFaultLogs) || 1000)), // 限制范围
+      faultLogRetentionDays: Math.max(1, Math.min(365, parseInt(faultLogRetentionDays) || 7)), // 限制范围
       errorCategories: {
-        immediate: Array.isArray(errorCategories?.immediate) ? errorCategories.immediate : [],
-        accumulative: Array.isArray(errorCategories?.accumulative)
-          ? errorCategories.accumulative
-          : [],
-        accumulativeThreshold: parseInt(errorCategories?.accumulativeThreshold) || 3
+        immediate: processKeywords(errorCategories?.immediate),
+        accumulative: processKeywords(errorCategories?.accumulative),
+        accumulativeThreshold: Math.max(1, parseInt(errorCategories?.accumulativeThreshold) || 3)
       },
       alerting: {
         enabled: Boolean(alerting?.enabled),
@@ -5508,8 +5521,13 @@ router.post('/intelligent-rate-limit/config', authenticateAdmin, async (req, res
     logger.info('[管理员] 智能限流配置已更新：', {
       enabled: newConfig.enabled,
       triggerOnAnyError: newConfig.triggerOnAnyError,
-      recoveryTestInterval: newConfig.recoveryTestInterval,
-      errorCategories: newConfig.errorCategories
+      recoveryTestIntervalMs: newConfig.recoveryTestInterval,
+      recoveryTestIntervalMin: newConfig.recoveryTestInterval / 60000,
+      recoveryTestTimeoutMs: newConfig.recoveryTestTimeout,
+      recoveryTestTimeoutSec: newConfig.recoveryTestTimeout / 1000,
+      immediateKeywords: newConfig.errorCategories.immediate,
+      accumulativeKeywords: newConfig.errorCategories.accumulative,
+      accumulativeThreshold: newConfig.errorCategories.accumulativeThreshold
     })
 
     res.json({

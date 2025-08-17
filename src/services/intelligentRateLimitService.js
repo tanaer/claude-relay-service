@@ -36,37 +36,44 @@ class IntelligentRateLimitService {
         accumulativeThreshold: 3
       }
 
-      const category = this._categorizeError(errorInfo)
+      const categoryResult = this._categorizeError(errorInfo)
+      const { type: category, matchedKeywords } = categoryResult
       const { accumulativeThreshold } = errorCategories
 
       // 立即触发类：立刻限流
       if (category === 'immediate') {
-        return true
+        logger.info(
+          `[智能限流] 立即触发限流 - 账户: ${accountId}, 匹配关键字: ${matchedKeywords.join(', ')}`
+        )
+        return { shouldLimit: true, category, matchedKeywords }
       }
 
       // 累积类：计数并判断是否达到阈值
       if (category === 'accumulative') {
         const errorCount = await this._incrementErrorCount(accountId, accountType, 'accumulative')
-        logger.debug(`[调试] 累积错误计数 ${accountType}:${accountId}:accumulative = ${errorCount}`)
+        logger.debug(
+          `[智能限流] 累积错误 - 账户: ${accountId}, 计数: ${errorCount}/${accumulativeThreshold}, 关键字: ${matchedKeywords.join(', ')}`
+        )
 
         if (errorCount >= accumulativeThreshold) {
           logger.warn(
-            `[警告] ${accountType} 账户 ${accountId} 达到累积阈值（${errorCount}/${accumulativeThreshold}）`
+            `[智能限流] 达到累积阈值 - 账户: ${accountId}, 次数: ${errorCount}/${accumulativeThreshold}, 关键字: ${matchedKeywords.join(', ')}`
           )
-          return true
+          return { shouldLimit: true, category, matchedKeywords }
         }
-        return false
+        return { shouldLimit: false, category, matchedKeywords }
       }
 
       // 关键字未命中：可选对任何错误限流
       if (rateLimitConfig.triggerOnAnyError) {
-        return true
+        logger.info(`[智能限流] 任意错误触发限流 - 账户: ${accountId}`)
+        return { shouldLimit: true, category: 'any_error', matchedKeywords: [] }
       }
 
-      return false
+      return { shouldLimit: false, category, matchedKeywords }
     } catch (error) {
       logger.error(`[错误] 检查智能限流条件出错：${error.message}`)
-      return false
+      return { shouldLimit: false, category: 'unknown', matchedKeywords: [] }
     }
   }
 
@@ -112,12 +119,15 @@ class IntelligentRateLimitService {
       const rateLimitKey = `${this.RATE_LIMIT_PREFIX}${accountType}:${accountId}`
 
       // 记录限流信息
+      const categoryResult = this._categorizeError(errorInfo)
       const rateLimitData = {
         accountId,
         accountType,
         rateLimitedAt: new Date().toISOString(),
         errorInfo: JSON.stringify(errorInfo),
-        errorType: this._categorizeError(errorInfo),
+        errorType: categoryResult.type || 'unknown',
+        errorCategory: categoryResult.type,
+        matchedKeywords: JSON.stringify(categoryResult.matchedKeywords || []),
         recoveryAttempts: 0,
         lastRecoveryTest: null,
         status: 'rate_limited'
@@ -361,53 +371,103 @@ class IntelligentRateLimitService {
     }
   }
 
-  // 错误分类 - 支持关键字匹配
+  // 错误分类 - 支持关键字匹配（增强版）
   _categorizeError(errorInfo) {
+    if (!errorInfo) {
+      return { type: 'unknown', matchedKeywords: [] }
+    }
+
     const rateLimitConfig = config.intelligentRateLimit || {}
     const errorCategories = rateLimitConfig.errorCategories || {
-      immediate: ['rate_limit', 'server_error'],
-      accumulative: ['authentication', 'network_error']
+      immediate: [],
+      accumulative: [],
+      accumulativeThreshold: 3
     }
 
-    const error = (errorInfo.error || errorInfo.message || '').toLowerCase()
-    const statusCode = errorInfo.statusCode || errorInfo.status
+    // 构建用于匹配的文本（合并所有错误信息）
+    const { status, statusCode, error, message, data } = errorInfo
+    const errorText = [
+      error?.toString() || '',
+      message || '',
+      typeof data === 'string' ? data : JSON.stringify(data || '')
+    ]
+      .join(' ')
+      .toLowerCase()
 
-    // 检查立即触发限流的关键字（优先级高）
-    if (Array.isArray(errorCategories.immediate)) {
+    const finalStatus = status || statusCode
+
+    // 优先检查关键字匹配
+    // 1. 检查立即触发关键字
+    if (errorCategories.immediate && errorCategories.immediate.length > 0) {
+      const matchedKeywords = []
       for (const keyword of errorCategories.immediate) {
-        if (error.includes(keyword.toLowerCase())) {
-          return 'immediate'
+        if (keyword && errorText.includes(keyword.toLowerCase())) {
+          matchedKeywords.push(keyword)
         }
+      }
+      if (matchedKeywords.length > 0) {
+        logger.debug(`[智能限流] 错误匹配到立即触发关键字: ${matchedKeywords.join(', ')}`)
+        return { type: 'immediate', matchedKeywords }
       }
     }
 
-    // 检查累积触发限流的关键字
-    if (Array.isArray(errorCategories.accumulative)) {
+    // 2. 检查累积触发关键字
+    if (errorCategories.accumulative && errorCategories.accumulative.length > 0) {
+      const matchedKeywords = []
       for (const keyword of errorCategories.accumulative) {
-        if (error.includes(keyword.toLowerCase())) {
-          return 'accumulative'
+        if (keyword && errorText.includes(keyword.toLowerCase())) {
+          matchedKeywords.push(keyword)
         }
+      }
+      if (matchedKeywords.length > 0) {
+        logger.debug(`[智能限流] 错误匹配到累积触发关键字: ${matchedKeywords.join(', ')}`)
+        return { type: 'accumulative', matchedKeywords }
       }
     }
 
-    // 如果没有匹配到关键字，则使用默认分类逻辑（保持兼容性）
-    if (statusCode === 429 || error.includes('rate limit')) {
-      return 'rate_limit'
-    } else if (statusCode === 401 || error.includes('unauthorized') || error.includes('token')) {
-      return 'authentication'
-    } else if (statusCode >= 500 || error.includes('server error') || error.includes('internal')) {
-      return 'server_error'
-    } else if (
-      error.includes('network') ||
-      error.includes('timeout') ||
-      error.includes('connection')
-    ) {
-      return 'network_error'
-    } else if (statusCode >= 400 && statusCode < 500) {
-      return 'client_error'
-    } else {
-      return 'unknown'
+    // 3. 回退到传统枚举分类
+    // 检查是否为限流错误
+    if (finalStatus === 429 || errorText.includes('rate limit')) {
+      return { type: 'immediate', matchedKeywords: ['429 rate limit'] }
     }
+
+    // 检查是否为认证错误
+    if (
+      finalStatus === 401 ||
+      errorText.includes('unauthorized') ||
+      errorText.includes('authentication')
+    ) {
+      return { type: 'accumulative', matchedKeywords: ['401 authentication'] }
+    }
+
+    // 检查是否为服务器错误
+    if (
+      finalStatus >= 500 ||
+      errorText.includes('server error') ||
+      errorText.includes('internal')
+    ) {
+      return { type: 'immediate', matchedKeywords: [`${finalStatus || '5xx'} server error`] }
+    }
+
+    // 检查是否为网络错误
+    if (
+      error === 'ECONNREFUSED' ||
+      error === 'ETIMEDOUT' ||
+      error === 'ENOTFOUND' ||
+      errorText.includes('network') ||
+      errorText.includes('timeout') ||
+      errorText.includes('connection')
+    ) {
+      return { type: 'accumulative', matchedKeywords: [error || 'network_error'] }
+    }
+
+    // 检查是否为客户端错误
+    if (finalStatus >= 400 && finalStatus < 500) {
+      return { type: 'client_error', matchedKeywords: [`${finalStatus} client error`] }
+    }
+
+    // 默认未知错误
+    return { type: 'unknown', matchedKeywords: [] }
   }
 
   // 记录故障日志
@@ -416,11 +476,13 @@ class IntelligentRateLimitService {
       const client = redis.getClientSafe()
       const faultLogKey = `${this.FAULT_LOG_PREFIX}${accountType}:${accountId}`
 
+      const categoryResult = this._categorizeError(errorInfo)
       const faultEntry = {
         timestamp: new Date().toISOString(),
         accountId,
         accountType,
-        errorType: this._categorizeError(errorInfo),
+        errorType: categoryResult.type || 'unknown',
+        matchedKeywords: categoryResult.matchedKeywords || [],
         errorInfo: JSON.stringify(errorInfo),
         severity: this._determineSeverity(errorInfo)
       }
@@ -479,16 +541,23 @@ class IntelligentRateLimitService {
 
   // 确定错误严重程度
   _determineSeverity(errorInfo) {
-    const errorType = this._categorizeError(errorInfo)
+    const categoryResult = this._categorizeError(errorInfo)
+    const errorType = categoryResult.type || categoryResult // 兼容旧格式
 
     switch (errorType) {
+      case 'immediate':
+        return 'high'
       case 'server_error':
         return 'high'
+      case 'accumulative':
+        return 'medium'
       case 'authentication':
         return 'medium'
       case 'rate_limit':
         return 'medium'
       case 'network_error':
+        return 'low'
+      case 'client_error':
         return 'low'
       default:
         return 'low'

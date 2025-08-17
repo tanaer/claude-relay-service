@@ -854,7 +854,7 @@
           </button>
         </div>
 
-        <div class="modal-body">
+        <div class="modal-body max-h-[60vh] overflow-y-auto">
           <div class="mb-4">
             <label class="mb-2 block text-sm font-medium text-gray-700">选择账户</label>
             <select

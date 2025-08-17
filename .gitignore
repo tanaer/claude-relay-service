@@ -239,3 +239,4 @@ web/apiStats/
 # Admin SPA build files
 web/admin-spa/dist/
 .bmad-core
+*.md

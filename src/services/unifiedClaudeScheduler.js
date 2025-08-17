@@ -5,7 +5,6 @@ const accountGroupService = require('./accountGroupService')
 const smartRateLimitService = require('./smartRateLimitService')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
-const config = require('../../config/config')
 
 class UnifiedClaudeScheduler {
   constructor() {
@@ -717,12 +716,10 @@ class UnifiedClaudeScheduler {
   // 检查账户是否处于任何类型的限流状态（智能限流或传统限流）
   async _isAccountRateLimitedAny(accountId, accountType) {
     try {
-      // 检查智能限流状态
-      if (config.smartRateLimit?.enabled) {
-        const isSmartRateLimited = await smartRateLimitService.isRateLimited(accountId)
-        if (isSmartRateLimited) {
-          return true
-        }
+      // 检查智能限流状态（由服务内部动态开关控制）
+      const isSmartRateLimited = await smartRateLimitService.isRateLimited(accountId)
+      if (isSmartRateLimited) {
+        return true
       }
 
       // 检查传统限流状态

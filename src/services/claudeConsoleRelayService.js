@@ -3,6 +3,7 @@ const claudeConsoleAccountService = require('./claudeConsoleAccountService')
 const logger = require('../utils/logger')
 const config = require('../../config/config')
 const upstreamErrorService = require('./upstreamErrorService')
+const smartRateLimitService = require('./smartRateLimitService')
 
 class ClaudeConsoleRelayService {
   constructor() {
@@ -255,6 +256,23 @@ class ClaudeConsoleRelayService {
 
       // 如果是非2xx，统一拦截改写为自定义文案（不透传上游详细）
       if (response.status < 200 || response.status >= 300) {
+        // 智能限流：根据上游错误应用规则（内部按动态配置判定是否启用）
+        try {
+          await smartRateLimitService.handleUpstreamError({
+            accountId,
+            accountName: account.name || accountId,
+            accountType: 'claude-console',
+            statusCode: response.status,
+            errorMessage:
+              typeof response.data === 'string' ? response.data : JSON.stringify(response.data),
+            errorBody: { headers: response.headers },
+            apiKeyId: apiKeyData.id || apiKeyData.keyId || 'unknown',
+            apiKeyName: apiKeyData.name || 'unknown'
+          })
+        } catch (e) {
+          logger.warn('⚠️ smartRateLimitService.handleUpstreamError failed (console):', e.message)
+        }
+
         const { errorType } = await upstreamErrorService.recordError({
           accountId,
           status: response.status,
@@ -466,6 +484,24 @@ class ClaudeConsoleRelayService {
             response.data.on('data', (chunk) => chunks.push(Buffer.from(chunk)))
             response.data.on('end', async () => {
               const raw = Buffer.concat(chunks).toString('utf8')
+              // 智能限流：根据上游错误应用规则（内部按动态配置判定是否启用）
+              try {
+                await smartRateLimitService.handleUpstreamError({
+                  accountId,
+                  accountName: account.name || accountId,
+                  accountType: 'claude-console',
+                  statusCode: response.status,
+                  errorMessage: raw,
+                  errorBody: { headers: response.headers },
+                  apiKeyId: 'unknown',
+                  apiKeyName: 'unknown'
+                })
+              } catch (e) {
+                logger.warn(
+                  '⚠️ smartRateLimitService.handleUpstreamError failed (console stream):',
+                  e.message
+                )
+              }
               await upstreamErrorService.recordError({
                 accountId,
                 status: response.status,

@@ -179,25 +179,23 @@ class ClaudeRelayService {
           timestamp: new Date().toISOString()
         }
 
-        // 使用新的智能限流系统
-        if (config.smartRateLimit?.enabled) {
-          const rateLimitResult = await smartRateLimitService.handleUpstreamError({
-            accountId,
-            accountName: accountId,
-            accountType: 'claude',
-            statusCode: response.statusCode,
-            errorMessage: response.body || '',
-            errorBody: errorInfo,
-            apiKeyId: apiKeyData.id,
-            apiKeyName: apiKeyData.name || 'unknown'
-          })
+        // 使用新的智能限流系统（服务内部根据动态配置决定是否启用）
+        const rateLimitResult = await smartRateLimitService.handleUpstreamError({
+          accountId,
+          accountName: accountId,
+          accountType: 'claude',
+          statusCode: response.statusCode,
+          errorMessage: response.body || '',
+          errorBody: errorInfo,
+          apiKeyId: apiKeyData.id,
+          apiKeyName: apiKeyData.name || 'unknown'
+        })
 
-          if (rateLimitResult.shouldLimit) {
-            logger.warn(`[智能限流] 触发限流 - 账户 ${accountId}，原因: ${rateLimitResult.reason}`)
-            // 删除会话映射
-            if (sessionHash) {
-              await unifiedClaudeScheduler._deleteSessionMapping(sessionHash)
-            }
+        if (rateLimitResult.shouldLimit) {
+          logger.warn(`[智能限流] 触发限流 - 账户 ${accountId}，原因: ${rateLimitResult.reason}`)
+          // 删除会话映射
+          if (sessionHash) {
+            await unifiedClaudeScheduler._deleteSessionMapping(sessionHash)
           }
         }
 
@@ -265,22 +263,10 @@ class ClaudeRelayService {
         // 请求成功，清除401错误计数
         await this.clearUnauthorizedErrors(accountId)
 
-        // 如果请求成功，检查并移除限流状态
-        if (config.smartRateLimit?.enabled) {
-          // 新的智能限流系统会自动处理恢复，这里只需要记录成功
-          const isRateLimited = await smartRateLimitService.isRateLimited(accountId)
-          if (isRateLimited) {
-            logger.info(`[智能限流] 账户 ${accountId} 请求成功，但仍在限流中`)
-          }
-        } else {
-          // 传统限流处理
-          const isRateLimited = await unifiedClaudeScheduler.isAccountRateLimited(
-            accountId,
-            accountType
-          )
-          if (isRateLimited) {
-            await unifiedClaudeScheduler.removeAccountRateLimit(accountId, accountType)
-          }
+        // 如果请求成功，检查并移除限流状态（智能限流由服务自动处理恢复）
+        const isRateLimited = await smartRateLimitService.isRateLimited(accountId)
+        if (isRateLimited) {
+          logger.info(`[智能限流] 账户 ${accountId} 请求成功，但仍在限流中`)
         }
 
         // 只有真实的 Claude Code 请求才更新 headers（原逻辑保留）
@@ -957,7 +943,7 @@ class ClaudeRelayService {
               timestamp: new Date().toISOString()
             }
 
-            // 应用智能限流
+            // 应用智能限流（服务内部根据动态配置决定是否启用）
             const rateLimitResult = await smartRateLimitService.handleUpstreamError({
               accountId,
               accountName: accountId, // 使用accountId作为名称
@@ -1143,45 +1129,23 @@ class ClaudeRelayService {
               )
             }
 
-            // 根据配置选择限流策略
-            if (config.smartRateLimit?.enabled) {
-              // 使用新的智能限流系统处理429错误
-              await smartRateLimitService.handleUpstreamError({
-                accountId,
-                accountName: accountId,
-                accountType: 'claude',
-                statusCode: 429,
-                errorMessage: 'Rate limit detected in stream',
-                errorBody: { headers: res.headers },
-                apiKeyId: apiKeyData.id || 'unknown',
-                apiKeyName: apiKeyData.name || 'unknown'
-              })
-            } else {
-              // 使用传统限流
-              await unifiedClaudeScheduler.markAccountRateLimited(
-                accountId,
-                accountType,
-                sessionHash,
-                rateLimitResetTimestamp
-              )
-            }
+            // 始终调用智能限流服务（内部根据动态配置决定是否启用）；
+            // 如需传统限流，可在服务内部扩展或在此处添加回退逻辑
+            await smartRateLimitService.handleUpstreamError({
+              accountId,
+              accountName: accountId,
+              accountType: 'claude',
+              statusCode: 429,
+              errorMessage: 'Rate limit detected in stream',
+              errorBody: { headers: res.headers },
+              apiKeyId: apiKeyData.id || 'unknown',
+              apiKeyName: apiKeyData.name || 'unknown'
+            })
           } else if (res.statusCode === 200) {
-            // 如果请求成功，检查限流状态
-            if (config.smartRateLimit?.enabled) {
-              // 新的智能限流系统会自动处理恢复
-              const isRateLimited = await smartRateLimitService.isRateLimited(accountId)
-              if (isRateLimited) {
-                logger.info(`[智能限流] 账户 ${accountId} 流式请求成功，但仍在限流中`)
-              }
-            } else {
-              // 传统限流处理
-              const isRateLimited = await unifiedClaudeScheduler.isAccountRateLimited(
-                accountId,
-                accountType
-              )
-              if (isRateLimited) {
-                await unifiedClaudeScheduler.removeAccountRateLimit(accountId, accountType)
-              }
+            // 如果请求成功，检查限流状态（智能限流由服务自动处理恢复）
+            const isRateLimited = await smartRateLimitService.isRateLimited(accountId)
+            if (isRateLimited) {
+              logger.info(`[智能限流] 账户 ${accountId} 流式请求成功，但仍在限流中`)
             }
 
             // 只有真实的 Claude Code 请求才更新 headers（流式请求）

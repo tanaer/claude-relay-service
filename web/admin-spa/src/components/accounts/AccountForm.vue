@@ -1395,7 +1395,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import { useAccountsStore } from '@/stores/accounts'
@@ -2342,7 +2342,9 @@ watch(
         region: newAccount.region || '',
         sessionToken: '', // 编辑模式不显示现有的会话令牌
         defaultModel: newAccount.defaultModel || '',
-        smallFastModel: newAccount.smallFastModel || ''
+        smallFastModel: newAccount.smallFastModel || '',
+        // 上游重置时间（智能限流功能）
+        upstreamResetTime: newAccount.upstreamResetTime || ''
       }
 
       // 如果是分组类型，加载分组ID
@@ -2366,6 +2368,14 @@ watch(
                 .catch(() => {})
             })
           }
+        })
+      }
+
+      // 初始化上游重置时间选择器
+      if (newAccount.upstreamResetTime) {
+        // 使用 nextTick 确保表单数据更新后再初始化时间选择器
+        nextTick(() => {
+          initUpstreamResetTime(newAccount.upstreamResetTime)
         })
       }
     }

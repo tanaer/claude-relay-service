@@ -43,7 +43,8 @@ class ClaudeAccountService {
       accountType = 'shared', // 'dedicated' or 'shared'
       priority = 50, // 调度优先级 (1-100，数字越小优先级越高)
       schedulable = true, // 是否可被调度
-      rateTemplateId = null // 倍率模板ID
+      rateTemplateId = null, // 倍率模板ID
+      upstreamResetTime = null // 上游重置时间（智能限流功能）
     } = options
 
     const accountId = uuidv4()
@@ -70,6 +71,7 @@ class ClaudeAccountService {
         accountType, // 账号类型：'dedicated' 或 'shared'
         priority: priority.toString(), // 调度优先级
         rateTemplateId: rateTemplateId || null, // 倍率模板ID
+        upstreamResetTime: upstreamResetTime || null, // 上游重置时间（智能限流功能）
         createdAt: new Date().toISOString(),
         lastUsedAt: '',
         lastRefreshAt: '',
@@ -95,6 +97,7 @@ class ClaudeAccountService {
         accountType, // 账号类型：'dedicated' 或 'shared'
         priority: priority.toString(), // 调度优先级
         rateTemplateId: rateTemplateId || null, // 倍率模板ID
+        upstreamResetTime: upstreamResetTime || null, // 上游重置时间（智能限流功能）
         createdAt: new Date().toISOString(),
         lastUsedAt: '',
         lastRefreshAt: '',
@@ -349,6 +352,7 @@ class ClaudeAccountService {
             accountType: account.accountType || 'shared', // 兼容旧数据，默认为共享
             priority: parseInt(account.priority) || 50, // 兼容旧数据，默认优先级50
             platform: 'claude-oauth', // 添加平台标识，用于前端区分
+            upstreamResetTime: account.upstreamResetTime || null, // 上游重置时间
             createdAt: account.createdAt,
             lastUsedAt: account.lastUsedAt,
             lastRefreshAt: account.lastRefreshAt,

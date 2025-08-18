@@ -552,16 +552,52 @@
               <label class="mb-3 block text-sm font-semibold text-gray-700">
                 上游重置时间 (可选)
               </label>
-              <input
-                v-model="form.upstreamResetTime"
-                class="form-input w-full"
-                placeholder="例如：14:30 或 2024-08-18 14:30:00"
-                type="text"
-              />
+              <div class="flex gap-2">
+                <!-- 时间类型选择 -->
+                <select
+                  v-model="upstreamResetTimeType"
+                  class="form-input w-32"
+                  @change="onResetTimeTypeChange"
+                >
+                  <option value="none">不设置</option>
+                  <option value="daily">每日重置</option>
+                  <option value="specific">特定时间</option>
+                  <option value="custom">自定义格式</option>
+                </select>
+
+                <!-- 每日重置时间选择器 -->
+                <input
+                  v-if="upstreamResetTimeType === 'daily'"
+                  v-model="dailyResetTime"
+                  class="form-input flex-1"
+                  placeholder="选择每日重置时间"
+                  type="time"
+                  @change="onDailyTimeChange"
+                />
+
+                <!-- 特定日期时间选择器 -->
+                <input
+                  v-if="upstreamResetTimeType === 'specific'"
+                  v-model="specificResetDateTime"
+                  class="form-input flex-1"
+                  placeholder="选择特定重置时间"
+                  type="datetime-local"
+                  @change="onSpecificTimeChange"
+                />
+
+                <!-- 自定义格式输入框 -->
+                <input
+                  v-if="upstreamResetTimeType === 'custom' || upstreamResetTimeType === 'none'"
+                  v-model="form.upstreamResetTime"
+                  class="form-input flex-1"
+                  placeholder="例如：14:30 或 2024-08-18 14:30:00"
+                  type="text"
+                />
+              </div>
               <p class="mt-1 text-xs text-gray-500">
                 设置上游限流重置的具体时间，到达此时间将自动解除智能限流。
                 <br />
-                格式支持：HH:MM (每日重置) 或 YYYY-MM-DD HH:MM:SS (特定时间)
+                每日重置：每天固定时间重置；特定时间：指定具体的日期和时间；自定义：手动输入格式
               </p>
             </div>
 
@@ -979,16 +1015,52 @@
             <label class="mb-3 block text-sm font-semibold text-gray-700">
               上游重置时间 (可选)
             </label>
-            <input
-              v-model="form.upstreamResetTime"
-              class="form-input w-full"
-              placeholder="例如：14:30 或 2024-08-18 14:30:00"
-              type="text"
-            />
+            <div class="flex gap-2">
+              <!-- 时间类型选择 -->
+              <select
+                v-model="upstreamResetTimeType"
+                class="form-input w-32"
+                @change="onResetTimeTypeChange"
+              >
+                <option value="none">不设置</option>
+                <option value="daily">每日重置</option>
+                <option value="specific">特定时间</option>
+                <option value="custom">自定义格式</option>
+              </select>
+
+              <!-- 每日重置时间选择器 -->
+              <input
+                v-if="upstreamResetTimeType === 'daily'"
+                v-model="dailyResetTime"
+                class="form-input flex-1"
+                placeholder="选择每日重置时间"
+                type="time"
+                @change="onDailyTimeChange"
+              />
+
+              <!-- 特定日期时间选择器 -->
+              <input
+                v-if="upstreamResetTimeType === 'specific'"
+                v-model="specificResetDateTime"
+                class="form-input flex-1"
+                placeholder="选择特定重置时间"
+                type="datetime-local"
+                @change="onSpecificTimeChange"
+              />
+
+              <!-- 自定义格式输入框 -->
+              <input
+                v-if="upstreamResetTimeType === 'custom' || upstreamResetTimeType === 'none'"
+                v-model="form.upstreamResetTime"
+                class="form-input flex-1"
+                placeholder="例如：14:30 或 2024-08-18 14:30:00"
+                type="text"
+              />
+            </div>
             <p class="mt-1 text-xs text-gray-500">
               设置上游限流重置的具体时间，到达此时间将自动解除智能限流。
               <br />
-              格式支持：HH:MM (每日重置) 或 YYYY-MM-DD HH:MM:SS (特定时间)
+              每日重置：每天固定时间重置；特定时间：指定具体的日期和时间；自定义：手动输入格式
             </p>
           </div>
 
@@ -1360,6 +1432,11 @@ const setupTokenAuthUrl = ref('')
 const setupTokenAuthCode = ref('')
 const setupTokenCopied = ref(false)
 const setupTokenSessionId = ref('')
+
+// 上游重置时间相关状态
+const upstreamResetTimeType = ref('none') // none, daily, specific, custom
+const dailyResetTime = ref('') // HH:MM 格式
+const specificResetDateTime = ref('') // datetime-local 格式
 
 // 初始化代理配置
 const initProxyConfig = () => {
@@ -2294,5 +2371,94 @@ watch(
     }
   },
   { immediate: true }
+)
+
+// 上游重置时间处理方法
+const initUpstreamResetTime = (resetTime) => {
+  if (!resetTime) {
+    upstreamResetTimeType.value = 'none'
+    dailyResetTime.value = ''
+    specificResetDateTime.value = ''
+    return
+  }
+
+  // 检查是否是 HH:MM 格式（每日重置）
+  if (/^\d{1,2}:\d{2}$/.test(resetTime)) {
+    upstreamResetTimeType.value = 'daily'
+    dailyResetTime.value = resetTime
+    specificResetDateTime.value = ''
+  }
+  // 检查是否是 YYYY-MM-DD HH:MM:SS 格式（特定时间）
+  else if (/^\d{4}-\d{2}-\d{2} \d{1,2}:\d{2}:\d{2}$/.test(resetTime)) {
+    upstreamResetTimeType.value = 'specific'
+    dailyResetTime.value = ''
+    // 转换为 datetime-local 格式
+    try {
+      const date = new Date(resetTime)
+      if (!isNaN(date.getTime())) {
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        const hours = String(date.getHours()).padStart(2, '0')
+        const minutes = String(date.getMinutes()).padStart(2, '0')
+        specificResetDateTime.value = `${year}-${month}-${day}T${hours}:${minutes}`
+      } else {
+        // 解析失败，使用自定义格式
+        upstreamResetTimeType.value = 'custom'
+      }
+    } catch (error) {
+      upstreamResetTimeType.value = 'custom'
+    }
+  }
+  // 其他格式使用自定义
+  else {
+    upstreamResetTimeType.value = 'custom'
+    dailyResetTime.value = ''
+    specificResetDateTime.value = ''
+  }
+}
+
+const onResetTimeTypeChange = () => {
+  if (upstreamResetTimeType.value === 'none') {
+    form.value.upstreamResetTime = ''
+    dailyResetTime.value = ''
+    specificResetDateTime.value = ''
+  }
+}
+
+const onDailyTimeChange = () => {
+  if (dailyResetTime.value) {
+    form.value.upstreamResetTime = dailyResetTime.value
+  }
+}
+
+const onSpecificTimeChange = () => {
+  if (specificResetDateTime.value) {
+    // 将 datetime-local 格式转换为 YYYY-MM-DD HH:MM:SS 格式
+    try {
+      const date = new Date(specificResetDateTime.value)
+      if (!isNaN(date.getTime())) {
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        const hours = String(date.getHours()).padStart(2, '0')
+        const minutes = String(date.getMinutes()).padStart(2, '0')
+        const seconds = String(date.getSeconds()).padStart(2, '0')
+        form.value.upstreamResetTime = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+      }
+    } catch (error) {
+      // 转换失败，保持原值
+    }
+  }
+}
+
+// 监听表单的 upstreamResetTime 变化，同步到相应的选择器
+watch(
+  () => form.value.upstreamResetTime,
+  (newValue) => {
+    if (newValue !== undefined) {
+      initUpstreamResetTime(newValue)
+    }
+  }
 )
 </script>

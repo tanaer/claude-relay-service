@@ -108,6 +108,7 @@ class SmartRateLimitService {
    * @param {Object} params.errorBody - 错误响应体
    * @param {string} params.apiKeyId - API Key ID
    * @param {string} params.apiKeyName - API Key名称
+   * @param {boolean} params.isFromUpstream - 是否来自上游API（true：上游API错误，false或undefined：本地中间件错误）
    * @returns {Promise<{shouldLimit: boolean, reason: string, ruleId?: string, ruleName?: string}>}
    */
   async handleUpstreamError({
@@ -118,10 +119,20 @@ class SmartRateLimitService {
     errorMessage = '',
     errorBody = {},
     apiKeyId,
-    apiKeyName = 'unknown'
+    apiKeyName = 'unknown',
+    isFromUpstream = true
   }) {
     if (!this.config || !this.config.enabled) {
       return { shouldLimit: false, reason: 'disabled' }
+    }
+
+    // 如果不是来自上游的错误，跳过智能限流处理
+    // 例如：API Key 费用限制、并发限制等本地限制产生的 429 错误
+    if (!isFromUpstream) {
+      logger.debug(
+        `[智能限流] 跳过本地中间件错误处理: ${statusCode} ${errorMessage} - API Key: ${apiKeyName}`
+      )
+      return { shouldLimit: false, reason: 'not_upstream_error' }
     }
 
     // 组合错误信息用于匹配

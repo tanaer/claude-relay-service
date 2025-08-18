@@ -267,7 +267,8 @@ class ClaudeConsoleRelayService {
               typeof response.data === 'string' ? response.data : JSON.stringify(response.data),
             errorBody: { headers: response.headers },
             apiKeyId: apiKeyData.id || apiKeyData.keyId || 'unknown',
-            apiKeyName: apiKeyData.name || 'unknown'
+            apiKeyName: apiKeyData.name || 'unknown',
+            isFromUpstream: true // 明确标识这是来自上游 API 的错误
           })
         } catch (e) {
           logger.warn('⚠️ smartRateLimitService.handleUpstreamError failed (console):', e.message)
@@ -494,7 +495,8 @@ class ClaudeConsoleRelayService {
                   errorMessage: raw,
                   errorBody: { headers: response.headers },
                   apiKeyId: 'unknown',
-                  apiKeyName: 'unknown'
+                  apiKeyName: 'unknown',
+                  isFromUpstream: true // 明确标识这是来自上游 API 的错误
                 })
               } catch (e) {
                 logger.warn(

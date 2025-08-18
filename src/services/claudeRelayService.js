@@ -188,7 +188,8 @@ class ClaudeRelayService {
           errorMessage: response.body || '',
           errorBody: errorInfo,
           apiKeyId: apiKeyData.id,
-          apiKeyName: apiKeyData.name || 'unknown'
+          apiKeyName: apiKeyData.name || 'unknown',
+          isFromUpstream: true // 明确标识这是来自上游 Claude API 的错误
         })
 
         if (rateLimitResult.shouldLimit) {
@@ -952,7 +953,8 @@ class ClaudeRelayService {
               errorMessage: errorData,
               errorBody: errorInfo,
               apiKeyId: apiKeyData.id || apiKeyData.keyId,
-              apiKeyName: apiKeyData.name || 'unknown'
+              apiKeyName: apiKeyData.name || 'unknown',
+              isFromUpstream: true // 明确标识这是来自上游 Claude API 的错误
             })
 
             if (rateLimitResult.shouldLimit) {
@@ -1139,7 +1141,8 @@ class ClaudeRelayService {
               errorMessage: 'Rate limit detected in stream',
               errorBody: { headers: res.headers },
               apiKeyId: apiKeyData.id || 'unknown',
-              apiKeyName: apiKeyData.name || 'unknown'
+              apiKeyName: apiKeyData.name || 'unknown',
+              isFromUpstream: true // 明确标识这是来自上游 Claude API 的错误
             })
           } else if (res.statusCode === 200) {
             // 如果请求成功，检查限流状态（智能限流由服务自动处理恢复）

@@ -1344,7 +1344,9 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       proxy,
       accountType,
       priority,
-      groupId
+      groupId,
+      // 上游重置时间（智能限流功能）
+      upstreamResetTime
     } = req.body
 
     if (!name) {
@@ -1381,7 +1383,8 @@ router.post('/claude-accounts', authenticateAdmin, async (req, res) => {
       officialApiUrl,
       proxy,
       accountType: accountType || 'shared', // 默认为共享类型
-      priority: priority || 50 // 默认优先级为50
+      priority: priority || 50, // 默认优先级为50
+      upstreamResetTime // 上游重置时间
     })
 
     // 如果是分组类型，将账户添加到分组

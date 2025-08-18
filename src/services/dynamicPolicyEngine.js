@@ -344,6 +344,32 @@ class DynamicPolicyEngine {
         return
       }
 
+      // 检查API Key是否为日卡类型，如果是则跳过重置
+      const apiKeyService = require('./apiKeyService')
+      const apiKeyData = await apiKeyService.getApiKeyById(apiKeyId)
+      if (apiKeyData && apiKeyData.tags) {
+        let tags = []
+        try {
+          if (typeof apiKeyData.tags === 'string') {
+            tags = JSON.parse(apiKeyData.tags)
+          } else if (Array.isArray(apiKeyData.tags)) {
+            tags = [...apiKeyData.tags]
+          }
+        } catch (error) {
+          // 如果解析失败，尝试按逗号分割
+          tags =
+            typeof apiKeyData.tags === 'string'
+              ? apiKeyData.tags.split(',').map((tag) => tag.trim())
+              : []
+        }
+
+        // 如果包含 daily-card 标签，跳过重置
+        if (tags.includes('daily-card')) {
+          logger.info(`[策略引擎] API Key ${apiKeyId} 为日卡类型，跳过每日重置`)
+          return
+        }
+      }
+
       const { metadata } = policyBinding
       const { initialTemplate } = policyBinding
 

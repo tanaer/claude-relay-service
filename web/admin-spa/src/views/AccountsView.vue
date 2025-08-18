@@ -581,6 +581,7 @@
                     <span class="ml-1">{{ account.schedulable ? '调度' : '停用' }}</span>
                   </button>
                   <button
+                    v-if="isTestSupported(account)"
                     :class="[
                       'rounded px-2.5 py-1 text-xs font-medium transition-colors',
                       account.isTesting
@@ -791,6 +792,7 @@
             </button>
 
             <button
+              v-if="isTestSupported(account)"
               class="flex flex-1 items-center justify-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors"
               :class="
                 account.isTesting
@@ -1667,8 +1669,14 @@ const testAccount = async (account) => {
       endpoint = `/admin/bedrock-accounts/${account.id}/test`
     } else if (account.platform === 'gemini') {
       endpoint = `/admin/gemini-accounts/${account.id}/test`
+    } else if (account.platform === 'claude-console') {
+      showToast('Claude Console 账户暂不支持测试功能', 'warning')
+      return
+    } else if (account.platform === 'openai') {
+      showToast('OpenAI 账户暂不支持测试功能', 'warning')
+      return
     } else {
-      showToast('不支持的账户类型', 'error')
+      showToast(`不支持的账户类型: ${account.platform}`, 'error')
       return
     }
 
@@ -1868,6 +1876,12 @@ const refreshAccountToken = async (account) => {
   } finally {
     refreshingTokens.value[account.id] = false
   }
+}
+
+// 检查账户平台是否支持测试功能
+const isTestSupported = (account) => {
+  const supportedPlatforms = ['claude', 'bedrock', 'gemini']
+  return supportedPlatforms.includes(account.platform)
 }
 
 // 获取账户的计费模板名称（根据优先级）

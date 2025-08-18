@@ -1177,6 +1177,151 @@ async function generateContentStream(
   return response.data // 返回流对象
 }
 
+// 🧪 测试Gemini账户连接和服务可用性
+async function testAccount(accountId) {
+  try {
+    const accountData = await getAccount(accountId)
+    if (!accountData || Object.keys(accountData).length === 0) {
+      return { success: false, error: 'Account not found' }
+    }
+
+    logger.info(`[信息] 测试Gemini账户服务可用性 - ID: ${accountId}, 名称: ${accountData.name}`)
+
+    // 解密OAuth数据
+    let oauthData
+    try {
+      oauthData = JSON.parse(decrypt(accountData.geminiOauth))
+    } catch (error) {
+      return { success: false, error: 'Failed to decrypt OAuth credentials' }
+    }
+
+    if (!oauthData.accessToken) {
+      return { success: false, error: 'No access token available' }
+    }
+
+    // 获取OAuth客户端
+    let client
+    try {
+      client = await getOauthClient(oauthData.accessToken, oauthData.refreshToken)
+    } catch (error) {
+      return { success: false, error: 'Failed to create OAuth client' }
+    }
+
+    // 构建测试请求 - 使用一个简单的消息测试Gemini API
+    const testRequest = {
+      model: 'gemini-1.5-flash-002', // 使用最便宜的模型进行测试
+      request: {
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: 'Hi' }]
+          }
+        ],
+        generation_config: {
+          max_output_tokens: 10
+        }
+      }
+    }
+
+    // 执行测试请求
+    let testResult
+    try {
+      // 模拟生成内容请求来测试连接
+      const response = await generateContent(
+        client,
+        testRequest,
+        `test-prompt-${Date.now()}`,
+        null, // projectId
+        null // sessionId
+      )
+
+      testResult = {
+        success: true,
+        statusCode: 200,
+        hasResponse: !!(response && response.candidates && response.candidates.length > 0),
+        model: testRequest.model,
+        usage: response.usage_metadata || null
+      }
+    } catch (error) {
+      // 处理不同类型的错误
+      if (error.response) {
+        const statusCode = error.response.status
+        if (statusCode === 429) {
+          testResult = {
+            success: false,
+            error: 'Rate limited (429)',
+            statusCode,
+            isRateLimit: true
+          }
+        } else if (statusCode === 401 || statusCode === 403) {
+          testResult = {
+            success: false,
+            error: `Unauthorized (${statusCode}) - Token may be invalid`,
+            statusCode,
+            isUnauthorized: true
+          }
+        } else {
+          const errorData = error.response.data || {}
+          testResult = {
+            success: false,
+            error: `HTTP ${statusCode}: ${errorData.message || 'Unknown error'}`,
+            statusCode
+          }
+        }
+      } else if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') {
+        testResult = {
+          success: false,
+          error: `Network error: ${error.message}`,
+          networkError: true,
+          timeout: error.code === 'ETIMEDOUT'
+        }
+      } else {
+        testResult = {
+          success: false,
+          error: error.message || 'Unknown error'
+        }
+      }
+    }
+
+    // 记录测试结果
+    if (testResult.success) {
+      logger.success(`✅ Gemini账户测试成功 - ID: ${accountId}`)
+    } else {
+      logger.error(`❌ Gemini账户测试失败 - ID: ${accountId}, 错误: ${testResult.error}`)
+    }
+
+    return {
+      success: testResult.success,
+      data: testResult.success
+        ? {
+            model: testResult.model,
+            status: 'active',
+            tokenValid: true,
+            hasResponse: testResult.hasResponse,
+            usage: testResult.usage
+          }
+        : null,
+      error: testResult.error,
+      details: {
+        statusCode: testResult.statusCode,
+        isRateLimit: testResult.isRateLimit || false,
+        isUnauthorized: testResult.isUnauthorized || false,
+        networkError: testResult.networkError || false,
+        timeout: testResult.timeout || false
+      }
+    }
+  } catch (error) {
+    logger.error(`❌ Gemini账户测试异常 - ID: ${accountId}`, error)
+    return {
+      success: false,
+      error: `Test failed: ${error.message}`,
+      details: {
+        networkError: true
+      }
+    }
+  }
+}
+
 module.exports = {
   generateAuthUrl,
   pollAuthorizationStatus,
@@ -1201,6 +1346,7 @@ module.exports = {
   countTokens,
   generateContent,
   generateContentStream,
+  testAccount,
   OAUTH_CLIENT_ID,
   OAUTH_SCOPES
 }

@@ -2142,6 +2142,36 @@ router.post('/claude-accounts/:accountId/test', authenticateAdmin, async (req, r
   }
 })
 
+// 测试Gemini账户连接和服务可用性
+router.post('/gemini-accounts/:accountId/test', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+
+    const result = await geminiAccountService.testAccount(accountId)
+
+    if (!result.success) {
+      return res.status(500).json({
+        error: 'Gemini account test failed',
+        message: result.error,
+        details: {
+          statusCode: result.details?.statusCode,
+          isRateLimit: result.details?.isRateLimit,
+          isUnauthorized: result.details?.isUnauthorized,
+          networkError: result.details?.networkError,
+          timeout: result.details?.timeout
+        }
+      })
+    }
+
+    logger.success(`🧪 Admin tested Gemini account: ${accountId} - ${result.data.status}`)
+
+    return res.json({ success: true, data: result.data })
+  } catch (error) {
+    logger.error('[错误] 测试 Gemini 账户失败：', error)
+    return res.status(500).json({ error: 'Failed to test Gemini account', message: error.message })
+  }
+})
+
 // 🤖 Gemini 账户管理
 
 // 生成 Gemini OAuth 授权 URL

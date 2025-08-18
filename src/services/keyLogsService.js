@@ -252,11 +252,14 @@ class KeyLogsService {
 
   // 便捷的日志记录方法
   async logRateLimit(accountId, accountType, action, details = {}) {
+    // 优先使用账户名称，如果没有则使用账户ID
+    const displayName = details.accountName || accountId
+
     await this.logKeyEvent({
       type: 'rate_limit',
       level: action === 'triggered' ? 'warn' : 'success',
       title: `智能限流${action === 'triggered' ? '触发' : '恢复'}`,
-      message: `账户 ${accountId} (${accountType}) ${action === 'triggered' ? '被智能限流' : '从限流中恢复'}`,
+      message: `账户 ${displayName} (${accountType}) ${action === 'triggered' ? '被智能限流' : '从限流中恢复'}`,
       details: { accountId, accountType, action, ...details }
     })
   }

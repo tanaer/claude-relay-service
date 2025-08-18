@@ -547,6 +547,24 @@
               <p class="mt-1 text-xs text-gray-500">数字越小优先级越高，建议范围：1-100</p>
             </div>
 
+            <!-- 上游重置时间设置 -->
+            <div>
+              <label class="mb-3 block text-sm font-semibold text-gray-700">
+                上游重置时间 (可选)
+              </label>
+              <input
+                v-model="form.upstreamResetTime"
+                class="form-input w-full"
+                placeholder="例如：14:30 或 2024-08-18 14:30:00"
+                type="text"
+              />
+              <p class="mt-1 text-xs text-gray-500">
+                设置上游限流重置的具体时间，到达此时间将自动解除智能限流。
+                <br />
+                格式支持：HH:MM (每日重置) 或 YYYY-MM-DD HH:MM:SS (特定时间)
+              </p>
+            </div>
+
             <!-- 手动输入 Token 字段 -->
             <div
               v-if="
@@ -948,6 +966,30 @@
               type="number"
             />
             <p class="mt-1 text-xs text-gray-500">数字越小优先级越高，建议范围：1-100</p>
+          </div>
+
+          <!-- 上游重置时间设置（编辑模式） -->
+          <div
+            v-if="
+              form.platform === 'claude' ||
+              form.platform === 'claude-console' ||
+              form.platform === 'bedrock'
+            "
+          >
+            <label class="mb-3 block text-sm font-semibold text-gray-700">
+              上游重置时间 (可选)
+            </label>
+            <input
+              v-model="form.upstreamResetTime"
+              class="form-input w-full"
+              placeholder="例如：14:30 或 2024-08-18 14:30:00"
+              type="text"
+            />
+            <p class="mt-1 text-xs text-gray-500">
+              设置上游限流重置的具体时间，到达此时间将自动解除智能限流。
+              <br />
+              格式支持：HH:MM (每日重置) 或 YYYY-MM-DD HH:MM:SS (特定时间)
+            </p>
           </div>
 
           <!-- Claude Console 特定字段（编辑模式）-->
@@ -1359,6 +1401,8 @@ const form = ref({
   apiUrl: props.account?.apiUrl || '',
   apiKey: props.account?.apiKey || '',
   priority: props.account?.priority || 50,
+  // 上游重置时间（智能限流功能）
+  upstreamResetTime: props.account?.upstreamResetTime || '',
   supportedModels: (() => {
     const models = props.account?.supportedModels
     if (!models) return ''
@@ -1606,6 +1650,9 @@ const handleOAuthSuccess = async (tokenInfo) => {
       // Claude使用claudeAiOauth字段
       data.claudeAiOauth = tokenInfo.claudeAiOauth || tokenInfo
       data.priority = form.value.priority || 50
+      if (form.value.upstreamResetTime && form.value.upstreamResetTime.trim()) {
+        data.upstreamResetTime = form.value.upstreamResetTime.trim()
+      }
     } else if (form.value.platform === 'gemini') {
       // Gemini使用geminiOauth字段
       data.geminiOauth = tokenInfo.tokens || tokenInfo
@@ -1729,6 +1776,9 @@ const createAccount = async () => {
         data.officialApiUrl = form.value.officialApiUrl.trim()
       }
       data.priority = form.value.priority || 50
+      if (form.value.upstreamResetTime && form.value.upstreamResetTime.trim()) {
+        data.upstreamResetTime = form.value.upstreamResetTime.trim()
+      }
     } else if (form.value.platform === 'gemini') {
       // Gemini手动模式需要构建geminiOauth对象
       const expiresInMs = form.value.refreshToken
@@ -1751,6 +1801,9 @@ const createAccount = async () => {
       data.apiUrl = form.value.apiUrl
       data.apiKey = form.value.apiKey
       data.priority = form.value.priority || 50
+      if (form.value.upstreamResetTime && form.value.upstreamResetTime.trim()) {
+        data.upstreamResetTime = form.value.upstreamResetTime.trim()
+      }
       data.supportedModels = convertMappingsToObject() || {}
       data.userAgent = form.value.userAgent || null
       data.rateLimitDuration = form.value.rateLimitDuration || 60
@@ -1765,6 +1818,9 @@ const createAccount = async () => {
       data.defaultModel = form.value.defaultModel || null
       data.smallFastModel = form.value.smallFastModel || null
       data.priority = form.value.priority || 50
+      if (form.value.upstreamResetTime && form.value.upstreamResetTime.trim()) {
+        data.upstreamResetTime = form.value.upstreamResetTime.trim()
+      }
       data.rateLimitDuration = form.value.rateLimitDuration || 60
     }
 
@@ -1880,6 +1936,9 @@ const updateAccount = async () => {
     // Claude 官方账号优先级更新
     if (props.account.platform === 'claude') {
       data.priority = form.value.priority || 50
+      if (form.value.upstreamResetTime !== undefined) {
+        data.upstreamResetTime = form.value.upstreamResetTime.trim() || null
+      }
     }
 
     // Claude Console 特定更新
@@ -1889,6 +1948,9 @@ const updateAccount = async () => {
         data.apiKey = form.value.apiKey
       }
       data.priority = form.value.priority || 50
+      if (form.value.upstreamResetTime !== undefined) {
+        data.upstreamResetTime = form.value.upstreamResetTime.trim() || null
+      }
       data.supportedModels = convertMappingsToObject() || {}
       data.userAgent = form.value.userAgent || null
       data.rateLimitDuration = form.value.rateLimitDuration || 60
@@ -1916,6 +1978,9 @@ const updateAccount = async () => {
       data.defaultModel = form.value.defaultModel || null
       data.smallFastModel = form.value.smallFastModel || null
       data.priority = form.value.priority || 50
+      if (form.value.upstreamResetTime !== undefined) {
+        data.upstreamResetTime = form.value.upstreamResetTime.trim() || null
+      }
       data.rateLimitDuration = form.value.rateLimitDuration || 60
     }
 

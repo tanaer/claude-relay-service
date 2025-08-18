@@ -242,6 +242,9 @@ class ClaudeConsoleAccountService {
       if (updates.schedulable !== undefined) {
         updatedData.schedulable = updates.schedulable.toString()
       }
+      if (updates.upstreamResetTime !== undefined) {
+        updatedData.upstreamResetTime = updates.upstreamResetTime || ''
+      }
 
       // 处理账户类型变更
       if (updates.accountType && updates.accountType !== existingAccount.accountType) {
@@ -581,6 +584,40 @@ class ClaudeConsoleAccountService {
         return { success: false, error: 'API URL or API Key is missing' }
       }
 
+      // 验证 API URL 格式
+      let parsedUrl
+      try {
+        parsedUrl = new URL(accountData.apiUrl)
+
+        // 检查是否为有效的 HTTPS URL
+        if (parsedUrl.protocol !== 'https:') {
+          return { success: false, error: 'API URL must use HTTPS protocol' }
+        }
+
+        // 检查是否有有效的主机名
+        if (!parsedUrl.hostname) {
+          return { success: false, error: 'API URL must have a valid hostname' }
+        }
+
+        // Claude Console 通常使用 /v1/messages 端点
+        // 如果 URL 不包含完整路径，我们需要确保使用正确的端点
+        if (
+          !parsedUrl.pathname.endsWith('/messages') &&
+          !parsedUrl.pathname.endsWith('/messages/')
+        ) {
+          if (parsedUrl.pathname.endsWith('/') || parsedUrl.pathname === '/') {
+            // 如果只是根路径或以 / 结尾，添加 v1/messages
+            parsedUrl.pathname = `${parsedUrl.pathname.replace(/\/$/, '')}/v1/messages`
+          } else if (!parsedUrl.pathname.includes('/v1/')) {
+            // 如果没有 v1 路径，添加它
+            parsedUrl.pathname = `${parsedUrl.pathname}/v1/messages`
+          }
+          logger.info(`🔧 Adjusted API URL path to: ${parsedUrl.pathname}`)
+        }
+      } catch (urlError) {
+        return { success: false, error: `Invalid API URL format: ${urlError.message}` }
+      }
+
       // 构建测试请求 - 使用一个简单的消息测试Claude Console API
       const testMessage = {
         model: 'claude-3-5-haiku-20241022', // 使用最便宜的模型进行测试
@@ -608,7 +645,7 @@ class ClaudeConsoleAccountService {
         timeout: 10000 // 10秒超时
       }
 
-      const parsedUrl = new URL(accountData.apiUrl)
+      // parsedUrl 已在上面定义和验证
 
       // 处理代理配置
       if (accountData.proxy) {
@@ -647,11 +684,48 @@ class ClaudeConsoleAccountService {
         testResult = await new Promise((resolve, reject) => {
           const req = https.request(requestOptions, (res) => {
             let data = ''
+
+            // 添加响应头调试信息
+            logger.debug(`📡 Response headers from ${parsedUrl.hostname}:`, {
+              statusCode: res.statusCode,
+              contentType: res.headers['content-type'],
+              contentLength: res.headers['content-length'],
+              server: res.headers['server']
+            })
+
             res.on('data', (chunk) => (data += chunk))
             res.on('end', () => {
               try {
+                // 添加响应内容调试信息
+                logger.debug(`📄 Response data from ${parsedUrl.hostname}:`, {
+                  statusCode: res.statusCode,
+                  dataLength: data.length,
+                  dataPreview: data.substring(0, 200) + (data.length > 200 ? '...' : '')
+                })
+
+                // 检查响应是否为空
+                if (!data || data.trim() === '') {
+                  resolve({
+                    success: false,
+                    error: `Empty response from server (HTTP ${res.statusCode})`,
+                    statusCode: res.statusCode
+                  })
+                  return
+                }
+
                 if (res.statusCode === 200) {
-                  const response = JSON.parse(data)
+                  let response
+                  try {
+                    response = JSON.parse(data)
+                  } catch (parseError) {
+                    resolve({
+                      success: false,
+                      error: `Invalid JSON response: ${parseError.message}. Response: ${data.substring(0, 200)}...`,
+                      statusCode: res.statusCode
+                    })
+                    return
+                  }
+
                   resolve({
                     success: true,
                     statusCode: res.statusCode,
@@ -674,18 +748,33 @@ class ClaudeConsoleAccountService {
                     isUnauthorized: true
                   })
                 } else {
-                  const errorData = data ? JSON.parse(data) : {}
+                  // 对于非 200 状态码，尝试解析错误信息
+                  let errorData = {}
+                  if (data && data.trim() !== '') {
+                    try {
+                      errorData = JSON.parse(data)
+                    } catch (parseError) {
+                      // 如果不能解析为 JSON，直接返回原始响应
+                      resolve({
+                        success: false,
+                        error: `HTTP ${res.statusCode}: ${data.substring(0, 200)}`,
+                        statusCode: res.statusCode
+                      })
+                      return
+                    }
+                  }
+
                   resolve({
                     success: false,
-                    error: `HTTP ${res.statusCode}: ${errorData.error?.message || 'Unknown error'}`,
+                    error: `HTTP ${res.statusCode}: ${errorData.error?.message || errorData.message || 'Unknown error'}`,
                     statusCode: res.statusCode
                   })
                 }
               } catch (error) {
                 resolve({
                   success: false,
-                  error: `Response parse error: ${error.message}`,
-                  statusCode: res.statusCode
+                  error: `Response processing error: ${error.message}`,
+                  statusCode: res.statusCode || 0
                 })
               }
             })
@@ -700,8 +789,20 @@ class ClaudeConsoleAccountService {
             reject(new Error('Request timeout (10s)'))
           })
 
-          req.write(JSON.stringify(testMessage))
-          req.end()
+          // 添加调试信息
+          logger.debug(`🔍 Testing Claude Console account ${accountId}:`, {
+            url: `${requestOptions.hostname}:${requestOptions.port}${requestOptions.path}`,
+            method: requestOptions.method,
+            hasProxy: !!requestOptions.agent,
+            userAgent: requestOptions.headers['User-Agent']
+          })
+
+          try {
+            req.write(JSON.stringify(testMessage))
+            req.end()
+          } catch (writeError) {
+            reject(new Error(`Request write error: ${writeError.message}`))
+          }
         })
       } catch (error) {
         // 处理网络错误和超时错误

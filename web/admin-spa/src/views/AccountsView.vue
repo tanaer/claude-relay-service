@@ -369,6 +369,7 @@
                   <span
                     v-if="account.smartRateLimit?.isRateLimited"
                     class="inline-flex items-center rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-800"
+                    :title="getSmartRateLimitTooltip(account)"
                   >
                     <i class="fas fa-brain mr-1" />
                     智能限流
@@ -377,6 +378,11 @@
                         Math.ceil(account.smartRateLimit.info.remainingSeconds / 60)
                       }}分钟)</span
                     >
+                    <i
+                      v-if="account.upstreamResetTime"
+                      class="fas fa-clock ml-1 text-yellow-600"
+                      :title="`上游重置时间: ${account.upstreamResetTime}`"
+                    />
                   </span>
                   <span
                     v-else-if="
@@ -1827,6 +1833,30 @@ const getAccountStatusText = (account) => {
   if (account.schedulable === false) return '已暂停'
   // 否则正常
   return '正常'
+}
+
+// 获取智能限流提示信息
+const getSmartRateLimitTooltip = (account) => {
+  if (!account.smartRateLimit?.isRateLimited) {
+    return ''
+  }
+
+  let tooltip = `智能限流激活`
+
+  if (account.smartRateLimit.info?.reason) {
+    tooltip += `\n原因: ${account.smartRateLimit.info.reason}`
+  }
+
+  if (account.upstreamResetTime) {
+    tooltip += `\n上游重置时间: ${account.upstreamResetTime}`
+  }
+
+  if (account.smartRateLimit.info?.remainingSeconds > 0) {
+    const minutes = Math.ceil(account.smartRateLimit.info.remainingSeconds / 60)
+    tooltip += `\n剩余时间: ${minutes}分钟`
+  }
+
+  return tooltip
 }
 
 // 获取账户状态样式类

@@ -119,7 +119,9 @@ class UnifiedClaudeScheduler {
       if (availableAccounts.length === 0) {
         // 提供更详细的错误信息
         if (requestedModel) {
-          throw new Error(`没有可用的 Claude 账户支持请求的模型：${requestedModel}`)
+          throw new Error(
+            `Claude账户池高负载时期，技术团队正在补号，请您稍后重试，模型：${requestedModel}`
+          )
         } else {
           throw new Error('没有可用的 Claude 账户（官方或 Console）')
         }

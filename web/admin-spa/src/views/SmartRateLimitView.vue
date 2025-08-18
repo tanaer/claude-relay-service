@@ -222,6 +222,15 @@
                 {{ formatDate(row.limitedAt) }}
               </template>
             </el-table-column>
+            <el-table-column align="center" label="重置时间" width="140">
+              <template #default="{ row }">
+                <span v-if="getUpstreamResetTime(row)" class="text-xs text-blue-600">
+                  <i class="fas fa-clock mr-1"></i>
+                  {{ getUpstreamResetTime(row) }}
+                </span>
+                <span v-else class="text-xs text-gray-400">-</span>
+              </template>
+            </el-table-column>
             <el-table-column align="center" label="剩余时间" width="120">
               <template #default="{ row }">
                 <el-tag size="small" type="warning">
@@ -307,7 +316,7 @@
                 </el-select>
               </el-form-item>
             </el-col>
-            <el-col :span="8">
+            <el-col :span="12">
               <el-form-item label="限流时长（秒）">
                 <el-input-number
                   v-model="instantRuleForm.duration"
@@ -317,7 +326,7 @@
                 />
               </el-form-item>
             </el-col>
-            <el-col :span="8">
+            <el-col :span="12">
               <el-form-item label="优先级">
                 <el-input-number
                   v-model="instantRuleForm.priority"
@@ -390,7 +399,7 @@
                 />
               </el-form-item>
             </el-col>
-            <el-col :span="6">
+            <el-col :span="8">
               <el-form-item label="限流时长（秒）">
                 <el-input-number
                   v-model="cumulativeRuleForm.duration"
@@ -592,6 +601,34 @@ function formatRemainingTime(expiresAt) {
   } else {
     return `${seconds}秒`
   }
+}
+
+function getUpstreamResetTime(account) {
+  if (!account.upstreamResetTime) {
+    return null
+  }
+
+  // 如果是 HH:MM 格式，显示为每日重置
+  if (/^\d{1,2}:\d{2}$/.test(account.upstreamResetTime)) {
+    return `每日 ${account.upstreamResetTime}`
+  }
+
+  // 如果是完整时间格式，格式化显示
+  try {
+    const resetTime = new Date(account.upstreamResetTime)
+    if (!isNaN(resetTime.getTime())) {
+      return resetTime.toLocaleString('zh-CN', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    }
+  } catch (error) {
+    // 解析失败，返回原字符串
+  }
+
+  return account.upstreamResetTime
 }
 
 // API 方法

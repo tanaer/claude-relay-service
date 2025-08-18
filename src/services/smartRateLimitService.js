@@ -352,7 +352,9 @@ class SmartRateLimitService {
     reason,
     duration,
     apiKeyId,
-    apiKeyName
+    apiKeyName,
+    ruleId,
+    ruleName
   }) {
     const limitKey = `smart_rate_limit:limited:${accountId}`
     const limitInfo = {
@@ -363,7 +365,9 @@ class SmartRateLimitService {
       startTime: new Date().toISOString(),
       duration,
       apiKeyId,
-      apiKeyName
+      apiKeyName,
+      ruleId: ruleId || 'manual',
+      ruleName: ruleName || '手动'
     }
 
     try {
@@ -552,7 +556,25 @@ class SmartRateLimitService {
       for (const accountId of accountIds) {
         const info = await this.getRateLimitInfo(accountId)
         if (info) {
-          accounts.push(info)
+          // 转换为前端期望的数据结构
+          const account = {
+            accountId: info.accountId,
+            accountName: info.accountName,
+            accountType: info.accountType,
+            reason: info.reason,
+            startTime: info.startTime,
+            duration: parseInt(info.duration) || 0,
+            remainingSeconds: info.remainingSeconds,
+            apiKeyId: info.apiKeyId,
+            apiKeyName: info.apiKeyName,
+            ruleId: info.ruleId,
+            ruleName: info.ruleName,
+            // 前端期望的字段
+            limitedAt: info.startTime, // 限流开始时间
+            expiresAt: this.calculateExpiresAt(info.startTime, info.duration), // 计算过期时间
+            triggeredRule: info.ruleName || this.extractRuleFromReason(info.reason) // 优先使用存储的规则名
+          }
+          accounts.push(account)
         }
       }
 
@@ -564,19 +586,118 @@ class SmartRateLimitService {
   }
 
   /**
+   * 计算过期时间
+   */
+  calculateExpiresAt(startTime, duration) {
+    if (!startTime || !duration) {
+      return null
+    }
+    try {
+      const start = new Date(startTime)
+      const expires = new Date(start.getTime() + duration * 1000)
+      return expires.toISOString()
+    } catch (error) {
+      return null
+    }
+  }
+
+  /**
+   * 从限流原因中提取规则名称
+   */
+  extractRuleFromReason(reason) {
+    if (!reason) {
+      return '未知'
+    }
+
+    // 如果原因包含规则名称（格式：规则名: 详细原因）
+    if (reason.includes(':')) {
+      const parts = reason.split(':')
+      if (parts.length > 1) {
+        return parts[0].trim()
+      }
+    }
+
+    // 检查是否是手动操作
+    if (reason.includes('手动') || reason.includes('manually')) {
+      return '手动'
+    }
+
+    // 检查是否是自动过期
+    if (reason.includes('auto_expired') || reason.includes('过期')) {
+      return '自动过期'
+    }
+
+    // 检查是否是提前恢复
+    if (reason.includes('early_recovery') || reason.includes('提前恢复')) {
+      return '提前恢复'
+    }
+
+    return '智能限流'
+  }
+
+  /**
    * 获取限流统计信息
    */
   async getStatistics() {
     try {
       const limitedAccounts = await redisClient.smembers('smart_rate_limit:limited_accounts')
+
+      // 获取今日统计数据
+      const today = new Date().toISOString().split('T')[0]
+      const todayStatsKey = `smart_rate_limit:stats:${today}`
+      const todayStats = await redisClient.hgetall(todayStatsKey)
+
+      // 获取过去7天的统计数据
+      const last7DaysStats = await this.getLast7DaysStats()
+
+      // 分析规则触发统计
+      const ruleStats = {}
+      const totalTriggers = parseInt(todayStats.total) || 0
+      let instantTriggers = 0
+      let cumulativeTriggers = 0
+
+      // 统计各规则的触发次数
+      for (const [key, value] of Object.entries(todayStats)) {
+        if (key.startsWith('rule:')) {
+          const ruleId = key.substring(5) // 移除 'rule:' 前缀
+          const triggerCount = parseInt(value) || 0
+          ruleStats[ruleId] = triggerCount
+
+          // 根据规则类型分类统计
+          const rule = this.findRuleById(ruleId)
+          if (rule) {
+            if (rule.type === 'instant') {
+              instantTriggers += triggerCount
+            } else if (rule.type === 'cumulative') {
+              cumulativeTriggers += triggerCount
+            }
+          }
+        }
+      }
+
       const stats = {
         enabled: this.config.enabled,
         limitedAccountsCount: limitedAccounts.length,
+
+        // 今日统计
+        totalTriggers,
+        instantTriggers,
+        cumulativeTriggers,
+
+        // 规则统计
+        ruleStats,
+
+        // 过去7天统计
+        last7DaysStats,
+
+        // 配置信息
         config: {
           instantRules: this.config.instantRules.length,
           cumulativeRules: this.config.cumulativeRules.length,
           globalSettings: this.config.globalSettings
         },
+
+        // 被限流账户
         limitedAccounts: await this.getAllRateLimitedAccounts()
       }
 
@@ -585,6 +706,62 @@ class SmartRateLimitService {
       logger.error('❌ Error getting statistics:', error)
       return null
     }
+  }
+
+  /**
+   * 获取过去7天的统计数据
+   */
+  async getLast7DaysStats() {
+    try {
+      const stats = []
+      const now = new Date()
+
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date(now)
+        date.setDate(date.getDate() - i)
+        const dateStr = date.toISOString().split('T')[0]
+        const statsKey = `smart_rate_limit:stats:${dateStr}`
+
+        const dayStats = await redisClient.hgetall(statsKey)
+        const total = parseInt(dayStats.total) || 0
+
+        stats.push({
+          date: dateStr,
+          total,
+          dayName: date.toLocaleDateString('zh-CN', { weekday: 'short' })
+        })
+      }
+
+      return stats
+    } catch (error) {
+      logger.error('❌ Error getting last 7 days stats:', error)
+      return []
+    }
+  }
+
+  /**
+   * 根据ID查找规则
+   */
+  findRuleById(ruleId) {
+    if (!this.config) {
+      return null
+    }
+
+    // 在立即限流规则中查找
+    for (const rule of this.config.instantRules) {
+      if (rule.id === ruleId) {
+        return { ...rule, type: 'instant' }
+      }
+    }
+
+    // 在累计触发规则中查找
+    for (const rule of this.config.cumulativeRules) {
+      if (rule.id === ruleId) {
+        return { ...rule, type: 'cumulative' }
+      }
+    }
+
+    return null
   }
 
   /**

@@ -406,7 +406,9 @@ class ClaudeAccountService {
         // 允许更新官方自定义 API 地址
         'officialApiUrl',
         'schedulable',
-        'rateTemplateId'
+        'rateTemplateId',
+        // 上游重置时间
+        'upstreamResetTime'
       ]
       const updatedData = { ...accountData }
 

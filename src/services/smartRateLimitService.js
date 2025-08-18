@@ -357,13 +357,38 @@ class SmartRateLimitService {
     ruleName
   }) {
     const limitKey = `smart_rate_limit:limited:${accountId}`
+
+    // 检查账户是否配置了上游重置时间
+    let finalDuration = duration
+    let upstreamResetTime = null
+
+    try {
+      upstreamResetTime = await this.getAccountUpstreamResetTime(accountId, accountType)
+      if (upstreamResetTime) {
+        const now = new Date()
+        const resetTime = this.parseUpstreamResetTime(upstreamResetTime)
+
+        if (resetTime && resetTime > now) {
+          // 计算到重置时间的秒数
+          finalDuration = Math.ceil((resetTime.getTime() - now.getTime()) / 1000)
+          logger.info(
+            `⏰ Using upstream reset time for account ${accountId}: ${resetTime.toISOString()} (${finalDuration}s)`
+          )
+        }
+      }
+    } catch (error) {
+      logger.warn(`⚠️ Error checking upstream reset time for account ${accountId}:`, error)
+    }
+
     const limitInfo = {
       accountId,
       accountName,
       accountType,
       reason,
       startTime: new Date().toISOString(),
-      duration,
+      duration: finalDuration,
+      originalDuration: duration, // 保存原始持续时间
+      upstreamResetTime: upstreamResetTime || '', // 保存上游重置时间配置
       apiKeyId,
       apiKeyName,
       ruleId: ruleId || 'manual',
@@ -373,20 +398,22 @@ class SmartRateLimitService {
     try {
       // 设置限流信息
       await redisClient.hset(limitKey, limitInfo)
-      await redisClient.expire(limitKey, duration)
+      await redisClient.expire(limitKey, finalDuration)
 
       // 添加到限流账户集合（用于恢复检查）
       await redisClient.sadd('smart_rate_limit:limited_accounts', accountId)
 
       // 记录关键日志
-      const logMessage = `🚫 Rate limit applied to ${accountType} account: ${accountName} (${accountId}) for ${duration}s. Reason: ${reason}`
+      const logMessage = `🚫 Rate limit applied to ${accountType} account: ${accountName} (${accountId}) for ${finalDuration}s. Reason: ${reason}${upstreamResetTime ? ` (upstream reset: ${upstreamResetTime})` : ''}`
       logger.warn(logMessage)
 
       // 记录到关键日志
       await keyLogsService.logRateLimit(accountId, accountType, 'triggered', {
         accountName,
         reason,
-        duration,
+        duration: finalDuration,
+        originalDuration: duration,
+        upstreamResetTime,
         apiKeyId,
         apiKeyName
       })
@@ -531,6 +558,40 @@ class SmartRateLimitService {
           accountName: info.accountName,
           reason: 'auto_expired'
         })
+
+        return // TTL已过期，无需进一步检查
+      }
+
+      // 检查上游重置时间
+      if (info.upstreamResetTime) {
+        try {
+          const resetTime = this.parseUpstreamResetTime(info.upstreamResetTime)
+          const now = new Date()
+
+          if (resetTime && now >= resetTime) {
+            // 上游重置时间已到，自动解除限流
+            await redisClient.del(limitKey)
+            await redisClient.srem('smart_rate_limit:limited_accounts', accountId)
+
+            const logMessage = `⏰ Rate limit auto-removed by upstream reset time: ${info.accountName} (${accountId}) at ${resetTime.toISOString()}`
+            logger.info(logMessage)
+
+            await keyLogsService.logRateLimit(accountId, info.accountType, 'upstream_reset', {
+              accountName: info.accountName,
+              reason: 'upstream_reset_time',
+              resetTime: resetTime.toISOString(),
+              originalResetConfig: info.upstreamResetTime
+            })
+
+            return // 已通过上游重置时间解除限流，无需进一步检查
+          } else if (resetTime) {
+            logger.debug(
+              `⏰ Upstream reset time not yet reached for account ${accountId}: ${resetTime.toISOString()}`
+            )
+          }
+        } catch (error) {
+          logger.warn(`⚠️ Error checking upstream reset time for account ${accountId}:`, error)
+        }
       }
 
       // 主动测试账户是否已恢复（模拟Claude Code客户端请求）
@@ -569,6 +630,7 @@ class SmartRateLimitService {
             apiKeyName: info.apiKeyName,
             ruleId: info.ruleId,
             ruleName: info.ruleName,
+            upstreamResetTime: info.upstreamResetTime || '', // 添加上游重置时间
             // 前端期望的字段
             limitedAt: info.startTime, // 限流开始时间
             expiresAt: this.calculateExpiresAt(info.startTime, info.duration), // 计算过期时间
@@ -845,6 +907,99 @@ class SmartRateLimitService {
       clearInterval(this.recoveryCheckInterval)
       this.recoveryCheckInterval = null
       logger.info('🛑 Smart rate limit recovery checker stopped')
+    }
+  }
+
+  /**
+   * 获取账户的上游重置时间配置
+   */
+  async getAccountUpstreamResetTime(accountId, accountType) {
+    try {
+      const redis = require('../models/redis')
+
+      if (accountType === 'claude' || accountType === 'claude-official') {
+        // Claude OAuth 账户
+        const account = await redis.getClaudeAccount(accountId)
+        return account?.upstreamResetTime || null
+      } else if (accountType === 'claude-console') {
+        // Claude Console 账户
+        const claudeConsoleAccountService = require('./claudeConsoleAccountService')
+        const account = await claudeConsoleAccountService.getAccount(accountId)
+        return account?.upstreamResetTime || null
+      } else if (accountType === 'bedrock') {
+        // Bedrock 账户
+        const bedrockAccountService = require('./bedrockAccountService')
+        const accountResult = await bedrockAccountService.getAccount(accountId)
+        if (accountResult.success) {
+          return accountResult.data.upstreamResetTime || null
+        }
+      }
+
+      return null
+    } catch (error) {
+      logger.error(`Error getting upstream reset time for account ${accountId}:`, error)
+      return null
+    }
+  }
+
+  /**
+   * 解析上游重置时间字符串
+   * 支持格式：
+   * - HH:MM (每日重置，如 "14:30")
+   * - YYYY-MM-DD HH:MM:SS (特定时间，如 "2024-08-18 14:30:00")
+   */
+  parseUpstreamResetTime(resetTimeStr) {
+    if (!resetTimeStr || typeof resetTimeStr !== 'string') {
+      return null
+    }
+
+    resetTimeStr = resetTimeStr.trim()
+
+    try {
+      // 检查是否是 HH:MM 格式（每日重置）
+      if (/^\d{1,2}:\d{2}$/.test(resetTimeStr)) {
+        const [hours, minutes] = resetTimeStr.split(':').map(Number)
+
+        if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+          logger.warn(`Invalid time format: ${resetTimeStr}`)
+          return null
+        }
+
+        const now = new Date()
+        const resetTime = new Date()
+        resetTime.setHours(hours, minutes, 0, 0)
+
+        // 如果今天的重置时间已过，设置为明天
+        if (resetTime <= now) {
+          resetTime.setDate(resetTime.getDate() + 1)
+        }
+
+        return resetTime
+      }
+
+      // 检查是否是 YYYY-MM-DD HH:MM:SS 格式（特定时间）
+      if (/^\d{4}-\d{2}-\d{2} \d{1,2}:\d{2}:\d{2}$/.test(resetTimeStr)) {
+        const resetTime = new Date(resetTimeStr)
+
+        if (isNaN(resetTime.getTime())) {
+          logger.warn(`Invalid datetime format: ${resetTimeStr}`)
+          return null
+        }
+
+        return resetTime
+      }
+
+      // 尝试直接解析为Date
+      const resetTime = new Date(resetTimeStr)
+      if (!isNaN(resetTime.getTime())) {
+        return resetTime
+      }
+
+      logger.warn(`Unsupported upstream reset time format: ${resetTimeStr}`)
+      return null
+    } catch (error) {
+      logger.error(`Error parsing upstream reset time "${resetTimeStr}":`, error)
+      return null
     }
   }
 }

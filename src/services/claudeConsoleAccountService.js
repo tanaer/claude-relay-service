@@ -242,6 +242,9 @@ class ClaudeConsoleAccountService {
       if (updates.schedulable !== undefined) {
         updatedData.schedulable = updates.schedulable.toString()
       }
+      if (updates.upstreamResetTime !== undefined) {
+        updatedData.upstreamResetTime = updates.upstreamResetTime || ''
+      }
 
       // 处理账户类型变更
       if (updates.accountType && updates.accountType !== existingAccount.accountType) {

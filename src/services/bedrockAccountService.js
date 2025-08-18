@@ -191,6 +191,9 @@ class BedrockAccountService {
       if (updates.schedulable !== undefined) {
         account.schedulable = updates.schedulable
       }
+      if (updates.upstreamResetTime !== undefined) {
+        account.upstreamResetTime = updates.upstreamResetTime || ''
+      }
       if (updates.credentialType !== undefined) {
         account.credentialType = updates.credentialType
       }

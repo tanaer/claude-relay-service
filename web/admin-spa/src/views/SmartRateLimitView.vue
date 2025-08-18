@@ -509,16 +509,35 @@ const mergeImport = ref(false)
 
 // 计算属性
 const topRules = computed(() => {
-  if (!statistics.value.ruleStatistics) return []
+  if (!statistics.value.ruleStats || !config.value) return []
 
-  return Object.entries(statistics.value.ruleStatistics)
-    .map(([ruleId, stats]) => ({
-      ruleId,
-      ruleName: stats.ruleName || ruleId,
-      type: stats.type,
-      triggerCount: stats.triggerCount || 0,
-      lastTriggered: stats.lastTriggered
-    }))
+  return Object.entries(statistics.value.ruleStats)
+    .map(([ruleId, triggerCount]) => {
+      // 在配置中查找规则名称
+      let ruleName = ruleId
+      let type = 'unknown'
+
+      // 在立即限流规则中查找
+      const instantRule = config.value.instantRules?.find((r) => r.id === ruleId)
+      if (instantRule) {
+        ruleName = instantRule.name
+        type = 'instant'
+      } else {
+        // 在累计触发规则中查找
+        const cumulativeRule = config.value.cumulativeRules?.find((r) => r.id === ruleId)
+        if (cumulativeRule) {
+          ruleName = cumulativeRule.name
+          type = 'cumulative'
+        }
+      }
+
+      return {
+        ruleId,
+        ruleName,
+        type,
+        triggerCount: parseInt(triggerCount) || 0
+      }
+    })
     .sort((a, b) => b.triggerCount - a.triggerCount)
     .slice(0, 10)
 })
@@ -543,9 +562,8 @@ function getMatchModeText(mode) {
 }
 
 function getStatistics(type, ruleId) {
-  if (!statistics.value.ruleStatistics) return 0
-  const key = `${type}:${ruleId}`
-  return statistics.value.ruleStatistics[key]?.triggerCount || 0
+  if (!statistics.value.ruleStats) return 0
+  return statistics.value.ruleStats[ruleId] || 0
 }
 
 function formatDate(dateStr) {
@@ -592,6 +610,7 @@ async function loadConfig() {
 async function loadStatistics() {
   try {
     const response = await api.get('/admin/smart-rate-limit/statistics')
+    // smartRateLimitService.getStatistics() 直接返回统计对象，不包含success/data包装
     statistics.value = response.data || {}
   } catch (error) {
     console.error('Failed to load statistics:', error)

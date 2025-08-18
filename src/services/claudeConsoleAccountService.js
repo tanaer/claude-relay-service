@@ -564,6 +564,193 @@ class ClaudeConsoleAccountService {
     // 返回映射后的模型，如果不存在则返回原模型
     return modelMapping[requestedModel] || requestedModel
   }
+
+  // 🧪 测试Claude Console账户连接和服务可用性
+  async testAccount(accountId) {
+    try {
+      const accountData = await this.getAccount(accountId)
+      if (!accountData || Object.keys(accountData).length === 0) {
+        return { success: false, error: 'Account not found' }
+      }
+
+      logger.info(
+        `[信息] 测试Claude Console账户服务可用性 - ID: ${accountId}, 名称: ${accountData.name}`
+      )
+
+      if (!accountData.apiUrl || !accountData.apiKey) {
+        return { success: false, error: 'API URL or API Key is missing' }
+      }
+
+      // 构建测试请求 - 使用一个简单的消息测试Claude Console API
+      const testMessage = {
+        model: 'claude-3-5-haiku-20241022', // 使用最便宜的模型进行测试
+        max_tokens: 10,
+        messages: [
+          {
+            role: 'user',
+            content: 'Hi'
+          }
+        ]
+      }
+
+      const https = require('https')
+      const { URL } = require('url')
+
+      // 构建请求选项
+      const requestOptions = {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': accountData.apiKey,
+          'anthropic-version': '2023-06-01',
+          'User-Agent': accountData.userAgent || 'Claude-Relay-Service/Test'
+        },
+        timeout: 10000 // 10秒超时
+      }
+
+      const parsedUrl = new URL(accountData.apiUrl)
+
+      // 处理代理配置
+      if (accountData.proxy) {
+        let proxyConfig
+        try {
+          proxyConfig =
+            typeof accountData.proxy === 'string'
+              ? JSON.parse(accountData.proxy)
+              : accountData.proxy
+        } catch (e) {
+          proxyConfig = null
+        }
+
+        if (proxyConfig && proxyConfig.enabled && proxyConfig.host && proxyConfig.port) {
+          if (proxyConfig.type === 'socks5') {
+            const proxyUrl = proxyConfig.auth
+              ? `socks5://${proxyConfig.auth.username}:${proxyConfig.auth.password}@${proxyConfig.host}:${proxyConfig.port}`
+              : `socks5://${proxyConfig.host}:${proxyConfig.port}`
+            requestOptions.agent = new SocksProxyAgent(proxyUrl)
+          } else if (proxyConfig.type === 'http') {
+            const proxyUrl = proxyConfig.auth
+              ? `http://${proxyConfig.auth.username}:${proxyConfig.auth.password}@${proxyConfig.host}:${proxyConfig.port}`
+              : `http://${proxyConfig.host}:${proxyConfig.port}`
+            requestOptions.agent = new HttpsProxyAgent(proxyUrl)
+          }
+        }
+      }
+
+      requestOptions.hostname = parsedUrl.hostname
+      requestOptions.port = parsedUrl.port || 443
+      requestOptions.path = parsedUrl.pathname
+
+      // 执行测试请求
+      let testResult
+      try {
+        testResult = await new Promise((resolve, reject) => {
+          const req = https.request(requestOptions, (res) => {
+            let data = ''
+            res.on('data', (chunk) => (data += chunk))
+            res.on('end', () => {
+              try {
+                if (res.statusCode === 200) {
+                  const response = JSON.parse(data)
+                  resolve({
+                    success: true,
+                    statusCode: res.statusCode,
+                    hasResponse: !!response.content,
+                    model: response.model || testMessage.model,
+                    usage: response.usage || null
+                  })
+                } else if (res.statusCode === 429) {
+                  resolve({
+                    success: false,
+                    error: 'Rate limited (429)',
+                    statusCode: res.statusCode,
+                    isRateLimit: true
+                  })
+                } else if (res.statusCode === 401 || res.statusCode === 403) {
+                  resolve({
+                    success: false,
+                    error: `Unauthorized (${res.statusCode}) - API Key may be invalid`,
+                    statusCode: res.statusCode,
+                    isUnauthorized: true
+                  })
+                } else {
+                  const errorData = data ? JSON.parse(data) : {}
+                  resolve({
+                    success: false,
+                    error: `HTTP ${res.statusCode}: ${errorData.error?.message || 'Unknown error'}`,
+                    statusCode: res.statusCode
+                  })
+                }
+              } catch (error) {
+                resolve({
+                  success: false,
+                  error: `Response parse error: ${error.message}`,
+                  statusCode: res.statusCode
+                })
+              }
+            })
+          })
+
+          req.on('error', (error) => {
+            reject(new Error(`Network error: ${error.message}`))
+          })
+
+          req.on('timeout', () => {
+            req.destroy()
+            reject(new Error('Request timeout (10s)'))
+          })
+
+          req.write(JSON.stringify(testMessage))
+          req.end()
+        })
+      } catch (error) {
+        // 处理网络错误和超时错误
+        testResult = {
+          success: false,
+          error: error.message,
+          networkError: error.message.includes('Network error'),
+          timeout: error.message.includes('timeout')
+        }
+      }
+
+      // 记录测试结果
+      if (testResult.success) {
+        logger.success(`✅ Claude Console账户测试成功 - ID: ${accountId}`)
+      } else {
+        logger.error(`❌ Claude Console账户测试失败 - ID: ${accountId}, 错误: ${testResult.error}`)
+      }
+
+      return {
+        success: testResult.success,
+        data: testResult.success
+          ? {
+              model: testResult.model,
+              status: 'active',
+              tokenValid: true,
+              hasResponse: testResult.hasResponse,
+              usage: testResult.usage
+            }
+          : null,
+        error: testResult.error,
+        details: {
+          statusCode: testResult.statusCode,
+          isRateLimit: testResult.isRateLimit || false,
+          isUnauthorized: testResult.isUnauthorized || false,
+          networkError: testResult.networkError || false,
+          timeout: testResult.timeout || false
+        }
+      }
+    } catch (error) {
+      logger.error(`❌ Claude Console账户测试异常 - ID: ${accountId}`, error)
+      return {
+        success: false,
+        error: `Test failed: ${error.message}`,
+        details: {
+          networkError: true
+        }
+      }
+    }
+  }
 }
 
 module.exports = new ClaudeConsoleAccountService()

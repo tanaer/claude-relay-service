@@ -367,11 +367,23 @@
                     }}
                   </span>
                   <span
-                    v-if="
+                    v-if="account.smartRateLimit?.isRateLimited"
+                    class="inline-flex items-center rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-800"
+                  >
+                    <i class="fas fa-brain mr-1" />
+                    智能限流
+                    <span v-if="account.smartRateLimit.info?.remainingSeconds > 0"
+                      >({{
+                        Math.ceil(account.smartRateLimit.info.remainingSeconds / 60)
+                      }}分钟)</span
+                    >
+                  </span>
+                  <span
+                    v-else-if="
                       (account.rateLimitStatus && account.rateLimitStatus.isRateLimited) ||
                       account.rateLimitStatus === 'limited'
                     "
-                    class="inline-flex items-center rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-800"
+                    class="inline-flex items-center rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-800"
                   >
                     <i class="fas fa-exclamation-triangle mr-1" />
                     限流中
@@ -1277,6 +1289,28 @@ const loadAccounts = async (forceReload = false) => {
     }
 
     accounts.value = allAccounts
+
+    // 批量检查智能限流状态
+    if (allAccounts.length > 0) {
+      try {
+        const accountIds = allAccounts.map((acc) => acc.id)
+        const rateLimitResponse = await apiClient.post('/admin/smart-rate-limit/check-accounts', {
+          accountIds
+        })
+
+        if (rateLimitResponse.success) {
+          const rateLimitStatuses = rateLimitResponse.data
+          // 更新账户的智能限流状态
+          accounts.value = accounts.value.map((account) => ({
+            ...account,
+            smartRateLimit: rateLimitStatuses[account.id] || { isRateLimited: false }
+          }))
+        }
+      } catch (error) {
+        console.warn('获取智能限流状态失败:', error)
+        // 如果获取失败，继续显示账户列表，但不显示智能限流状态
+      }
+    }
   } catch (error) {
     showToast('加载账户失败', 'error')
   } finally {
@@ -1665,13 +1699,12 @@ const testAccount = async (account) => {
     // 根据账户平台选择对应的测试端点
     if (account.platform === 'claude') {
       endpoint = `/admin/claude-accounts/${account.id}/test`
+    } else if (account.platform === 'claude-console') {
+      endpoint = `/admin/claude-console-accounts/${account.id}/test`
     } else if (account.platform === 'bedrock') {
       endpoint = `/admin/bedrock-accounts/${account.id}/test`
     } else if (account.platform === 'gemini') {
       endpoint = `/admin/gemini-accounts/${account.id}/test`
-    } else if (account.platform === 'claude-console') {
-      showToast('Claude Console 账户暂不支持测试功能', 'warning')
-      return
     } else if (account.platform === 'openai') {
       showToast('OpenAI 账户暂不支持测试功能', 'warning')
       return
@@ -1778,6 +1811,8 @@ const getAccountStatusText = (account) => {
   if (account.status === 'blocked') return '已封锁'
   // 检查是否未授权（401错误）
   if (account.status === 'unauthorized') return '异常'
+  // 检查智能限流状态
+  if (account.smartRateLimit?.isRateLimited) return '智能限流'
   // 检查是否限流
   if (
     account.isRateLimited ||
@@ -1801,6 +1836,9 @@ const getAccountStatusClass = (account) => {
   }
   if (account.status === 'unauthorized') {
     return 'bg-red-100 text-red-800'
+  }
+  if (account.smartRateLimit?.isRateLimited) {
+    return 'bg-yellow-100 text-yellow-800'
   }
   if (
     account.isRateLimited ||
@@ -1826,6 +1864,9 @@ const getAccountStatusDotClass = (account) => {
   }
   if (account.status === 'unauthorized') {
     return 'bg-red-500'
+  }
+  if (account.smartRateLimit?.isRateLimited) {
+    return 'bg-yellow-500'
   }
   if (
     account.isRateLimited ||
@@ -1880,7 +1921,7 @@ const refreshAccountToken = async (account) => {
 
 // 检查账户平台是否支持测试功能
 const isTestSupported = (account) => {
-  const supportedPlatforms = ['claude', 'bedrock', 'gemini']
+  const supportedPlatforms = ['claude', 'claude-console', 'bedrock', 'gemini']
   return supportedPlatforms.includes(account.platform)
 }
 

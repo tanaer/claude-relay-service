@@ -1816,6 +1816,38 @@ router.put(
   }
 )
 
+// 测试Claude Console账户连接和服务可用性
+router.post('/claude-console-accounts/:accountId/test', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+
+    const result = await claudeConsoleAccountService.testAccount(accountId)
+
+    if (!result.success) {
+      return res.status(500).json({
+        error: 'Claude Console account test failed',
+        message: result.error,
+        details: {
+          statusCode: result.details?.statusCode,
+          isRateLimit: result.details?.isRateLimit,
+          isUnauthorized: result.details?.isUnauthorized,
+          networkError: result.details?.networkError,
+          timeout: result.details?.timeout
+        }
+      })
+    }
+
+    logger.success(`🧪 Admin tested Claude Console account: ${accountId} - ${result.data.status}`)
+
+    return res.json({ success: true, data: result.data })
+  } catch (error) {
+    logger.error('[错误] 测试 Claude Console 账户失败：', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to test Claude Console account', message: error.message })
+  }
+})
+
 // ================ 上游错误聚合与自定义文案 ================
 // 注意：upstreamErrorService 相关功能已被移除，这些路由已不再使用
 
@@ -5448,7 +5480,7 @@ router.put('/smart-rate-limit/global-settings', authenticateAdmin, async (req, r
 // 获取限流统计
 router.get('/smart-rate-limit/statistics', authenticateAdmin, async (req, res) => {
   try {
-    const result = await smartRateLimitConfigService.getStatistics()
+    const result = await smartRateLimitService.getStatistics()
     res.json(result)
   } catch (error) {
     logger.error('获取限流统计失败:', error)
@@ -5463,6 +5495,37 @@ router.get('/smart-rate-limit/limited-accounts', authenticateAdmin, async (req, 
     res.json({ success: true, data: accounts })
   } catch (error) {
     logger.error('获取被限流账户失败:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 批量检查账户的智能限流状态
+router.post('/smart-rate-limit/check-accounts', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountIds } = req.body
+    if (!Array.isArray(accountIds)) {
+      return res.status(400).json({ success: false, error: '账户ID列表格式错误' })
+    }
+
+    const rateLimitStatuses = {}
+    for (const accountId of accountIds) {
+      const isLimited = await smartRateLimitService.isRateLimited(accountId)
+      if (isLimited) {
+        const info = await smartRateLimitService.getRateLimitInfo(accountId)
+        rateLimitStatuses[accountId] = {
+          isRateLimited: true,
+          info
+        }
+      } else {
+        rateLimitStatuses[accountId] = {
+          isRateLimited: false
+        }
+      }
+    }
+
+    res.json({ success: true, data: rateLimitStatuses })
+  } catch (error) {
+    logger.error('批量检查智能限流状态失败:', error)
     res.status(500).json({ success: false, error: error.message })
   }
 })

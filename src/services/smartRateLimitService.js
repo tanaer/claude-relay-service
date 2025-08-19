@@ -579,25 +579,38 @@ class SmartRateLimitService {
           const resetTime = this.parseUpstreamResetTime(info.upstreamResetTime)
           const now = new Date()
 
+          logger.debug(`🔍 Checking upstream reset time for account ${accountId}:`, {
+            accountName: info.accountName,
+            resetTimeConfig: info.upstreamResetTime,
+            parsedResetTime: resetTime
+              ? resetTime.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
+              : 'null',
+            currentTime: now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
+            shouldReset: resetTime && now >= resetTime
+          })
+
           if (resetTime && now >= resetTime) {
             // 上游重置时间已到，自动解除限流
             await redisClient.del(limitKey)
             await redisClient.srem('smart_rate_limit:limited_accounts', accountId)
 
-            const logMessage = `⏰ Rate limit auto-removed by upstream reset time: ${info.accountName} (${accountId}) at ${resetTime.toISOString()}`
+            const logMessage = `⏰ Rate limit auto-removed by upstream reset time: ${info.accountName} (${accountId}) at ${resetTime.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`
             logger.info(logMessage)
 
             await keyLogsService.logRateLimit(accountId, info.accountType, 'upstream_reset', {
               accountName: info.accountName,
               reason: 'upstream_reset_time',
               resetTime: resetTime.toISOString(),
-              originalResetConfig: info.upstreamResetTime
+              originalResetConfig: info.upstreamResetTime,
+              currentTime: now.toISOString()
             })
 
             return // 已通过上游重置时间解除限流，无需进一步检查
           } else if (resetTime) {
+            const remainingMs = resetTime.getTime() - now.getTime()
+            const remainingMinutes = Math.ceil(remainingMs / 60000)
             logger.debug(
-              `⏰ Upstream reset time not yet reached for account ${accountId}: ${resetTime.toISOString()}`
+              `⏰ Upstream reset time not yet reached for account ${accountId}: ${resetTime.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })} (还剩 ${remainingMinutes} 分钟)`
             )
           }
         } catch (error) {
@@ -976,8 +989,9 @@ class SmartRateLimitService {
           return null
         }
 
+        // 使用本地时区创建今天的重置时间
         const now = new Date()
-        const resetTime = new Date()
+        const resetTime = new Date(now)
         resetTime.setHours(hours, minutes, 0, 0)
 
         // 如果今天的重置时间已过，设置为明天
@@ -985,24 +999,34 @@ class SmartRateLimitService {
           resetTime.setDate(resetTime.getDate() + 1)
         }
 
+        logger.debug(
+          `Parsed daily reset time: ${resetTimeStr} -> ${resetTime.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`
+        )
         return resetTime
       }
 
       // 检查是否是 YYYY-MM-DD HH:MM:SS 格式（特定时间）
       if (/^\d{4}-\d{2}-\d{2} \d{1,2}:\d{2}:\d{2}$/.test(resetTimeStr)) {
-        const resetTime = new Date(resetTimeStr)
+        // 明确使用本地时区解析时间
+        const resetTime = new Date(resetTimeStr.replace(/-/g, '/'))
 
         if (isNaN(resetTime.getTime())) {
           logger.warn(`Invalid datetime format: ${resetTimeStr}`)
           return null
         }
 
+        logger.debug(
+          `Parsed specific reset time: ${resetTimeStr} -> ${resetTime.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`
+        )
         return resetTime
       }
 
       // 尝试直接解析为Date
       const resetTime = new Date(resetTimeStr)
       if (!isNaN(resetTime.getTime())) {
+        logger.debug(
+          `Parsed generic reset time: ${resetTimeStr} -> ${resetTime.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`
+        )
         return resetTime
       }
 

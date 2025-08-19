@@ -275,6 +275,17 @@
               </li>
               <li>• 兑换成功后可点击“下载安装脚本”，脚本会自动注入你的 API Key</li>
               <li>• 安装脚本为 Windows 系统专用，下载后右键点击文件，“使用管理员身份运行”</li>
+              <li>
+                • 如果安装脚本无法使用，请
+                <a
+                  class="cursor-pointer text-red-600 underline hover:text-red-800"
+                  href="#"
+                  role="button"
+                  @click.prevent="currentTab = 'tutorial'"
+                >
+                  点击查看使用教程
+                </a>
+              </li>
             </ul>
           </div>
         </div>

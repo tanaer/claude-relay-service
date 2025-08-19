@@ -20,7 +20,8 @@ class ApiKeyService {
         claudeAccountId = null,
         claudeConsoleAccountId = null,
         geminiAccountId = null,
-        permissions = 'all', // 'claude', 'gemini', 'all'
+        openaiAccountId = null,
+        permissions = 'all', // 'claude', 'gemini', 'openai', 'all'
         isActive = true,
         concurrencyLimit = 0,
         rateLimitWindow = null,
@@ -31,7 +32,10 @@ class ApiKeyService {
         allowedClients = [],
         dailyCostLimit = 0,
         tags = [],
-        rateTemplateId = null
+        rateTemplateId = null,
+        // 新增：计划类型与无时限余额
+        planType = 'windowed', // 'windowed' | 'lifetime'
+        lifetimeTokenBalance = 0
       } = options
 
       // 生成简单的API Key (64字符十六进制)
@@ -52,6 +56,7 @@ class ApiKeyService {
         claudeAccountId: claudeAccountId || '',
         claudeConsoleAccountId: claudeConsoleAccountId || '',
         geminiAccountId: geminiAccountId || '',
+        openaiAccountId: openaiAccountId || '',
         permissions: permissions || 'all',
         enableModelRestriction: String(enableModelRestriction),
         restrictedModels: JSON.stringify(restrictedModels || []),
@@ -63,7 +68,10 @@ class ApiKeyService {
         createdAt: new Date().toISOString(),
         lastUsedAt: '',
         expiresAt: expiresAt || '',
-        createdBy: 'admin' // 可以根据需要扩展用户系统
+        createdBy: 'admin', // 可以根据需要扩展用户系统
+        // 新增字段
+        planType: planType === 'lifetime' ? 'lifetime' : 'windowed',
+        lifetimeTokenBalance: String(Math.max(0, Number(lifetimeTokenBalance) || 0))
       }
 
       // 保存API Key数据并建立哈希映射
@@ -85,6 +93,7 @@ class ApiKeyService {
         claudeAccountId: keyData.claudeAccountId,
         claudeConsoleAccountId: keyData.claudeConsoleAccountId,
         geminiAccountId: keyData.geminiAccountId,
+        openaiAccountId: keyData.openaiAccountId,
         permissions: keyData.permissions,
         enableModelRestriction: keyData.enableModelRestriction === 'true',
         restrictedModels: JSON.parse(keyData.restrictedModels),
@@ -95,7 +104,10 @@ class ApiKeyService {
         rateTemplateId: keyData.rateTemplateId || null,
         createdAt: keyData.createdAt,
         expiresAt: keyData.expiresAt,
-        createdBy: keyData.createdBy
+        createdBy: keyData.createdBy,
+        // 新增返回
+        planType: keyData.planType,
+        lifetimeTokenBalance: parseInt(keyData.lifetimeTokenBalance || '0')
       }
     } catch (error) {
       logger.error('❌ Failed to generate API key:', {
@@ -140,11 +152,6 @@ class ApiKeyService {
       // 获取当日费用统计
       const dailyCost = await redis.getDailyCost(keyData.id)
 
-      // 更新最后使用时间（优化：只在实际API调用时更新，而不是验证时）
-      // 注意：lastUsedAt的更新已移至recordUsage方法中
-
-      logger.api(`🔓 API key validated successfully: ${keyData.id}`)
-
       // 解析限制模型数据
       let restrictedModels = []
       try {
@@ -180,6 +187,7 @@ class ApiKeyService {
           claudeAccountId: keyData.claudeAccountId,
           claudeConsoleAccountId: keyData.claudeConsoleAccountId,
           geminiAccountId: keyData.geminiAccountId,
+          openaiAccountId: keyData.openaiAccountId,
           permissions: keyData.permissions || 'all',
           tokenLimit: parseInt(keyData.tokenLimit),
           concurrencyLimit: parseInt(keyData.concurrencyLimit || 0),
@@ -193,7 +201,10 @@ class ApiKeyService {
           dailyCost: dailyCost || 0,
           tags,
           rateTemplateId: keyData.rateTemplateId || null,
-          usage
+          usage,
+          // 新增
+          planType: keyData.planType === 'lifetime' ? 'lifetime' : 'windowed',
+          lifetimeTokenBalance: parseInt(keyData.lifetimeTokenBalance || '0')
         }
       }
     } catch (error) {
@@ -223,6 +234,9 @@ class ApiKeyService {
         key.dailyCostLimit = parseFloat(key.dailyCostLimit || 0)
         key.dailyCost = (await redis.getDailyCost(key.id)) || 0
         key.rateTemplateId = key.rateTemplateId || null
+        // 新增：计划类型与余额
+        key.planType = key.planType === 'lifetime' ? 'lifetime' : 'windowed'
+        key.lifetimeTokenBalance = parseInt(key.lifetimeTokenBalance || '0')
 
         // 获取当前时间窗口的请求次数和Token使用量
         if (key.rateLimitWindow > 0) {
@@ -314,6 +328,7 @@ class ApiKeyService {
         'claudeAccountId',
         'claudeConsoleAccountId',
         'geminiAccountId',
+        'openaiAccountId',
         'permissions',
         'expiresAt',
         'enableModelRestriction',
@@ -322,7 +337,10 @@ class ApiKeyService {
         'allowedClients',
         'dailyCostLimit',
         'tags',
-        'rateTemplateId'
+        'rateTemplateId',
+        // 新增
+        'planType',
+        'lifetimeTokenBalance'
       ]
       const updatedData = { ...keyData }
 
@@ -334,6 +352,11 @@ class ApiKeyService {
           } else if (field === 'enableModelRestriction' || field === 'enableClientRestriction') {
             // 布尔值转字符串
             updatedData[field] = String(value)
+          } else if (field === 'planType') {
+            updatedData[field] = value === 'lifetime' ? 'lifetime' : 'windowed'
+          } else if (field === 'lifetimeTokenBalance') {
+            const num = Math.max(0, Number(value) || 0)
+            updatedData[field] = String(num)
           } else {
             updatedData[field] = (value !== null && value !== undefined ? value : '').toString()
           }
@@ -578,6 +601,21 @@ class ApiKeyService {
         // 更新最后使用时间
         keyData.lastUsedAt = new Date().toISOString()
         await redis.setApiKey(keyId, keyData)
+
+        // 新增：无时限计划扣减余额
+        if (keyData.planType === 'lifetime') {
+          try {
+            const client = redis.getClientSafe()
+            // 使用 HINCRBY 原子扣减
+            await client.hincrby(
+              `apikey:${keyId}`,
+              'lifetimeTokenBalance',
+              -Math.max(0, totalTokens)
+            )
+          } catch (e) {
+            logger.error(`Failed to decrement lifetimeTokenBalance for ${keyId}:`, e)
+          }
+        }
 
         // 记录账户级别的使用统计（只统计实际处理请求的账户）
         if (accountId) {

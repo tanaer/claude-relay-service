@@ -60,6 +60,82 @@ router.post('/api/get-key-id', async (req, res) => {
   }
 })
 
+// 🔋 无时限余额充值（通过兑换码叠加到指定 API Key）
+router.post('/api/topup-lifetime', async (req, res) => {
+  try {
+    const { apiId, code } = req.body
+
+    if (!apiId || !code || typeof code !== 'string') {
+      return res.status(400).json({ success: false, message: '缺少 apiId 或兑换码' })
+    }
+
+    // 校验 apiId
+    if (!apiId.match(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i)) {
+      return res.status(400).json({ success: false, message: 'API ID 格式不正确' })
+    }
+
+    // 读取 API Key
+    const keyData = await redis.getApiKey(apiId)
+    if (!keyData || Object.keys(keyData).length === 0) {
+      return res.status(404).json({ success: false, message: 'API Key 不存在' })
+    }
+    if (keyData.isActive !== 'true') {
+      return res.status(403).json({ success: false, message: 'API Key 已禁用' })
+    }
+
+    // 解析兑换码（示例：采用前缀 + Base64JSON），示意实现，可替换为你的真实校验逻辑
+    // 约定：code 内容携带 { type: 'lifetime', tokens: number, nonce, exp(optional) }
+    let payload
+    try {
+      const trimmed = code.trim()
+      const parts = trimmed.split('.')
+      const base = parts.length > 1 ? parts[1] : trimmed // 兼容带签名的形态
+      const json = Buffer.from(base, 'base64').toString('utf8')
+      payload = JSON.parse(json)
+    } catch (e) {
+      return res.status(400).json({ success: false, message: '兑换码格式不正确' })
+    }
+
+    if (
+      !payload ||
+      payload.type !== 'lifetime' ||
+      !Number.isInteger(payload.tokens) ||
+      payload.tokens <= 0
+    ) {
+      return res.status(400).json({ success: false, message: '兑换码无效或不支持的类型' })
+    }
+
+    if (payload.exp && Date.now() > Number(payload.exp)) {
+      return res.status(400).json({ success: false, message: '兑换码已过期' })
+    }
+
+    // TODO: 可选校验：防重放 nonce、签名校验等（留给实际部署接入）
+
+    // 确保为无时限类型；如果不是，则自动切换为无时限
+    const client = redis.getClientSafe()
+    const currentBalance = parseInt(keyData.lifetimeTokenBalance || '0') || 0
+    const addAmount = payload.tokens
+
+    const updated = { ...keyData }
+    updated.planType = 'lifetime'
+    updated.lifetimeTokenBalance = String(Math.max(0, currentBalance + addAmount))
+    await client.hset(`apikey:${apiId}`, updated)
+
+    logger.success(`🪙 Lifetime topup: +${addAmount} tokens to ${apiId}`)
+    return res.json({
+      success: true,
+      data: {
+        apiId,
+        added: addAmount,
+        newBalance: parseInt(updated.lifetimeTokenBalance)
+      }
+    })
+  } catch (error) {
+    logger.error('❌ Failed to topup lifetime:', error)
+    return res.status(500).json({ success: false, message: '充值失败，请稍后重试' })
+  }
+})
+
 // 📊 用户API Key统计查询接口 - 安全的自查询接口
 router.post('/api/user-stats', async (req, res) => {
   try {
@@ -279,6 +355,9 @@ router.post('/api/user-stats', async (req, res) => {
     let currentWindowRequests = 0
     let currentWindowTokens = 0
     let currentDailyCost = 0
+    let windowStartTime = null
+    let windowEndTime = null
+    let windowRemainingSeconds = null
 
     try {
       // 获取当前时间窗口的请求次数和Token使用量
@@ -286,9 +365,32 @@ router.post('/api/user-stats', async (req, res) => {
         const client = redis.getClientSafe()
         const requestCountKey = `rate_limit:requests:${keyId}`
         const tokenCountKey = `rate_limit:tokens:${keyId}`
+        const windowStartKey = `rate_limit:window_start:${keyId}`
 
         currentWindowRequests = parseInt((await client.get(requestCountKey)) || '0')
         currentWindowTokens = parseInt((await client.get(tokenCountKey)) || '0')
+
+        // 获取窗口开始时间和计算剩余时间
+        const windowStart = await client.get(windowStartKey)
+        if (windowStart) {
+          const now = Date.now()
+          windowStartTime = parseInt(windowStart)
+          const windowDuration = fullKeyData.rateLimitWindow * 60 * 1000 // 转换为毫秒
+          windowEndTime = windowStartTime + windowDuration
+
+          // 如果窗口还有效
+          if (now < windowEndTime) {
+            windowRemainingSeconds = Math.max(0, Math.floor((windowEndTime - now) / 1000))
+          } else {
+            // 窗口已过期，下次请求会重置
+            windowStartTime = null
+            windowEndTime = null
+            windowRemainingSeconds = 0
+            // 重置计数为0，因为窗口已过期
+            currentWindowRequests = 0
+            currentWindowTokens = 0
+          }
+        }
       }
 
       // 获取当日费用
@@ -306,6 +408,9 @@ router.post('/api/user-stats', async (req, res) => {
       createdAt: keyData.createdAt,
       expiresAt: keyData.expiresAt,
       permissions: fullKeyData.permissions,
+      // 新增：计划类型与余额
+      planType: fullKeyData.planType || 'windowed',
+      lifetimeTokenBalance: fullKeyData.lifetimeTokenBalance || 0,
 
       // 使用统计（使用验证结果中的完整数据）
       usage: {
@@ -334,7 +439,11 @@ router.post('/api/user-stats', async (req, res) => {
         // 当前使用量
         currentWindowRequests,
         currentWindowTokens,
-        currentDailyCost
+        currentDailyCost,
+        // 时间窗口信息
+        windowStartTime,
+        windowEndTime,
+        windowRemainingSeconds
       },
 
       // 绑定的账户信息（只显示ID，不显示敏感信息）

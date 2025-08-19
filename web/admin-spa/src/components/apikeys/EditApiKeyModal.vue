@@ -38,6 +38,30 @@
             <p class="mt-1 text-xs text-gray-500 sm:mt-2">名称不可修改</p>
           </div>
 
+          <!-- 套餐类型与余额 -->
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label class="mb-1 block text-xs font-semibold text-gray-700 sm:mb-3 sm:text-sm"
+                >套餐类型</label
+              >
+              <select v-model="form.planType" class="form-input w-full text-sm">
+                <option value="windowed">按窗口限速</option>
+                <option value="lifetime">无时限（一次性余额）</option>
+              </select>
+            </div>
+            <div v-if="form.planType === 'lifetime'">
+              <label class="mb-1 block text-xs font-semibold text-gray-700 sm:mb-3 sm:text-sm"
+                >无时限余额（tokens）</label
+              >
+              <input
+                v-model.number="form.lifetimeTokenBalance"
+                class="form-input w-full text-sm"
+                min="0"
+                type="number"
+              />
+            </div>
+          </div>
+
           <!-- 标签 -->
           <div>
             <label class="mb-1.5 block text-xs font-semibold text-gray-700 sm:mb-3 sm:text-sm"
@@ -290,6 +314,10 @@
                 <input v-model="form.permissions" class="mr-2" type="radio" value="gemini" />
                 <span class="text-sm text-gray-700">仅 Gemini</span>
               </label>
+              <label class="flex cursor-pointer items-center">
+                <input v-model="form.permissions" class="mr-2" type="radio" value="openai" />
+                <span class="text-sm text-gray-700">仅 OpenAI</span>
+              </label>
             </div>
             <p class="mt-2 text-xs text-gray-500">控制此 API Key 可以访问哪些服务</p>
           </div>
@@ -321,7 +349,7 @@
                   v-model="form.claudeAccountId"
                   :accounts="localAccounts.claude"
                   default-option-text="使用共享账号池"
-                  :disabled="form.permissions === 'gemini'"
+                  :disabled="form.permissions === 'gemini' || form.permissions === 'openai'"
                   :groups="localAccounts.claudeGroups"
                   placeholder="请选择Claude账号"
                   platform="claude"
@@ -333,10 +361,22 @@
                   v-model="form.geminiAccountId"
                   :accounts="localAccounts.gemini"
                   default-option-text="使用共享账号池"
-                  :disabled="form.permissions === 'claude'"
+                  :disabled="form.permissions === 'claude' || form.permissions === 'openai'"
                   :groups="localAccounts.geminiGroups"
                   placeholder="请选择Gemini账号"
                   platform="gemini"
+                />
+              </div>
+              <div>
+                <label class="mb-1 block text-sm font-medium text-gray-600">OpenAI 专属账号</label>
+                <AccountSelector
+                  v-model="form.openaiAccountId"
+                  :accounts="localAccounts.openai"
+                  default-option-text="使用共享账号池"
+                  :disabled="form.permissions === 'claude' || form.permissions === 'gemini'"
+                  :groups="localAccounts.openaiGroups"
+                  placeholder="请选择OpenAI账号"
+                  platform="openai"
                 />
               </div>
             </div>
@@ -518,7 +558,14 @@ const clientsStore = useClientsStore()
 const apiKeysStore = useApiKeysStore()
 const loading = ref(false)
 const accountsLoading = ref(false)
-const localAccounts = ref({ claude: [], gemini: [], claudeGroups: [], geminiGroups: [] })
+const localAccounts = ref({
+  claude: [],
+  gemini: [],
+  openai: [],
+  claudeGroups: [],
+  geminiGroups: [],
+  openaiGroups: []
+})
 const rateTemplates = ref([])
 const rateTemplatesLoading = ref(false)
 
@@ -545,6 +592,7 @@ const form = reactive({
   permissions: 'all',
   claudeAccountId: '',
   geminiAccountId: '',
+  openaiAccountId: '',
   enableModelRestriction: false,
   restrictedModels: [],
   modelInput: '',
@@ -552,7 +600,10 @@ const form = reactive({
   allowedClients: [],
   tags: [],
   isActive: true,
-  rateTemplateId: ''
+  rateTemplateId: '',
+  // 新增
+  planType: 'windowed',
+  lifetimeTokenBalance: 0
 })
 
 // 添加限制的模型
@@ -631,7 +682,11 @@ const updateApiKey = async () => {
           : 0,
       permissions: form.permissions,
       rateTemplateId: form.rateTemplateId || undefined,
-      tags: form.tags
+      tags: form.tags,
+      // 新增
+      planType: form.planType,
+      lifetimeTokenBalance:
+        form.planType === 'lifetime' ? Number(form.lifetimeTokenBalance) || 0 : undefined
     }
 
     // 处理Claude账户绑定（区分OAuth和Console）
@@ -660,6 +715,13 @@ const updateApiKey = async () => {
       data.geminiAccountId = form.geminiAccountId
     } else {
       data.geminiAccountId = null
+    }
+
+    // OpenAI账户绑定
+    if (form.openaiAccountId) {
+      data.openaiAccountId = form.openaiAccountId
+    } else {
+      data.openaiAccountId = null
     }
 
     // 模型限制 - 始终提交这些字段
@@ -692,10 +754,11 @@ const updateApiKey = async () => {
 const refreshAccounts = async () => {
   accountsLoading.value = true
   try {
-    const [claudeData, claudeConsoleData, geminiData, groupsData] = await Promise.all([
+    const [claudeData, claudeConsoleData, geminiData, openaiData, groupsData] = await Promise.all([
       apiClient.get('/admin/claude-accounts'),
       apiClient.get('/admin/claude-console-accounts'),
       apiClient.get('/admin/gemini-accounts'),
+      apiClient.get('/admin/openai-accounts'),
       apiClient.get('/admin/account-groups')
     ])
 
@@ -731,11 +794,19 @@ const refreshAccounts = async () => {
       }))
     }
 
+    if (openaiData.success) {
+      localAccounts.value.openai = (openaiData.data || []).map((account) => ({
+        ...account,
+        isDedicated: account.accountType === 'dedicated'
+      }))
+    }
+
     // 处理分组数据
     if (groupsData.success) {
       const allGroups = groupsData.data || []
       localAccounts.value.claudeGroups = allGroups.filter((g) => g.platform === 'claude')
       localAccounts.value.geminiGroups = allGroups.filter((g) => g.platform === 'gemini')
+      localAccounts.value.openaiGroups = allGroups.filter((g) => g.platform === 'openai')
     }
 
     showToast('账号列表已刷新', 'success')
@@ -773,8 +844,10 @@ onMounted(async () => {
     localAccounts.value = {
       claude: props.accounts.claude || [],
       gemini: props.accounts.gemini || [],
+      openai: props.accounts.openai || [],
       claudeGroups: props.accounts.claudeGroups || [],
-      geminiGroups: props.accounts.geminiGroups || []
+      geminiGroups: props.accounts.geminiGroups || [],
+      openaiGroups: props.accounts.openaiGroups || []
     }
   }
 
@@ -793,6 +866,7 @@ onMounted(async () => {
     form.claudeAccountId = props.apiKey.claudeAccountId || ''
   }
   form.geminiAccountId = props.apiKey.geminiAccountId || ''
+  form.openaiAccountId = props.apiKey.openaiAccountId || ''
   form.restrictedModels = props.apiKey.restrictedModels || []
   form.allowedClients = props.apiKey.allowedClients || []
   form.tags = props.apiKey.tags || []
@@ -801,6 +875,9 @@ onMounted(async () => {
   form.enableClientRestriction = props.apiKey.enableClientRestriction || false
   // 初始化活跃状态，默认为 true
   form.isActive = props.apiKey.isActive !== undefined ? props.apiKey.isActive : true
+  // 新增：无时限配置
+  form.planType = props.apiKey.planType || 'windowed'
+  form.lifetimeTokenBalance = props.apiKey.lifetimeTokenBalance || 0
 })
 </script>
 

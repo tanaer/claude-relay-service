@@ -4,6 +4,7 @@ const claudeAccountService = require('../services/claudeAccountService')
 const claudeConsoleAccountService = require('../services/claudeConsoleAccountService')
 const bedrockAccountService = require('../services/bedrockAccountService')
 const geminiAccountService = require('../services/geminiAccountService')
+const openaiAccountService = require('../services/openaiAccountService')
 const accountGroupService = require('../services/accountGroupService')
 const redemptionCodeService = require('../services/redemptionCodeService')
 const redemptionPolicyService = require('../services/redemptionPolicyService')
@@ -25,7 +26,9 @@ const crypto = require('crypto')
 const upstreamErrorService = require('../services/upstreamErrorService') // Removed - no longer needed
 const path = require('path')
 const config = require('../../config/config')
-const { v4: uuidv4 } = require('uuid')
+const { SocksProxyAgent } = require('socks-proxy-agent')
+const { HttpsProxyAgent } = require('https-proxy-agent')
+const couponService = require('../services/couponService')
 
 const router = express.Router()
 // ================ 上游错误聚合与自定义文案 ================
@@ -512,6 +515,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       claudeAccountId,
       claudeConsoleAccountId,
       geminiAccountId,
+      openaiAccountId,
       permissions,
       concurrencyLimit,
       rateLimitWindow,
@@ -521,7 +525,9 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
-      tags
+      tags,
+      planType,
+      lifetimeTokenBalance
     } = req.body
 
     // 输入验证
@@ -607,6 +613,7 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       claudeAccountId,
       claudeConsoleAccountId,
       geminiAccountId,
+      openaiAccountId,
       permissions,
       concurrencyLimit,
       rateLimitWindow,
@@ -616,7 +623,9 @@ router.post('/api-keys', authenticateAdmin, async (req, res) => {
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
-      tags
+      tags,
+      planType,
+      lifetimeTokenBalance
     })
 
     logger.success(`🔑 Admin created new API key: ${name}`)
@@ -639,6 +648,7 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       claudeAccountId,
       claudeConsoleAccountId,
       geminiAccountId,
+      openaiAccountId,
       permissions,
       concurrencyLimit,
       rateLimitWindow,
@@ -648,7 +658,9 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
       enableClientRestriction,
       allowedClients,
       dailyCostLimit,
-      tags
+      tags,
+      planType,
+      lifetimeTokenBalance
     } = req.body
 
     // 输入验证
@@ -681,6 +693,7 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
           claudeAccountId,
           claudeConsoleAccountId,
           geminiAccountId,
+          openaiAccountId,
           permissions,
           concurrencyLimit,
           rateLimitWindow,
@@ -690,7 +703,9 @@ router.post('/api-keys/batch', authenticateAdmin, async (req, res) => {
           enableClientRestriction,
           allowedClients,
           dailyCostLimit,
-          tags
+          tags,
+          planType,
+          lifetimeTokenBalance
         })
 
         // 保留原始 API Key 供返回
@@ -750,6 +765,7 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       claudeAccountId,
       claudeConsoleAccountId,
       geminiAccountId,
+      openaiAccountId,
       permissions,
       enableModelRestriction,
       restrictedModels,
@@ -757,7 +773,9 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       allowedClients,
       expiresAt,
       dailyCostLimit,
-      tags
+      tags,
+      planType,
+      lifetimeTokenBalance
     } = req.body
 
     // 只允许更新指定字段
@@ -808,12 +826,17 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
       updates.geminiAccountId = geminiAccountId || ''
     }
 
+    if (openaiAccountId !== undefined) {
+      // 空字符串表示解绑，null或空字符串都设置为空字符串
+      updates.openaiAccountId = openaiAccountId || ''
+    }
+
     if (permissions !== undefined) {
       // 验证权限值
-      if (!['claude', 'gemini', 'all'].includes(permissions)) {
+      if (!['claude', 'gemini', 'openai', 'all'].includes(permissions)) {
         return res
           .status(400)
-          .json({ error: 'Invalid permissions value. Must be claude, gemini, or all' })
+          .json({ error: 'Invalid permissions value. Must be claude, gemini, openai, or all' })
       }
       updates.permissions = permissions
     }
@@ -883,6 +906,28 @@ router.put('/api-keys/:keyId', authenticateAdmin, async (req, res) => {
         return res.status(400).json({ error: 'All tags must be non-empty strings' })
       }
       updates.tags = tags
+    }
+
+    // 新增：无时限字段
+    if (planType !== undefined) {
+      if (!['windowed', 'lifetime'].includes(planType)) {
+        return res.status(400).json({ error: 'Invalid planType. Use windowed or lifetime' })
+      }
+      updates.planType = planType
+    }
+
+    if (
+      lifetimeTokenBalance !== undefined &&
+      lifetimeTokenBalance !== null &&
+      lifetimeTokenBalance !== ''
+    ) {
+      const num = Number(lifetimeTokenBalance)
+      if (!Number.isInteger(num) || num < 0) {
+        return res
+          .status(400)
+          .json({ error: 'lifetimeTokenBalance must be a non-negative integer' })
+      }
+      updates.lifetimeTokenBalance = num
     }
 
     // 处理活跃/禁用状态状态, 放在过期处理后，以确保后续增加禁用key功能
@@ -1016,6 +1061,11 @@ router.get('/account-groups/:groupId/members', authenticateAdmin, async (req, re
       // 如果还找不到，尝试Gemini账户
       if (!account) {
         account = await geminiAccountService.getAccount(memberId)
+      }
+
+      // 如果还找不到，尝试OpenAI账户
+      if (!account) {
+        account = await openaiAccountService.getAccount(memberId)
       }
 
       if (account) {
@@ -1489,6 +1539,46 @@ router.delete('/claude-accounts/:accountId', authenticateAdmin, async (req, res)
   }
 })
 
+// 更新单个Claude账户的Profile信息
+router.post('/claude-accounts/:accountId/update-profile', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+
+    const profileInfo = await claudeAccountService.fetchAndUpdateAccountProfile(accountId)
+
+    logger.success(`✅ Updated profile for Claude account: ${accountId}`)
+    return res.json({
+      success: true,
+      message: 'Account profile updated successfully',
+      data: profileInfo
+    })
+  } catch (error) {
+    logger.error('❌ Failed to update account profile:', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to update account profile', message: error.message })
+  }
+})
+
+// 批量更新所有Claude账户的Profile信息
+router.post('/claude-accounts/update-all-profiles', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await claudeAccountService.updateAllAccountProfiles()
+
+    logger.success('✅ Batch profile update completed')
+    return res.json({
+      success: true,
+      message: 'Batch profile update completed',
+      data: result
+    })
+  } catch (error) {
+    logger.error('❌ Failed to update all account profiles:', error)
+    return res
+      .status(500)
+      .json({ error: 'Failed to update all account profiles', message: error.message })
+  }
+})
+
 // 刷新Claude账户token
 router.post('/claude-accounts/:accountId/refresh', authenticateAdmin, async (req, res) => {
   try {
@@ -1662,7 +1752,8 @@ router.post('/claude-console-accounts', authenticateAdmin, async (req, res) => {
       priority: priority || 50,
       supportedModels: supportedModels || [],
       userAgent,
-      rateLimitDuration: rateLimitDuration || 60,
+      rateLimitDuration:
+        rateLimitDuration !== undefined && rateLimitDuration !== null ? rateLimitDuration : 60,
       proxy,
       accountType: accountType || 'shared'
     })
@@ -2517,16 +2608,21 @@ router.put(
         return res.status(404).json({ error: 'Account not found' })
       }
 
-      // 将字符串 'true'/'false' 转换为布尔值，然后取反
-      const currentSchedulable = account.schedulable === 'true'
-      const newSchedulable = !currentSchedulable
+      // 现在 account.schedulable 已经是布尔值了，直接取反即可
+      const newSchedulable = !account.schedulable
 
       await geminiAccountService.updateAccount(accountId, { schedulable: String(newSchedulable) })
 
-      logger.info(
+      // 验证更新是否成功，重新获取账户信息
+      const updatedAccount = await geminiAccountService.getAccount(accountId)
+      const actualSchedulable = updatedAccount ? updatedAccount.schedulable : newSchedulable
+
+      logger.success(
         `🔄 Admin toggled Gemini account schedulable status: ${accountId} -> ${newSchedulable ? 'schedulable' : 'not schedulable'}`
       )
-      return res.json({ success: true, schedulable: newSchedulable })
+
+      // 返回实际的数据库值，确保前端状态与后端一致
+      return res.json({ success: true, schedulable: actualSchedulable })
     } catch (error) {
       logger.error('[错误] 切换 Gemini 账户可调度状态失败：', error)
       return res
@@ -2621,6 +2717,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       claudeConsoleAccounts,
       geminiAccounts,
       bedrockAccountsResult,
+      openaiAccounts,
       todayStats,
       systemAverages,
       realtimeMetrics
@@ -2631,6 +2728,7 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       claudeConsoleAccountService.getAllAccounts(),
       geminiAccountService.getAllAccounts(),
       bedrockAccountService.getAllAccounts(),
+      redis.getAllOpenAIAccounts(),
       redis.getTodayStats(),
       redis.getSystemAverages(),
       redis.getRealtimeSystemMetrics()
@@ -2768,6 +2866,39 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
       (acc) => acc.rateLimitStatus && acc.rateLimitStatus.isRateLimited
     ).length
 
+    // OpenAI账户统计
+    // 注意：OpenAI账户的isActive和schedulable是字符串类型，默认值为'true'
+    const normalOpenAIAccounts = openaiAccounts.filter(
+      (acc) =>
+        (acc.isActive === 'true' ||
+          acc.isActive === true ||
+          (!acc.isActive && acc.isActive !== 'false' && acc.isActive !== false)) &&
+        acc.status !== 'blocked' &&
+        acc.status !== 'unauthorized' &&
+        acc.schedulable !== 'false' &&
+        acc.schedulable !== false && // 包括'true'、true和undefined
+        !(acc.rateLimitStatus && acc.rateLimitStatus.isRateLimited)
+    ).length
+    const abnormalOpenAIAccounts = openaiAccounts.filter(
+      (acc) =>
+        acc.isActive === 'false' ||
+        acc.isActive === false ||
+        acc.status === 'blocked' ||
+        acc.status === 'unauthorized'
+    ).length
+    const pausedOpenAIAccounts = openaiAccounts.filter(
+      (acc) =>
+        (acc.schedulable === 'false' || acc.schedulable === false) &&
+        (acc.isActive === 'true' ||
+          acc.isActive === true ||
+          (!acc.isActive && acc.isActive !== 'false' && acc.isActive !== false)) &&
+        acc.status !== 'blocked' &&
+        acc.status !== 'unauthorized'
+    ).length
+    const rateLimitedOpenAIAccounts = openaiAccounts.filter(
+      (acc) => acc.rateLimitStatus && acc.rateLimitStatus.isRateLimited
+    ).length
+
     const dashboard = {
       overview: {
         totalApiKeys: apiKeys.length,
@@ -2777,27 +2908,32 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           claudeAccounts.length +
           claudeConsoleAccounts.length +
           geminiAccounts.length +
-          bedrockAccounts.length,
+          bedrockAccounts.length +
+          openaiAccounts.length,
         normalAccounts:
           normalClaudeAccounts +
           normalClaudeConsoleAccounts +
           normalGeminiAccounts +
-          normalBedrockAccounts,
+          normalBedrockAccounts +
+          normalOpenAIAccounts,
         abnormalAccounts:
           abnormalClaudeAccounts +
           abnormalClaudeConsoleAccounts +
           abnormalGeminiAccounts +
-          abnormalBedrockAccounts,
+          abnormalBedrockAccounts +
+          abnormalOpenAIAccounts,
         pausedAccounts:
           pausedClaudeAccounts +
           pausedClaudeConsoleAccounts +
           pausedGeminiAccounts +
-          pausedBedrockAccounts,
+          pausedBedrockAccounts +
+          pausedOpenAIAccounts,
         rateLimitedAccounts:
           rateLimitedClaudeAccounts +
           rateLimitedClaudeConsoleAccounts +
           rateLimitedGeminiAccounts +
-          rateLimitedBedrockAccounts,
+          rateLimitedBedrockAccounts +
+          rateLimitedOpenAIAccounts,
         // 各平台详细统计
         accountsByPlatform: {
           claude: {
@@ -2827,6 +2963,13 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
             abnormal: abnormalBedrockAccounts,
             paused: pausedBedrockAccounts,
             rateLimited: rateLimitedBedrockAccounts
+          },
+          openai: {
+            total: openaiAccounts.length,
+            normal: normalOpenAIAccounts,
+            abnormal: abnormalOpenAIAccounts,
+            paused: pausedOpenAIAccounts,
+            rateLimited: rateLimitedOpenAIAccounts
           }
         },
         // 保留旧字段以兼容
@@ -2834,7 +2977,8 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
           normalClaudeAccounts +
           normalClaudeConsoleAccounts +
           normalGeminiAccounts +
-          normalBedrockAccounts,
+          normalBedrockAccounts +
+          normalOpenAIAccounts,
         totalClaudeAccounts: claudeAccounts.length + claudeConsoleAccounts.length,
         activeClaudeAccounts: normalClaudeAccounts + normalClaudeConsoleAccounts,
         rateLimitedClaudeAccounts: rateLimitedClaudeAccounts + rateLimitedClaudeConsoleAccounts,
@@ -4486,12 +4630,16 @@ router.post('/openai-accounts/exchange-code', authenticateAdmin, async (req, res
 
     if (sessionData.proxy) {
       const { type, host, port, username, password } = sessionData.proxy
-      if (type === 'http' || type === 'https') {
-        axiosConfig.proxy = {
-          host,
-          port: parseInt(port),
-          auth: username && password ? { username, password } : undefined
-        }
+      if (type === 'socks5') {
+        // SOCKS5 代理
+        const auth = username && password ? `${username}:${password}@` : ''
+        const socksUrl = `socks5://${auth}${host}:${port}`
+        axiosConfig.httpsAgent = new SocksProxyAgent(socksUrl)
+      } else if (type === 'http' || type === 'https') {
+        // HTTP/HTTPS 代理
+        const auth = username && password ? `${username}:${password}@` : ''
+        const proxyUrl = `${type}://${auth}${host}:${port}`
+        axiosConfig.httpsAgent = new HttpsProxyAgent(proxyUrl)
       }
     }
 
@@ -4567,13 +4715,60 @@ router.post('/openai-accounts/exchange-code', authenticateAdmin, async (req, res
 // 获取所有 OpenAI 账户
 router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
   try {
-    const accounts = await redis.getAllOpenAIAccounts()
+    const { platform, groupId } = req.query
+    let accounts = await openaiAccountService.getAllAccounts()
 
-    logger.info(`获取 OpenAI 账户列表: ${accounts.length} 个账户`)
+    // 根据查询参数进行筛选
+    if (platform && platform !== 'all' && platform !== 'openai') {
+      // 如果指定了其他平台，返回空数组
+      accounts = []
+    }
+
+    // 如果指定了分组筛选
+    if (groupId && groupId !== 'all') {
+      if (groupId === 'ungrouped') {
+        // 筛选未分组账户
+        accounts = accounts.filter((account) => !account.groupInfo)
+      } else {
+        // 筛选特定分组的账户
+        accounts = accounts.filter(
+          (account) => account.groupInfo && account.groupInfo.id === groupId
+        )
+      }
+    }
+
+    // 为每个账户添加使用统计信息
+    const accountsWithStats = await Promise.all(
+      accounts.map(async (account) => {
+        try {
+          const usageStats = await redis.getAccountUsageStats(account.id)
+          return {
+            ...account,
+            usage: {
+              daily: usageStats.daily,
+              total: usageStats.total,
+              monthly: usageStats.monthly
+            }
+          }
+        } catch (error) {
+          logger.debug(`Failed to get usage stats for OpenAI account ${account.id}:`, error)
+          return {
+            ...account,
+            usage: {
+              daily: { requests: 0, tokens: 0, allTokens: 0 },
+              total: { requests: 0, tokens: 0, allTokens: 0 },
+              monthly: { requests: 0, tokens: 0, allTokens: 0 }
+            }
+          }
+        }
+      })
+    )
+
+    logger.info(`获取 OpenAI 账户列表: ${accountsWithStats.length} 个账户`)
 
     return res.json({
       success: true,
-      data: accounts
+      data: accountsWithStats
     })
   } catch (error) {
     logger.error('[错误] 获取 OpenAI 账户列表失败：', error)
@@ -4596,7 +4791,6 @@ router.post('/openai-accounts', authenticateAdmin, async (req, res) => {
       proxy,
       accountType,
       groupId,
-      dedicatedApiKeys,
       rateLimitDuration,
       priority
     } = req.body
@@ -4607,60 +4801,34 @@ router.post('/openai-accounts', authenticateAdmin, async (req, res) => {
         message: '账户名称不能为空'
       })
     }
-    const id = uuidv4()
     // 创建账户数据
     const accountData = {
-      id,
       name,
       description: description || '',
-      platform: 'openai',
       accountType: accountType || 'shared',
-      groupId: groupId || null,
-      dedicatedApiKeys: dedicatedApiKeys || [],
       priority: priority || 50,
-      rateLimitDuration: rateLimitDuration || 60,
-      enabled: true,
-      idToken: claudeAccountService._encryptSensitiveData(openaiOauth.idToken),
-      accessToken: claudeAccountService._encryptSensitiveData(openaiOauth.accessToken),
-      refreshToken: claudeAccountService._encryptSensitiveData(openaiOauth.refreshToken),
-      accountId: accountInfo?.accountId || '',
-      expiresAt: (Math.floor(Date.now() / 1000) + openaiOauth.expires_in) * 1000,
-      chatgptUserId: accountInfo?.chatgptUserId || '',
-      organizationId: accountInfo?.organizationId || '',
-      organizationRole: accountInfo?.organizationRole || '',
-      organizationTitle: accountInfo?.organizationTitle || '',
-      planType: accountInfo?.planType || '',
-      email: claudeAccountService._encryptSensitiveData(accountInfo?.email || ''),
-      emailVerified: accountInfo?.emailVerified || false,
+      rateLimitDuration:
+        rateLimitDuration !== undefined && rateLimitDuration !== null ? rateLimitDuration : 60,
+      openaiOauth: openaiOauth || {},
+      accountInfo: accountInfo || {},
+      proxy: proxy || null,
       isActive: true,
-      status: 'active',
-      lastRefresh: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      schedulable: true
     }
 
-    // 存储代理配置（如果提供）
-    if (proxy?.enabled) {
-      accountData.proxy = {
-        type: proxy.type,
-        host: proxy.host,
-        port: proxy.port,
-        username: proxy.username || null,
-        password: proxy.password || null
-      }
+    // 创建账户
+    const createdAccount = await openaiAccountService.createAccount(accountData)
+
+    // 如果是分组类型，添加到分组
+    if (accountType === 'group' && groupId) {
+      await accountGroupService.addAccountToGroup(createdAccount.id, groupId, 'openai')
     }
 
-    // 保存到 Redis
-    const accountId = await redis.setOpenAiAccount(id, accountData)
-
-    logger.success(`✅ 创建 OpenAI 账户成功: ${name} (ID: ${accountId})`)
+    logger.success(`✅ 创建 OpenAI 账户成功: ${name} (ID: ${createdAccount.id})`)
 
     return res.json({
       success: true,
-      data: {
-        id: accountId,
-        ...accountData
-      }
+      data: createdAccount
     })
   } catch (error) {
     logger.error('[错误] 创建 OpenAI 账户失败：', error)
@@ -4673,19 +4841,100 @@ router.post('/openai-accounts', authenticateAdmin, async (req, res) => {
 })
 
 // 更新 OpenAI 账户
-router.put('/openai-accounts/:id', authenticateAdmin, async (req, res) =>
-  //TODO:
-  res.json({
-    success: true
-  })
-)
+router.put('/openai-accounts/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+    const updates = req.body
+
+    // 验证accountType的有效性
+    if (updates.accountType && !['shared', 'dedicated', 'group'].includes(updates.accountType)) {
+      return res
+        .status(400)
+        .json({ error: 'Invalid account type. Must be "shared", "dedicated" or "group"' })
+    }
+
+    // 如果更新为分组类型，验证groupId
+    if (updates.accountType === 'group' && !updates.groupId) {
+      return res.status(400).json({ error: 'Group ID is required for group type accounts' })
+    }
+
+    // 获取账户当前信息以处理分组变更
+    const currentAccount = await openaiAccountService.getAccount(id)
+    if (!currentAccount) {
+      return res.status(404).json({ error: 'Account not found' })
+    }
+
+    // 处理分组的变更
+    if (updates.accountType !== undefined) {
+      // 如果之前是分组类型，需要从原分组中移除
+      if (currentAccount.accountType === 'group') {
+        const oldGroup = await accountGroupService.getAccountGroup(id)
+        if (oldGroup) {
+          await accountGroupService.removeAccountFromGroup(id, oldGroup.id)
+        }
+      }
+      // 如果新类型是分组，添加到新分组
+      if (updates.accountType === 'group' && updates.groupId) {
+        await accountGroupService.addAccountToGroup(id, updates.groupId, 'openai')
+      }
+    }
+
+    // 准备更新数据
+    const updateData = { ...updates }
+
+    // 处理敏感数据加密
+    if (updates.openaiOauth) {
+      updateData.openaiOauth = updates.openaiOauth
+      if (updates.openaiOauth.idToken) {
+        updateData.idToken = updates.openaiOauth.idToken
+      }
+      if (updates.openaiOauth.accessToken) {
+        updateData.accessToken = updates.openaiOauth.accessToken
+      }
+      if (updates.openaiOauth.refreshToken) {
+        updateData.refreshToken = updates.openaiOauth.refreshToken
+      }
+      if (updates.openaiOauth.expires_in) {
+        updateData.expiresAt = new Date(
+          Date.now() + updates.openaiOauth.expires_in * 1000
+        ).toISOString()
+      }
+    }
+
+    // 更新账户信息
+    if (updates.accountInfo) {
+      updateData.accountId = updates.accountInfo.accountId || currentAccount.accountId
+      updateData.chatgptUserId = updates.accountInfo.chatgptUserId || currentAccount.chatgptUserId
+      updateData.organizationId =
+        updates.accountInfo.organizationId || currentAccount.organizationId
+      updateData.organizationRole =
+        updates.accountInfo.organizationRole || currentAccount.organizationRole
+      updateData.organizationTitle =
+        updates.accountInfo.organizationTitle || currentAccount.organizationTitle
+      updateData.planType = updates.accountInfo.planType || currentAccount.planType
+      updateData.email = updates.accountInfo.email || currentAccount.email
+      updateData.emailVerified =
+        updates.accountInfo.emailVerified !== undefined
+          ? updates.accountInfo.emailVerified
+          : currentAccount.emailVerified
+    }
+
+    const updatedAccount = await openaiAccountService.updateAccount(id, updateData)
+
+    logger.success(`📝 Admin updated OpenAI account: ${id}`)
+    return res.json({ success: true, data: updatedAccount })
+  } catch (error) {
+    logger.error('❌ Failed to update OpenAI account:', error)
+    return res.status(500).json({ error: 'Failed to update account', message: error.message })
+  }
+})
 
 // 删除 OpenAI 账户
 router.delete('/openai-accounts/:id', authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params
 
-    const account = await redis.getOpenAiAccount(id)
+    const account = await openaiAccountService.getAccount(id)
     if (!account) {
       return res.status(404).json({
         success: false,
@@ -4693,7 +4942,15 @@ router.delete('/openai-accounts/:id', authenticateAdmin, async (req, res) => {
       })
     }
 
-    await redis.deleteOpenAiAccount(id)
+    // 如果账户在分组中，从分组中移除
+    if (account.accountType === 'group') {
+      const group = await accountGroupService.getAccountGroup(id)
+      if (group) {
+        await accountGroupService.removeAccountFromGroup(id, group.id)
+      }
+    }
+
+    await openaiAccountService.deleteAccount(id)
 
     logger.success(`✅ 删除 OpenAI 账户成功: ${account.name} (ID: ${id})`)
 
@@ -5716,6 +5973,77 @@ router.post('/redemption-policies/toggle-scheduler', authenticateAdmin, async (r
       error: 'Failed to toggle scheduler',
       message: error.message
     })
+  }
+})
+
+// 切换 OpenAI 账户调度状态
+router.put(
+  '/openai-accounts/:accountId/toggle-schedulable',
+  authenticateAdmin,
+  async (req, res) => {
+    try {
+      const { accountId } = req.params
+
+      const result = await openaiAccountService.toggleSchedulable(accountId)
+
+      return res.json({
+        success: result.success,
+        schedulable: result.schedulable,
+        message: result.schedulable ? '已启用调度' : '已禁用调度'
+      })
+    } catch (error) {
+      logger.error('切换 OpenAI 账户调度状态失败:', error)
+      return res.status(500).json({
+        success: false,
+        message: '切换调度状态失败',
+        error: error.message
+      })
+    }
+  }
+)
+
+// 兑换码：创建无时限卡（管理员）
+router.post('/coupons/lifetime', authenticateAdmin, async (req, res) => {
+  try {
+    const { tokens, code } = req.body
+    const amount = Number(tokens)
+    if (!Number.isInteger(amount) || amount <= 0) {
+      return res.status(400).json({ success: false, message: '余额必须为正整数 tokens' })
+    }
+    if (code && typeof code === 'string' && !code.trim().toUpperCase().startsWith('U')) {
+      return res.status(400).json({ success: false, message: '无时限卡券码需以 U 开头' })
+    }
+    const result = await couponService.createLifetimeCoupon(amount, code)
+    return res.json({ success: true, data: result })
+  } catch (error) {
+    logger.error('❌ Failed to create lifetime coupon:', error)
+    return res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// 兑换码：列表（管理员）
+router.get('/coupons', authenticateAdmin, async (req, res) => {
+  try {
+    const list = await couponService.listCoupons()
+    return res.json({ success: true, data: list })
+  } catch (error) {
+    logger.error('❌ Failed to list coupons:', error)
+    return res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// 兑换码：兑换为新的 API Key（公开/或管理员调用）
+router.post('/coupons/redeem', async (req, res) => {
+  try {
+    const { code, namePrefix } = req.body
+    if (!code || typeof code !== 'string') {
+      return res.status(400).json({ success: false, message: '缺少兑换码' })
+    }
+    const newKey = await couponService.redeemToApiKey(code, { namePrefix })
+    return res.json({ success: true, data: newKey })
+  } catch (error) {
+    logger.error('❌ Failed to redeem coupon:', error)
+    return res.status(400).json({ success: false, message: error.message })
   }
 })
 

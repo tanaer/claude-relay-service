@@ -240,3 +240,6 @@ web/apiStats/
 web/admin-spa/dist/
 .bmad-core
 *.md
+
+*.md
+*.yaml

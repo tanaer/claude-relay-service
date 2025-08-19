@@ -350,19 +350,34 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700"
-                  >限流时间 (分钟)</label
-                >
-                <input
-                  v-model.number="form.rateLimitDuration"
-                  class="form-input w-full"
-                  min="1"
-                  placeholder="默认60分钟"
-                  type="number"
-                />
-                <p class="mt-1 text-xs text-gray-500">
-                  当账号返回429错误时，暂停调度的时间（分钟）
-                </p>
+                <label class="mb-3 block text-sm font-semibold text-gray-700">限流机制</label>
+                <div class="mb-3">
+                  <label class="inline-flex cursor-pointer items-center">
+                    <input
+                      v-model="form.enableRateLimit"
+                      class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200"
+                      type="checkbox"
+                    />
+                    <span class="text-sm text-gray-700">启用限流机制</span>
+                  </label>
+                  <p class="mt-1 text-xs text-gray-500">
+                    启用后，当账号返回429错误时将暂停调度一段时间
+                  </p>
+                </div>
+
+                <div v-if="form.enableRateLimit">
+                  <label class="mb-3 block text-sm font-semibold text-gray-700"
+                    >限流时间 (分钟)</label
+                  >
+                  <input
+                    v-model.number="form.rateLimitDuration"
+                    class="form-input w-full"
+                    min="1"
+                    placeholder="默认60分钟"
+                    type="number"
+                  />
+                  <p class="mt-1 text-xs text-gray-500">账号被限流后暂停调度的时间（分钟）</p>
+                </div>
               </div>
             </div>
 
@@ -509,20 +524,64 @@
               </div>
 
               <div>
-                <label class="mb-3 block text-sm font-semibold text-gray-700"
-                  >限流时间 (分钟)</label
-                >
-                <input
-                  v-model.number="form.rateLimitDuration"
-                  class="form-input w-full"
-                  min="1"
-                  placeholder="默认60分钟"
-                  type="number"
-                />
-                <p class="mt-1 text-xs text-gray-500">
-                  当账号返回429错误时，暂停调度的时间（分钟）
-                </p>
+                <label class="mb-3 block text-sm font-semibold text-gray-700">限流机制</label>
+                <div class="mb-3">
+                  <label class="inline-flex cursor-pointer items-center">
+                    <input
+                      v-model="form.enableRateLimit"
+                      class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200"
+                      type="checkbox"
+                    />
+                    <span class="text-sm text-gray-700">启用限流机制</span>
+                  </label>
+                  <p class="mt-1 text-xs text-gray-500">
+                    启用后，当账号返回429错误时将暂停调度一段时间
+                  </p>
+                </div>
+
+                <div v-if="form.enableRateLimit">
+                  <label class="mb-3 block text-sm font-semibold text-gray-700"
+                    >限流时间 (分钟)</label
+                  >
+                  <input
+                    v-model.number="form.rateLimitDuration"
+                    class="form-input w-full"
+                    min="1"
+                    placeholder="默认60分钟"
+                    type="number"
+                  />
+                  <p class="mt-1 text-xs text-gray-500">账号被限流后暂停调度的时间（分钟）</p>
+                </div>
               </div>
+            </div>
+
+            <!-- Claude 订阅类型选择 -->
+            <div v-if="form.platform === 'claude'">
+              <label class="mb-3 block text-sm font-semibold text-gray-700">订阅类型</label>
+              <div class="flex gap-4">
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.subscriptionType"
+                    class="mr-2"
+                    type="radio"
+                    value="claude_max"
+                  />
+                  <span class="text-sm text-gray-700">Claude Max</span>
+                </label>
+                <label class="flex cursor-pointer items-center">
+                  <input
+                    v-model="form.subscriptionType"
+                    class="mr-2"
+                    type="radio"
+                    value="claude_pro"
+                  />
+                  <span class="text-sm text-gray-700">Claude Pro</span>
+                </label>
+              </div>
+              <p class="mt-2 text-xs text-gray-500">
+                <i class="fas fa-info-circle mr-1" />
+                Pro 账号不支持 Claude Opus 4 模型
+              </p>
             </div>
 
             <!-- Claude、Claude Console和Bedrock的优先级设置 -->
@@ -676,6 +735,25 @@
                     如填写，将在调用时以此地址替代默认官网地址。
                   </p>
                 </div>
+              </div>
+
+              <!-- OpenAI 平台需要 ID Token -->
+              <div v-if="form.platform === 'openai'">
+                <label class="mb-3 block text-sm font-semibold text-gray-700">ID Token *</label>
+                <textarea
+                  v-model="form.idToken"
+                  class="form-input w-full resize-none font-mono text-xs"
+                  :class="{ 'border-red-500': errors.idToken }"
+                  placeholder="请输入 ID Token (JWT 格式)..."
+                  required
+                  rows="4"
+                />
+                <p v-if="errors.idToken" class="mt-1 text-xs text-red-500">
+                  {{ errors.idToken }}
+                </p>
+                <p class="mt-2 text-xs text-gray-500">
+                  ID Token 是 OpenAI OAuth 认证返回的 JWT token，包含用户信息和组织信息
+                </p>
               </div>
 
               <div>
@@ -984,6 +1062,35 @@
             <p class="mt-2 text-xs text-gray-500">Google Cloud/Workspace 账号可能需要提供项目 ID</p>
           </div>
 
+          <!-- Claude 订阅类型选择（编辑模式） -->
+          <div v-if="form.platform === 'claude'">
+            <label class="mb-3 block text-sm font-semibold text-gray-700">订阅类型</label>
+            <div class="flex gap-4">
+              <label class="flex cursor-pointer items-center">
+                <input
+                  v-model="form.subscriptionType"
+                  class="mr-2"
+                  type="radio"
+                  value="claude_max"
+                />
+                <span class="text-sm text-gray-700">Claude Max</span>
+              </label>
+              <label class="flex cursor-pointer items-center">
+                <input
+                  v-model="form.subscriptionType"
+                  class="mr-2"
+                  type="radio"
+                  value="claude_pro"
+                />
+                <span class="text-sm text-gray-700">Claude Pro</span>
+              </label>
+            </div>
+            <p class="mt-2 text-xs text-gray-500">
+              <i class="fas fa-info-circle mr-1" />
+              Pro 账号不支持 Claude Opus 4 模型
+            </p>
+          </div>
+
           <!-- Claude、Claude Console和Bedrock的优先级设置（编辑模式） -->
           <div
             v-if="
@@ -1193,13 +1300,33 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">限流时间 (分钟)</label>
-              <input
-                v-model.number="form.rateLimitDuration"
-                class="form-input w-full"
-                min="1"
-                type="number"
-              />
+              <label class="mb-3 block text-sm font-semibold text-gray-700">限流机制</label>
+              <div class="mb-3">
+                <label class="inline-flex cursor-pointer items-center">
+                  <input
+                    v-model="form.enableRateLimit"
+                    class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200"
+                    type="checkbox"
+                  />
+                  <span class="text-sm text-gray-700">启用限流机制</span>
+                </label>
+                <p class="mt-1 text-xs text-gray-500">
+                  启用后，当账号返回429错误时将暂停调度一段时间
+                </p>
+              </div>
+
+              <div v-if="form.enableRateLimit">
+                <label class="mb-3 block text-sm font-semibold text-gray-700"
+                  >限流时间 (分钟)</label
+                >
+                <input
+                  v-model.number="form.rateLimitDuration"
+                  class="form-input w-full"
+                  min="1"
+                  type="number"
+                />
+                <p class="mt-1 text-xs text-gray-500">账号被限流后暂停调度的时间（分钟）</p>
+              </div>
             </div>
           </div>
 
@@ -1292,13 +1419,33 @@
             </div>
 
             <div>
-              <label class="mb-3 block text-sm font-semibold text-gray-700">限流时间 (分钟)</label>
-              <input
-                v-model.number="form.rateLimitDuration"
-                class="form-input w-full"
-                min="1"
-                type="number"
-              />
+              <label class="mb-3 block text-sm font-semibold text-gray-700">限流机制</label>
+              <div class="mb-3">
+                <label class="inline-flex cursor-pointer items-center">
+                  <input
+                    v-model="form.enableRateLimit"
+                    class="mr-2 rounded border-gray-300 text-blue-600 focus:border-blue-500 focus:ring focus:ring-blue-200"
+                    type="checkbox"
+                  />
+                  <span class="text-sm text-gray-700">启用限流机制</span>
+                </label>
+                <p class="mt-1 text-xs text-gray-500">
+                  启用后，当账号返回429错误时将暂停调度一段时间
+                </p>
+              </div>
+
+              <div v-if="form.enableRateLimit">
+                <label class="mb-3 block text-sm font-semibold text-gray-700"
+                  >限流时间 (分钟)</label
+                >
+                <input
+                  v-model.number="form.rateLimitDuration"
+                  class="form-input w-full"
+                  min="1"
+                  type="number"
+                />
+                <p class="mt-1 text-xs text-gray-500">账号被限流后暂停调度的时间（分钟）</p>
+              </div>
             </div>
           </div>
 
@@ -1467,8 +1614,10 @@ const form = ref({
   name: props.account?.name || '',
   description: props.account?.description || '',
   accountType: props.account?.accountType || 'shared',
+  subscriptionType: 'claude_max', // 默认为 Claude Max，兼容旧数据
   groupId: '',
   projectId: props.account?.projectId || '',
+  idToken: '',
   accessToken: '',
   refreshToken: '',
   // 官方 Claude（非 Console）可选：自定义官网 API 地址
@@ -1494,6 +1643,7 @@ const form = ref({
     return ''
   })(),
   userAgent: props.account?.userAgent || '',
+  enableRateLimit: props.account ? props.account.rateLimitDuration > 0 : true,
   rateLimitDuration: props.account?.rateLimitDuration || 60,
   // Bedrock 特定字段
   accessKeyId: props.account?.accessKeyId || '',
@@ -1532,6 +1682,7 @@ const initModelMappings = () => {
 // 表单验证错误
 const errors = ref({
   name: '',
+  idToken: '',
   accessToken: '',
   apiUrl: '',
   apiKey: '',
@@ -1730,6 +1881,13 @@ const handleOAuthSuccess = async (tokenInfo) => {
       if (form.value.upstreamResetTime && form.value.upstreamResetTime.trim()) {
         data.upstreamResetTime = form.value.upstreamResetTime.trim()
       }
+      // 添加订阅类型信息
+      data.subscriptionInfo = {
+        accountType: form.value.subscriptionType || 'claude_max',
+        hasClaudeMax: form.value.subscriptionType === 'claude_max',
+        hasClaudePro: form.value.subscriptionType === 'claude_pro',
+        manuallySet: true // 标记为手动设置
+      }
     } else if (form.value.platform === 'gemini') {
       // Gemini使用geminiOauth字段
       data.geminiOauth = tokenInfo.tokens || tokenInfo
@@ -1739,6 +1897,7 @@ const handleOAuthSuccess = async (tokenInfo) => {
     } else if (form.value.platform === 'openai') {
       data.openaiOauth = tokenInfo.tokens || tokenInfo
       data.accountInfo = tokenInfo.accountInfo
+      data.priority = form.value.priority || 50
     }
 
     let result
@@ -1797,12 +1956,20 @@ const createAccount = async () => {
       errors.value.region = '请选择 AWS 区域'
       hasError = true
     }
-  } else if (
-    form.value.addType === 'manual' &&
-    (!form.value.accessToken || form.value.accessToken.trim() === '')
-  ) {
-    errors.value.accessToken = '请填写 Access Token'
-    hasError = true
+  } else if (form.value.addType === 'manual') {
+    // 手动模式验证
+    if (!form.value.accessToken || form.value.accessToken.trim() === '') {
+      errors.value.accessToken = '请填写 Access Token'
+      hasError = true
+    }
+    // OpenAI 平台需要验证 ID Token
+    if (
+      form.value.platform === 'openai' &&
+      (!form.value.idToken || form.value.idToken.trim() === '')
+    ) {
+      errors.value.idToken = '请填写 ID Token'
+      hasError = true
+    }
   }
 
   // 分组类型验证
@@ -1856,6 +2023,13 @@ const createAccount = async () => {
       if (form.value.upstreamResetTime && form.value.upstreamResetTime.trim()) {
         data.upstreamResetTime = form.value.upstreamResetTime.trim()
       }
+      // 添加订阅类型信息
+      data.subscriptionInfo = {
+        accountType: form.value.subscriptionType || 'claude_max',
+        hasClaudeMax: form.value.subscriptionType === 'claude_max',
+        hasClaudePro: form.value.subscriptionType === 'claude_pro',
+        manuallySet: true // 标记为手动设置
+      }
     } else if (form.value.platform === 'gemini') {
       // Gemini手动模式需要构建geminiOauth对象
       const expiresInMs = form.value.refreshToken
@@ -1873,6 +2047,57 @@ const createAccount = async () => {
       if (form.value.projectId) {
         data.projectId = form.value.projectId
       }
+    } else if (form.value.platform === 'openai') {
+      // OpenAI手动模式需要构建openaiOauth对象
+      const expiresInMs = form.value.refreshToken
+        ? 10 * 60 * 1000 // 10分钟
+        : 365 * 24 * 60 * 60 * 1000 // 1年
+
+      data.openaiOauth = {
+        idToken: form.value.idToken, // 使用用户输入的 ID Token
+        accessToken: form.value.accessToken,
+        refreshToken: form.value.refreshToken || '',
+        expires_in: Math.floor(expiresInMs / 1000) // 转换为秒
+      }
+
+      // 手动模式下，尝试从 ID Token 解析用户信息
+      let accountInfo = {
+        accountId: '',
+        chatgptUserId: '',
+        organizationId: '',
+        organizationRole: '',
+        organizationTitle: '',
+        planType: '',
+        email: '',
+        emailVerified: false
+      }
+
+      // 尝试解析 ID Token (JWT)
+      if (form.value.idToken) {
+        try {
+          const idTokenParts = form.value.idToken.split('.')
+          if (idTokenParts.length === 3) {
+            const payload = JSON.parse(atob(idTokenParts[1]))
+            const authClaims = payload['https://api.openai.com/auth'] || {}
+
+            accountInfo = {
+              accountId: authClaims.accountId || '',
+              chatgptUserId: authClaims.chatgptUserId || '',
+              organizationId: authClaims.organizationId || '',
+              organizationRole: authClaims.organizationRole || '',
+              organizationTitle: authClaims.organizationTitle || '',
+              planType: authClaims.planType || '',
+              email: payload.email || '',
+              emailVerified: payload.email_verified || false
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to parse ID Token:', e)
+        }
+      }
+
+      data.accountInfo = accountInfo
+      data.priority = form.value.priority || 50
     } else if (form.value.platform === 'claude-console') {
       // Claude Console 账户特定数据
       data.apiUrl = form.value.apiUrl
@@ -1883,7 +2108,8 @@ const createAccount = async () => {
       }
       data.supportedModels = convertMappingsToObject() || {}
       data.userAgent = form.value.userAgent || null
-      data.rateLimitDuration = form.value.rateLimitDuration || 60
+      // 如果不启用限流，传递 0 表示不限流
+      data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
     } else if (form.value.platform === 'bedrock') {
       // Bedrock 账户特定数据 - 构造 awsCredentials 对象
       data.awsCredentials = {
@@ -1898,7 +2124,8 @@ const createAccount = async () => {
       if (form.value.upstreamResetTime && form.value.upstreamResetTime.trim()) {
         data.upstreamResetTime = form.value.upstreamResetTime.trim()
       }
-      data.rateLimitDuration = form.value.rateLimitDuration || 60
+      // 如果不启用限流，传递 0 表示不限流
+      data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
     }
 
     let result
@@ -2003,6 +2230,18 @@ const updateAccount = async () => {
           token_type: 'Bearer',
           expiry_date: Date.now() + expiresInMs
         }
+      } else if (props.account.platform === 'openai') {
+        // OpenAI需要构建openaiOauth对象
+        const expiresInMs = form.value.refreshToken
+          ? 10 * 60 * 1000 // 10分钟
+          : 365 * 24 * 60 * 60 * 1000 // 1年
+
+        data.openaiOauth = {
+          idToken: form.value.idToken || '', // 更新时使用用户输入的 ID Token
+          accessToken: form.value.accessToken || '',
+          refreshToken: form.value.refreshToken || '',
+          expires_in: Math.floor(expiresInMs / 1000) // 转换为秒
+        }
       }
     }
 
@@ -2017,8 +2256,27 @@ const updateAccount = async () => {
         : null
     }
 
-    // Claude 官方账号优先级更新
+    // 统一处理上游重置时间（支持所有平台）
+    if (form.value.upstreamResetTime !== undefined) {
+      data.upstreamResetTime = form.value.upstreamResetTime
+        ? form.value.upstreamResetTime.trim()
+        : null
+    }
+
+    // Claude 官方账号优先级和订阅类型更新
     if (props.account.platform === 'claude') {
+      data.priority = form.value.priority || 50
+      // 更新订阅类型信息
+      data.subscriptionInfo = {
+        accountType: form.value.subscriptionType || 'claude_max',
+        hasClaudeMax: form.value.subscriptionType === 'claude_max',
+        hasClaudePro: form.value.subscriptionType === 'claude_pro',
+        manuallySet: true // 标记为手动设置
+      }
+    }
+
+    // OpenAI 账号优先级更新
+    if (props.account.platform === 'openai') {
       data.priority = form.value.priority || 50
     }
 
@@ -2031,7 +2289,8 @@ const updateAccount = async () => {
       data.priority = form.value.priority || 50
       data.supportedModels = convertMappingsToObject() || {}
       data.userAgent = form.value.userAgent || null
-      data.rateLimitDuration = form.value.rateLimitDuration || 60
+      // 如果不启用限流，传递 0 表示不限流
+      data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
     }
 
     // Bedrock 特定更新
@@ -2056,7 +2315,8 @@ const updateAccount = async () => {
       data.defaultModel = form.value.defaultModel || null
       data.smallFastModel = form.value.smallFastModel || null
       data.priority = form.value.priority || 50
-      data.rateLimitDuration = form.value.rateLimitDuration || 60
+      // 如果不启用限流，传递 0 表示不限流
+      data.rateLimitDuration = form.value.enableRateLimit ? form.value.rateLimitDuration || 60 : 0
     }
 
     if (props.account.platform === 'claude') {
@@ -2304,13 +2564,39 @@ watch(
               password: ''
             }
 
+      // 获取分组ID - 可能来自 groupId 字段或 groupInfo 对象
+      let groupId = ''
+      if (newAccount.accountType === 'group') {
+        groupId = newAccount.groupId || (newAccount.groupInfo && newAccount.groupInfo.id) || ''
+      }
+
+      // 初始化订阅类型（从 subscriptionInfo 中提取，兼容旧数据默认为 claude_max）
+      let subscriptionType = 'claude_max'
+      if (newAccount.subscriptionInfo) {
+        const info =
+          typeof newAccount.subscriptionInfo === 'string'
+            ? JSON.parse(newAccount.subscriptionInfo)
+            : newAccount.subscriptionInfo
+
+        if (info.accountType) {
+          subscriptionType = info.accountType
+        } else if (info.hasClaudeMax) {
+          subscriptionType = 'claude_max'
+        } else if (info.hasClaudePro) {
+          subscriptionType = 'claude_pro'
+        } else {
+          subscriptionType = 'claude_free'
+        }
+      }
+
       form.value = {
         platform: newAccount.platform,
         addType: 'oauth',
         name: newAccount.name,
         description: newAccount.description || '',
         accountType: newAccount.accountType || 'shared',
-        groupId: '',
+        subscriptionType: subscriptionType,
+        groupId: groupId,
         projectId: newAccount.projectId || '',
         accessToken: '',
         refreshToken: '',
@@ -2333,6 +2619,8 @@ watch(
           return ''
         })(),
         userAgent: newAccount.userAgent || '',
+        enableRateLimit:
+          newAccount.rateLimitDuration && newAccount.rateLimitDuration > 0 ? true : false,
         rateLimitDuration: newAccount.rateLimitDuration || 60,
         // Bedrock 特定字段
         accessKeyId: '', // 编辑模式不显示现有的访问密钥

@@ -1,11 +1,11 @@
-const geminiAccountService = require('./geminiAccountService')
+const openaiAccountService = require('./openaiAccountService')
 const accountGroupService = require('./accountGroupService')
 const redis = require('../models/redis')
 const logger = require('../utils/logger')
 
-class UnifiedGeminiScheduler {
+class UnifiedOpenAIScheduler {
   constructor() {
-    this.SESSION_MAPPING_PREFIX = 'unified_gemini_session_mapping:'
+    this.SESSION_MAPPING_PREFIX = 'unified_openai_session_mapping:'
   }
 
   // 🔧 辅助方法：检查账户是否可调度（兼容字符串和布尔值）
@@ -18,14 +18,14 @@ class UnifiedGeminiScheduler {
     return schedulable !== false && schedulable !== 'false'
   }
 
-  // 🎯 统一调度Gemini账号
+  // 🎯 统一调度OpenAI账号
   async selectAccountForApiKey(apiKeyData, sessionHash = null, requestedModel = null) {
     try {
       // 如果API Key绑定了专属账户或分组，优先使用
-      if (apiKeyData.geminiAccountId) {
+      if (apiKeyData.openaiAccountId) {
         // 检查是否是分组
-        if (apiKeyData.geminiAccountId.startsWith('group:')) {
-          const groupId = apiKeyData.geminiAccountId.replace('group:', '')
+        if (apiKeyData.openaiAccountId.startsWith('group:')) {
+          const groupId = apiKeyData.openaiAccountId.replace('group:', '')
           logger.info(
             `🎯 API key ${apiKeyData.name} is bound to group ${groupId}, selecting from group`
           )
@@ -33,20 +33,20 @@ class UnifiedGeminiScheduler {
         }
 
         // 普通专属账户
-        const boundAccount = await geminiAccountService.getAccount(apiKeyData.geminiAccountId)
+        const boundAccount = await openaiAccountService.getAccount(apiKeyData.openaiAccountId)
         if (boundAccount && boundAccount.isActive === 'true' && boundAccount.status !== 'error') {
           logger.info(
-            `🎯 Using bound dedicated Gemini account: ${boundAccount.name} (${apiKeyData.geminiAccountId}) for API key ${apiKeyData.name}`
+            `🎯 Using bound dedicated OpenAI account: ${boundAccount.name} (${apiKeyData.openaiAccountId}) for API key ${apiKeyData.name}`
           )
           // 更新账户的最后使用时间
-          await geminiAccountService.markAccountUsed(apiKeyData.geminiAccountId)
+          await openaiAccountService.recordUsage(apiKeyData.openaiAccountId, 0)
           return {
-            accountId: apiKeyData.geminiAccountId,
-            accountType: 'gemini'
+            accountId: apiKeyData.openaiAccountId,
+            accountType: 'openai'
           }
         } else {
           logger.warn(
-            `⚠️ Bound Gemini account ${apiKeyData.geminiAccountId} is not available, falling back to pool`
+            `⚠️ Bound OpenAI account ${apiKeyData.openaiAccountId} is not available, falling back to pool`
           )
         }
       }
@@ -65,7 +65,7 @@ class UnifiedGeminiScheduler {
               `🎯 Using sticky session account: ${mappedAccount.accountId} (${mappedAccount.accountType}) for session ${sessionHash}`
             )
             // 更新账户的最后使用时间
-            await geminiAccountService.markAccountUsed(mappedAccount.accountId)
+            await openaiAccountService.recordUsage(mappedAccount.accountId, 0)
             return mappedAccount
           } else {
             logger.warn(
@@ -83,10 +83,10 @@ class UnifiedGeminiScheduler {
         // 提供更详细的错误信息
         if (requestedModel) {
           throw new Error(
-            `No available Gemini accounts support the requested model: ${requestedModel}`
+            `No available OpenAI accounts support the requested model: ${requestedModel}`
           )
         } else {
-          throw new Error('No available Gemini accounts')
+          throw new Error('No available OpenAI accounts')
         }
       }
 
@@ -113,7 +113,7 @@ class UnifiedGeminiScheduler {
       )
 
       // 更新账户的最后使用时间
-      await geminiAccountService.markAccountUsed(selectedAccount.accountId)
+      await openaiAccountService.recordUsage(selectedAccount.accountId, 0)
 
       return {
         accountId: selectedAccount.accountId,
@@ -130,51 +130,48 @@ class UnifiedGeminiScheduler {
     const availableAccounts = []
 
     // 如果API Key绑定了专属账户，优先返回
-    if (apiKeyData.geminiAccountId) {
-      const boundAccount = await geminiAccountService.getAccount(apiKeyData.geminiAccountId)
+    if (apiKeyData.openaiAccountId) {
+      const boundAccount = await openaiAccountService.getAccount(apiKeyData.openaiAccountId)
       if (boundAccount && boundAccount.isActive === 'true' && boundAccount.status !== 'error') {
         const isRateLimited = await this.isAccountRateLimited(boundAccount.id)
         if (!isRateLimited) {
-          // 检查模型支持
+          // 检查模型支持（仅在明确设置了supportedModels且不为空时才检查）
+          // 如果没有设置supportedModels或为空数组，则支持所有模型
           if (
             requestedModel &&
             boundAccount.supportedModels &&
             boundAccount.supportedModels.length > 0
           ) {
-            // 处理可能带有 models/ 前缀的模型名
-            const normalizedModel = requestedModel.replace('models/', '')
-            const modelSupported = boundAccount.supportedModels.some(
-              (model) => model.replace('models/', '') === normalizedModel
-            )
+            const modelSupported = boundAccount.supportedModels.includes(requestedModel)
             if (!modelSupported) {
               logger.warn(
-                `⚠️ Bound Gemini account ${boundAccount.name} does not support model ${requestedModel}`
+                `⚠️ Bound OpenAI account ${boundAccount.name} does not support model ${requestedModel}`
               )
               return availableAccounts
             }
           }
 
           logger.info(
-            `🎯 Using bound dedicated Gemini account: ${boundAccount.name} (${apiKeyData.geminiAccountId})`
+            `🎯 Using bound dedicated OpenAI account: ${boundAccount.name} (${apiKeyData.openaiAccountId})`
           )
           return [
             {
               ...boundAccount,
               accountId: boundAccount.id,
-              accountType: 'gemini',
+              accountType: 'openai',
               priority: parseInt(boundAccount.priority) || 50,
               lastUsedAt: boundAccount.lastUsedAt || '0'
             }
           ]
         }
       } else {
-        logger.warn(`⚠️ Bound Gemini account ${apiKeyData.geminiAccountId} is not available`)
+        logger.warn(`⚠️ Bound OpenAI account ${apiKeyData.openaiAccountId} is not available`)
       }
     }
 
-    // 获取所有Gemini账户（共享池）
-    const geminiAccounts = await geminiAccountService.getAllAccounts()
-    for (const account of geminiAccounts) {
+    // 获取所有OpenAI账户（共享池）
+    const openaiAccounts = await openaiAccountService.getAllAccounts()
+    for (const account of openaiAccounts) {
       if (
         account.isActive === 'true' &&
         account.status !== 'error' &&
@@ -184,24 +181,21 @@ class UnifiedGeminiScheduler {
         // 检查是否可调度
 
         // 检查token是否过期
-        const isExpired = geminiAccountService.isTokenExpired(account)
+        const isExpired = openaiAccountService.isTokenExpired(account)
         if (isExpired && !account.refreshToken) {
           logger.warn(
-            `⚠️ Gemini account ${account.name} token expired and no refresh token available`
+            `⚠️ OpenAI account ${account.name} token expired and no refresh token available`
           )
           continue
         }
 
-        // 检查模型支持
+        // 检查模型支持（仅在明确设置了supportedModels且不为空时才检查）
+        // 如果没有设置supportedModels或为空数组，则支持所有模型
         if (requestedModel && account.supportedModels && account.supportedModels.length > 0) {
-          // 处理可能带有 models/ 前缀的模型名
-          const normalizedModel = requestedModel.replace('models/', '')
-          const modelSupported = account.supportedModels.some(
-            (model) => model.replace('models/', '') === normalizedModel
-          )
+          const modelSupported = account.supportedModels.includes(requestedModel)
           if (!modelSupported) {
             logger.debug(
-              `⏭️ Skipping Gemini account ${account.name} - doesn't support model ${requestedModel}`
+              `⏭️ Skipping OpenAI account ${account.name} - doesn't support model ${requestedModel}`
             )
             continue
           }
@@ -209,19 +203,21 @@ class UnifiedGeminiScheduler {
 
         // 检查是否被限流
         const isRateLimited = await this.isAccountRateLimited(account.id)
-        if (!isRateLimited) {
-          availableAccounts.push({
-            ...account,
-            accountId: account.id,
-            accountType: 'gemini',
-            priority: parseInt(account.priority) || 50, // 默认优先级50
-            lastUsedAt: account.lastUsedAt || '0'
-          })
+        if (isRateLimited) {
+          logger.debug(`⏭️ Skipping OpenAI account ${account.name} - rate limited`)
+          continue
         }
+
+        availableAccounts.push({
+          ...account,
+          accountId: account.id,
+          accountType: 'openai',
+          priority: parseInt(account.priority) || 50,
+          lastUsedAt: account.lastUsedAt || '0'
+        })
       }
     }
 
-    logger.info(`📊 Total available Gemini accounts: ${availableAccounts.length}`)
     return availableAccounts
   }
 
@@ -243,14 +239,14 @@ class UnifiedGeminiScheduler {
   // 🔍 检查账户是否可用
   async _isAccountAvailable(accountId, accountType) {
     try {
-      if (accountType === 'gemini') {
-        const account = await geminiAccountService.getAccount(accountId)
+      if (accountType === 'openai') {
+        const account = await openaiAccountService.getAccount(accountId)
         if (!account || account.isActive !== 'true' || account.status === 'error') {
           return false
         }
         // 检查是否可调度
         if (!this._isSchedulable(account.schedulable)) {
-          logger.info(`🚫 Gemini account ${accountId} is not schedulable`)
+          logger.info(`🚫 OpenAI account ${accountId} is not schedulable`)
           return false
         }
         return !(await this.isAccountRateLimited(accountId))
@@ -297,8 +293,8 @@ class UnifiedGeminiScheduler {
   // 🚫 标记账户为限流状态
   async markAccountRateLimited(accountId, accountType, sessionHash = null) {
     try {
-      if (accountType === 'gemini') {
-        await geminiAccountService.setAccountRateLimited(accountId, true)
+      if (accountType === 'openai') {
+        await openaiAccountService.setAccountRateLimited(accountId, true)
       }
 
       // 删除会话映射
@@ -319,8 +315,8 @@ class UnifiedGeminiScheduler {
   // ✅ 移除账户的限流状态
   async removeAccountRateLimit(accountId, accountType) {
     try {
-      if (accountType === 'gemini') {
-        await geminiAccountService.setAccountRateLimited(accountId, false)
+      if (accountType === 'openai') {
+        await openaiAccountService.setAccountRateLimited(accountId, false)
       }
 
       return { success: true }
@@ -336,7 +332,7 @@ class UnifiedGeminiScheduler {
   // 🔍 检查账户是否处于限流状态
   async isAccountRateLimited(accountId) {
     try {
-      const account = await geminiAccountService.getAccount(accountId)
+      const account = await openaiAccountService.getAccount(accountId)
       if (!account) {
         return false
       }
@@ -364,79 +360,69 @@ class UnifiedGeminiScheduler {
         throw new Error(`Group ${groupId} not found`)
       }
 
-      if (group.platform !== 'gemini') {
-        throw new Error(`Group ${group.name} is not a Gemini group`)
+      if (group.platform !== 'openai') {
+        throw new Error(`Group ${group.name} is not an OpenAI group`)
       }
 
-      logger.info(`👥 Selecting account from Gemini group: ${group.name}`)
+      logger.info(`👥 Selecting account from OpenAI group: ${group.name}`)
 
       // 如果有会话哈希，检查是否有已映射的账户
       if (sessionHash) {
         const mappedAccount = await this._getSessionMapping(sessionHash)
         if (mappedAccount) {
-          // 验证映射的账户是否属于这个分组
-          const memberIds = await accountGroupService.getGroupMembers(groupId)
-          if (memberIds.includes(mappedAccount.accountId)) {
+          // 验证映射的账户是否仍然可用并且在分组中
+          const isInGroup = await this._isAccountInGroup(mappedAccount.accountId, groupId)
+          if (isInGroup) {
             const isAvailable = await this._isAccountAvailable(
               mappedAccount.accountId,
               mappedAccount.accountType
             )
             if (isAvailable) {
               logger.info(
-                `🎯 Using sticky session account from group: ${mappedAccount.accountId} (${mappedAccount.accountType}) for session ${sessionHash}`
+                `🎯 Using sticky session account from group: ${mappedAccount.accountId} (${mappedAccount.accountType})`
               )
               // 更新账户的最后使用时间
-              await geminiAccountService.markAccountUsed(mappedAccount.accountId)
+              await openaiAccountService.recordUsage(mappedAccount.accountId, 0)
               return mappedAccount
             }
           }
-          // 如果映射的账户不可用或不在分组中，删除映射
+          // 如果账户不可用或不在分组中，删除映射
           await this._deleteSessionMapping(sessionHash)
         }
       }
 
-      // 获取分组内的所有账户
+      // 获取分组成员
       const memberIds = await accountGroupService.getGroupMembers(groupId)
       if (memberIds.length === 0) {
         throw new Error(`Group ${group.name} has no members`)
       }
 
+      // 获取可用的分组成员账户
       const availableAccounts = []
-
-      // 获取所有成员账户的详细信息
       for (const memberId of memberIds) {
-        const account = await geminiAccountService.getAccount(memberId)
-
-        if (!account) {
-          logger.warn(`⚠️ Gemini account ${memberId} not found in group ${group.name}`)
-          continue
-        }
-
-        // 检查账户是否可用
+        const account = await openaiAccountService.getAccount(memberId)
         if (
+          account &&
           account.isActive === 'true' &&
           account.status !== 'error' &&
           this._isSchedulable(account.schedulable)
         ) {
           // 检查token是否过期
-          const isExpired = geminiAccountService.isTokenExpired(account)
+          const isExpired = openaiAccountService.isTokenExpired(account)
           if (isExpired && !account.refreshToken) {
             logger.warn(
-              `⚠️ Gemini account ${account.name} in group token expired and no refresh token available`
+              `⚠️ Group member OpenAI account ${account.name} token expired and no refresh token available`
             )
             continue
           }
 
-          // 检查模型支持
+          // 检查模型支持（仅在明确设置了supportedModels且不为空时才检查）
+          // 如果没有设置supportedModels或为空数组，则支持所有模型
           if (requestedModel && account.supportedModels && account.supportedModels.length > 0) {
-            // 处理可能带有 models/ 前缀的模型名
-            const normalizedModel = requestedModel.replace('models/', '')
-            const modelSupported = account.supportedModels.some(
-              (model) => model.replace('models/', '') === normalizedModel
-            )
+            const modelSupported = account.supportedModels.includes(requestedModel)
             if (!modelSupported) {
               logger.debug(
-                `⏭️ Skipping Gemini account ${account.name} in group - doesn't support model ${requestedModel}`
+                `⏭️ Skipping group member OpenAI account ${account.name} - doesn't support model ${requestedModel}`
               )
               continue
             }
@@ -444,23 +430,26 @@ class UnifiedGeminiScheduler {
 
           // 检查是否被限流
           const isRateLimited = await this.isAccountRateLimited(account.id)
-          if (!isRateLimited) {
-            availableAccounts.push({
-              ...account,
-              accountId: account.id,
-              accountType: 'gemini',
-              priority: parseInt(account.priority) || 50,
-              lastUsedAt: account.lastUsedAt || '0'
-            })
+          if (isRateLimited) {
+            logger.debug(`⏭️ Skipping group member OpenAI account ${account.name} - rate limited`)
+            continue
           }
+
+          availableAccounts.push({
+            ...account,
+            accountId: account.id,
+            accountType: 'openai',
+            priority: parseInt(account.priority) || 50,
+            lastUsedAt: account.lastUsedAt || '0'
+          })
         }
       }
 
       if (availableAccounts.length === 0) {
-        throw new Error(`No available accounts in Gemini group ${group.name}`)
+        throw new Error(`No available accounts in group ${group.name}`)
       }
 
-      // 使用现有的优先级排序逻辑
+      // 按优先级和最后使用时间排序
       const sortedAccounts = this._sortAccountsByPriority(availableAccounts)
 
       // 选择第一个账户
@@ -474,26 +463,45 @@ class UnifiedGeminiScheduler {
           selectedAccount.accountType
         )
         logger.info(
-          `🎯 Created new sticky session mapping in group: ${selectedAccount.name} (${selectedAccount.accountId}, ${selectedAccount.accountType}) for session ${sessionHash}`
+          `🎯 Created new sticky session mapping from group: ${selectedAccount.name} (${selectedAccount.accountId})`
         )
       }
 
       logger.info(
-        `🎯 Selected account from Gemini group ${group.name}: ${selectedAccount.name} (${selectedAccount.accountId}, ${selectedAccount.accountType}) with priority ${selectedAccount.priority}`
+        `🎯 Selected account from group: ${selectedAccount.name} (${selectedAccount.accountId}) with priority ${selectedAccount.priority}`
       )
 
       // 更新账户的最后使用时间
-      await geminiAccountService.markAccountUsed(selectedAccount.accountId)
+      await openaiAccountService.recordUsage(selectedAccount.accountId, 0)
 
       return {
         accountId: selectedAccount.accountId,
         accountType: selectedAccount.accountType
       }
     } catch (error) {
-      logger.error(`❌ Failed to select account from Gemini group ${groupId}:`, error)
+      logger.error(`❌ Failed to select account from group ${groupId}:`, error)
       throw error
+    }
+  }
+
+  // 🔍 检查账户是否在分组中
+  async _isAccountInGroup(accountId, groupId) {
+    const members = await accountGroupService.getGroupMembers(groupId)
+    return members.includes(accountId)
+  }
+
+  // 📊 更新账户最后使用时间
+  async updateAccountLastUsed(accountId, accountType) {
+    try {
+      if (accountType === 'openai') {
+        await openaiAccountService.updateAccount(accountId, {
+          lastUsedAt: new Date().toISOString()
+        })
+      }
+    } catch (error) {
+      logger.warn(`⚠️ Failed to update last used time for account ${accountId}:`, error)
     }
   }
 }
 
-module.exports = new UnifiedGeminiScheduler()
+module.exports = new UnifiedOpenAIScheduler()

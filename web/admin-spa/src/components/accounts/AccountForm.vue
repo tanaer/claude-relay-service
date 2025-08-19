@@ -2010,12 +2010,16 @@ const updateAccount = async () => {
       data.projectId = form.value.projectId
     }
 
+    // 统一处理上游重置时间（支持所有平台）
+    if (form.value.upstreamResetTime !== undefined) {
+      data.upstreamResetTime = form.value.upstreamResetTime
+        ? form.value.upstreamResetTime.trim()
+        : null
+    }
+
     // Claude 官方账号优先级更新
     if (props.account.platform === 'claude') {
       data.priority = form.value.priority || 50
-      if (form.value.upstreamResetTime !== undefined) {
-        data.upstreamResetTime = form.value.upstreamResetTime.trim() || null
-      }
     }
 
     // Claude Console 特定更新
@@ -2025,9 +2029,6 @@ const updateAccount = async () => {
         data.apiKey = form.value.apiKey
       }
       data.priority = form.value.priority || 50
-      if (form.value.upstreamResetTime !== undefined) {
-        data.upstreamResetTime = form.value.upstreamResetTime.trim() || null
-      }
       data.supportedModels = convertMappingsToObject() || {}
       data.userAgent = form.value.userAgent || null
       data.rateLimitDuration = form.value.rateLimitDuration || 60
@@ -2055,9 +2056,6 @@ const updateAccount = async () => {
       data.defaultModel = form.value.defaultModel || null
       data.smallFastModel = form.value.smallFastModel || null
       data.priority = form.value.priority || 50
-      if (form.value.upstreamResetTime !== undefined) {
-        data.upstreamResetTime = form.value.upstreamResetTime.trim() || null
-      }
       data.rateLimitDuration = form.value.rateLimitDuration || 60
     }
 

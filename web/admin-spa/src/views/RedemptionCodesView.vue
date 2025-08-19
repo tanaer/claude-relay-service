@@ -40,7 +40,7 @@
               v-model="filters.status"
               :options="statusOptions"
               placeholder="所有状态"
-              @change="loadCodes()"
+              @change="handleFilterChange"
             />
 
             <!-- 类型筛选 -->
@@ -48,7 +48,7 @@
               v-model="filters.type"
               :options="typeOptions"
               placeholder="所有类型"
-              @change="loadCodes()"
+              @change="handleFilterChange"
             />
 
             <!-- 搜索框 -->
@@ -419,8 +419,17 @@ let searchTimeout = null
 const debounceSearch = () => {
   clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => {
+    // 搜索时重置到第一页
+    pagination.currentPage = 1
     loadCodes()
   }, 500)
+}
+
+// 处理筛选器改变
+const handleFilterChange = () => {
+  // 筛选器改变时重置到第一页
+  pagination.currentPage = 1
+  loadCodes()
 }
 
 // 加载兑换码列表
@@ -437,17 +446,38 @@ const loadCodes = async () => {
     params.page = pagination.currentPage
     params.pageSize = pagination.pageSize
 
+    console.log('🔍 Loading redemption codes with params:', params)
+
     const result = await api.get('/admin/redemption-codes', {
       params
     })
 
-    if (result.success) {
-      codes.value = result.data.items || result.data
+    console.log('📊 API response:', result)
 
-      // 更新分页信息
-      if (result.data.pagination) {
-        Object.assign(pagination, result.data.pagination)
+    if (result.success) {
+      // 处理响应数据结构
+      if (result.data && typeof result.data === 'object' && result.data.items) {
+        // 分页数据结构: { items: [], pagination: {} }
+        codes.value = result.data.items
+
+        // 更新分页信息
+        if (result.data.pagination) {
+          Object.assign(pagination, result.data.pagination)
+          console.log('📄 Updated pagination:', pagination)
+        }
+      } else if (Array.isArray(result.data)) {
+        // 直接返回数组（向后兼容）
+        codes.value = result.data
+        // 没有分页信息时，重置分页
+        pagination.totalCount = result.data.length
+        pagination.totalPages = Math.ceil(result.data.length / pagination.pageSize)
+        console.log('📄 Legacy array response, updated pagination:', pagination)
+      } else {
+        console.warn('⚠️ Unexpected data structure:', result.data)
+        codes.value = []
       }
+
+      console.log('✅ Loaded codes count:', codes.value.length)
     }
   } catch (error) {
     console.error('Error loading redemption codes:', error)

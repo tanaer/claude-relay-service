@@ -238,13 +238,6 @@ class Application {
       this.app.post('/redeem', async (req, res) => {
         try {
           const redemptionCodeService = require('./services/redemptionCodeService')
-          // 如果兑换码是纯数字 返回错误“这是拼多多的核销码，请发给拼多多店铺客服，客服会给您兑换码”
-          if (/^\d+$/.test(code)) {
-            return res.status(400).json({
-              success: false,
-              error: '这是拼多多的核销码，请发给拼多多店铺客服，客服会给您兑换码'
-            })
-          }
 
           // 统一清洗兑换码：去除各种空白/零宽字符，规范连字符，并仅保留允许字符
           const sanitizeRedemptionCode = (raw) => {
@@ -268,6 +261,14 @@ class Application {
             return res.status(400).json({
               success: false,
               error: '兑换码不能为空'
+            })
+          }
+
+          // 如果兑换码是纯数字 返回错误“这是拼多多的核销码，请发给拼多多店铺客服，客服会给您兑换码”
+          if (/^\d+$/.test(code)) {
+            return res.status(400).json({
+              success: false,
+              error: '这是拼多多的核销码，请发给拼多多店铺客服，客服会给您兑换码'
             })
           }
 

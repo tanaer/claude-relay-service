@@ -441,6 +441,12 @@ onMounted(() => {
     apiKey.value = urlApiKey
   }
 
+  // 根据 URL 参数设置默认 Tab（支持 stats / redeem / tutorial）
+  const urlTab = route.query.tab
+  if (typeof urlTab === 'string' && ['stats', 'redeem', 'tutorial'].includes(urlTab)) {
+    currentTab.value = urlTab
+  }
+
   // 添加键盘事件监听
   document.addEventListener('keydown', handleKeyDown)
 })

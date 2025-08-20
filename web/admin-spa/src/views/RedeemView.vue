@@ -1,8 +1,8 @@
 <template>
   <div class="redeem-page">
     <div class="card">
-      <h1 class="title">请输入兑换码跳转 Claude 网页版</h1>
-      <p class="subtitle">仅需输入兑换码进行验证，成功后将跳转到 Claude 网页端。</p>
+      <h1 class="title">请输入兑换码使用 Claude MAX20 镜像服务</h1>
+      <p class="subtitle">仅需输入兑换码进行验证，成功后将跳转到 Claude MAX20 镜像服务。</p>
 
       <form class="form" @submit.prevent="onSubmit">
         <input
@@ -22,14 +22,9 @@
 
       <div v-if="success && targetUrl" class="actions">
         <a class="link-button" :href="targetUrl" rel="noopener" target="_blank"
-          >前往 Claude 网页版</a
+          >前往 Claude MAX20 镜像服务</a
         >
       </div>
-
-      <p class="hint">
-        若已获得兑换码，输入后将跳转到
-        <a href="https://free.yourapi.cn/" rel="noopener" target="_blank">Claude 网页版</a>。
-      </p>
     </div>
   </div>
 </template>

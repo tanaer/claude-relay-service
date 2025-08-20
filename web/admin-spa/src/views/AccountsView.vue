@@ -383,6 +383,11 @@
                       class="fas fa-clock ml-1 text-yellow-600"
                       :title="`上游重置时间: ${account.upstreamResetTime}`"
                     />
+                    <i
+                      class="fas fa-times ml-2 cursor-pointer text-red-600 hover:text-red-800"
+                      title="取消智能限流"
+                      @click.stop="removeSmartRateLimit(account)"
+                    />
                   </span>
                   <span
                     v-else-if="
@@ -1032,7 +1037,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import { useConfirm } from '@/composables/useConfirm'
@@ -1775,6 +1780,39 @@ const testAccount = async (account) => {
     showToast(errorMessage, 'error')
   } finally {
     account.isTesting = false
+  }
+}
+
+// 移除智能限流状态
+const removeSmartRateLimit = async (account) => {
+  // 确认对话框
+  const confirmResult = await ElMessageBox.confirm(
+    `确定要取消账户 "${account.name}" 的智能限流状态吗？`,
+    '确认操作',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).catch(() => false)
+
+  if (!confirmResult) return
+
+  try {
+    const { data } = await apiClient.delete(
+      `/admin/smart-rate-limit/limited-accounts/${account.id}`
+    )
+
+    if (data.success) {
+      showToast('智能限流已取消', 'success')
+      // 刷新账户列表以获取最新状态
+      loadAccounts()
+    } else {
+      showToast(data.message || '取消智能限流失败', 'error')
+    }
+  } catch (error) {
+    console.error('取消智能限流失败:', error)
+    showToast(error.response?.data?.message || '取消智能限流失败', 'error')
   }
 }
 

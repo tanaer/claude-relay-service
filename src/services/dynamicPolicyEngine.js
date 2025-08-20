@@ -345,28 +345,56 @@ class DynamicPolicyEngine {
       }
 
       // 检查API Key是否为日卡类型，如果是则跳过重置
-      const apiKeyService = require('./apiKeyService')
-      const apiKeyData = await apiKeyService.getApiKeyById(apiKeyId)
+      const apiKeyData = await redis.getApiKey(apiKeyId)
       if (apiKeyData && apiKeyData.tags) {
         let tags = []
+
+        // 增强的标签解析逻辑
         try {
           if (typeof apiKeyData.tags === 'string') {
-            tags = JSON.parse(apiKeyData.tags)
+            const trimmedTags = apiKeyData.tags.trim()
+
+            // 尝试JSON解析
+            if (trimmedTags.startsWith('[') && trimmedTags.endsWith(']')) {
+              try {
+                tags = JSON.parse(trimmedTags)
+              } catch (jsonError) {
+                logger.debug(`[策略引擎] JSON解析失败，尝试其他方式: ${jsonError.message}`)
+                // JSON解析失败，按逗号分割
+                tags = trimmedTags
+                  .slice(1, -1)
+                  .split(',')
+                  .map((tag) =>
+                    // 移除引号和空格
+                    tag.replace(/['"]/g, '').trim()
+                  )
+                  .filter((tag) => tag.length > 0)
+              }
+            } else {
+              // 不是JSON格式，按逗号分割
+              tags = trimmedTags
+                .split(',')
+                .map((tag) => tag.trim())
+                .filter((tag) => tag.length > 0)
+            }
           } else if (Array.isArray(apiKeyData.tags)) {
             tags = [...apiKeyData.tags]
           }
         } catch (error) {
-          // 如果解析失败，尝试按逗号分割
-          tags =
-            typeof apiKeyData.tags === 'string'
-              ? apiKeyData.tags.split(',').map((tag) => tag.trim())
-              : []
+          logger.warn(`[策略引擎] 标签解析失败: ${error.message}, 使用空标签列表`)
+          tags = []
         }
+
+        logger.debug(`[策略引擎] API Key ${apiKeyId} 标签解析结果: ${JSON.stringify(tags)}`)
 
         // 如果包含 daily-card 标签，跳过重置
         if (tags.includes('daily-card')) {
           logger.info(`[策略引擎] API Key ${apiKeyId} 为日卡类型，跳过每日重置`)
           return
+        } else {
+          logger.debug(
+            `[策略引擎] API Key ${apiKeyId} 非日卡类型，将执行重置。标签: ${JSON.stringify(tags)}`
+          )
         }
       }
 

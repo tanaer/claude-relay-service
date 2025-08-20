@@ -442,7 +442,11 @@ onMounted(() => {
   }
 
   // 根据 URL 参数设置默认 Tab（支持 stats / redeem / tutorial）
-  const urlTab = route.query.tab
+  let urlTab = route.query.tab
+  // 兼容 t= 简写
+  if (!urlTab && typeof route.query.t === 'string') {
+    urlTab = route.query.t
+  }
   if (typeof urlTab === 'string' && ['stats', 'redeem', 'tutorial'].includes(urlTab)) {
     currentTab.value = urlTab
   }

@@ -382,14 +382,16 @@ router.post('/redeem', async (req, res) => {
           success: true,
           message: result.message,
           data: { ...result.data, downloadUrl },
-          alreadyUsed: result.alreadyUsed || false
+          alreadyUsed: result.alreadyUsed || false,
+          targetUrl: 'https://free.yourapi.cn/'
         })
       } catch (e) {
         return res.json({
           success: true,
           message: result.message,
           data: result.data,
-          alreadyUsed: result.alreadyUsed || false
+          alreadyUsed: result.alreadyUsed || false,
+          targetUrl: 'https://free.yourapi.cn/'
         })
       }
     } else {

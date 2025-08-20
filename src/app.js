@@ -283,13 +283,15 @@ class Application {
               return res.json({
                 success: true,
                 message: result.message,
-                data: { ...result.data, downloadUrl }
+                data: { ...result.data, downloadUrl },
+                targetUrl: 'https://free.yourapi.cn/'
               })
             } catch (e) {
               return res.json({
                 success: true,
                 message: result.message,
-                data: result.data
+                data: result.data,
+                targetUrl: 'https://free.yourapi.cn/'
               })
             }
           } else {

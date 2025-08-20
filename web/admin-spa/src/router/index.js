@@ -11,6 +11,7 @@ const AccountsView = () => import('@/views/AccountsView.vue')
 const KeyLogsView = () => import('@/views/KeyLogsView.vue')
 const SettingsView = () => import('@/views/SettingsView.vue')
 const ApiStatsView = () => import('@/views/ApiStatsView.vue')
+const RedeemView = () => import('@/views/RedeemView.vue')
 const RedemptionCodesView = () => import('@/views/RedemptionCodesView.vue')
 const RateTemplatesView = () => import('@/views/RateTemplates.vue')
 const PolicyMonitoringView = () => import('@/views/PolicyMonitoringView.vue')
@@ -32,6 +33,12 @@ const routes = [
       // 否则保持默认重定向
       return '/api-stats'
     }
+  },
+  {
+    path: '/redeem',
+    name: 'Redeem',
+    component: RedeemView,
+    meta: { requiresAuth: false }
   },
   {
     path: '/login',

@@ -94,6 +94,13 @@ class RedemptionCodeService {
       const keys = await client.keys('redemption_code:*')
       const codes = []
 
+      // 添加调试日志
+      logger.debug(`🔍 [兑换码服务] 开始查询兑换码`, {
+        filters,
+        pagination,
+        totalKeys: keys.length
+      })
+
       for (const key of keys) {
         if (key.includes('_lookup:')) {
           continue
@@ -108,32 +115,71 @@ class RedemptionCodeService {
         }
       }
 
+      logger.debug(`📊 [兑换码服务] 从Redis获取到兑换码数量: ${codes.length}`)
+
       // 应用过滤器
       let filteredCodes = codes
-      if (filters.status) {
-        filteredCodes = filteredCodes.filter((code) => code.status === filters.status)
+
+      // 清理空值过滤器
+      const cleanFilters = {}
+      if (filters.status && filters.status.trim()) {
+        cleanFilters.status = filters.status.trim()
       }
-      if (filters.type) {
-        filteredCodes = filteredCodes.filter((code) => code.type === filters.type)
+      if (filters.type && filters.type.trim()) {
+        cleanFilters.type = filters.type.trim()
       }
-      if (filters.code) {
-        filteredCodes = filteredCodes.filter((code) =>
-          code.code.toLowerCase().includes(filters.code.toLowerCase())
+      if (filters.code && filters.code.trim()) {
+        cleanFilters.code = filters.code.trim()
+      }
+      if (filters.apiKey && filters.apiKey.trim()) {
+        cleanFilters.apiKey = filters.apiKey.trim()
+      }
+
+      logger.debug(`🔍 [兑换码服务] 清理后的过滤器:`, cleanFilters)
+
+      if (cleanFilters.status) {
+        const beforeCount = filteredCodes.length
+        filteredCodes = filteredCodes.filter((code) => code.status === cleanFilters.status)
+        logger.debug(
+          `📝 [兑换码服务] 状态过滤 (${cleanFilters.status}): ${beforeCount} -> ${filteredCodes.length}`
         )
       }
-      if (filters.apiKey) {
+      if (cleanFilters.type) {
+        const beforeCount = filteredCodes.length
+        filteredCodes = filteredCodes.filter((code) => code.type === cleanFilters.type)
+        logger.debug(
+          `📝 [兑换码服务] 类型过滤 (${cleanFilters.type}): ${beforeCount} -> ${filteredCodes.length}`
+        )
+      }
+      if (cleanFilters.code) {
+        const beforeCount = filteredCodes.length
+        filteredCodes = filteredCodes.filter(
+          (code) => code.code && code.code.toLowerCase().includes(cleanFilters.code.toLowerCase())
+        )
+        logger.debug(
+          `📝 [兑换码服务] 兑换码过滤 (${cleanFilters.code}): ${beforeCount} -> ${filteredCodes.length}`
+        )
+      }
+      if (cleanFilters.apiKey) {
+        const beforeCount = filteredCodes.length
         filteredCodes = filteredCodes.filter(
           (code) =>
             code.usedByApiKey &&
-            code.usedByApiKey.toLowerCase().includes(filters.apiKey.toLowerCase())
+            code.usedByApiKey.toLowerCase().includes(cleanFilters.apiKey.toLowerCase())
+        )
+        logger.debug(
+          `📝 [兑换码服务] API Key过滤 (${cleanFilters.apiKey}): ${beforeCount} -> ${filteredCodes.length}`
         )
       }
 
       // 按创建时间倒序排列
       filteredCodes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 
+      logger.debug(`📊 [兑换码服务] 过滤后的兑换码数量: ${filteredCodes.length}`)
+
       // 如果没有分页参数，返回所有数据（向后兼容）
       if (!pagination) {
+        logger.debug(`📄 [兑换码服务] 无分页参数，返回所有数据`)
         return filteredCodes
       }
 
@@ -144,14 +190,23 @@ class RedemptionCodeService {
       const endIndex = startIndex + pagination.pageSize
       const items = filteredCodes.slice(startIndex, endIndex)
 
+      const paginationResult = {
+        currentPage: pagination.page,
+        pageSize: pagination.pageSize,
+        totalCount,
+        totalPages
+      }
+
+      logger.debug(`📄 [兑换码服务] 分页结果:`, {
+        ...paginationResult,
+        startIndex,
+        endIndex,
+        itemsCount: items.length
+      })
+
       return {
         items,
-        pagination: {
-          currentPage: pagination.page,
-          pageSize: pagination.pageSize,
-          totalCount,
-          totalPages
-        }
+        pagination: paginationResult
       }
     } catch (error) {
       logger.error('❌ Failed to get redemption codes:', error)

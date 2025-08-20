@@ -173,7 +173,8 @@ class UnifiedClaudeScheduler {
         boundAccount.status !== 'error' &&
         boundAccount.status !== 'blocked'
       ) {
-        const isRateLimited = await claudeAccountService.isAccountRateLimited(boundAccount.id)
+        // 暂时屏蔽传统限流检查，仅使用智能限流
+        const isRateLimited = await smartRateLimitService.isRateLimited(boundAccount.id)
         if (!isRateLimited) {
           logger.info(
             `[信息] 使用绑定的 Claude OAuth 账户：${boundAccount.name}（${apiKeyData.claudeAccountId}）`
@@ -203,9 +204,8 @@ class UnifiedClaudeScheduler {
         boundConsoleAccount.isActive === true &&
         boundConsoleAccount.status === 'active'
       ) {
-        const isRateLimited = await claudeConsoleAccountService.isAccountRateLimited(
-          boundConsoleAccount.id
-        )
+        // 暂时屏蔽传统限流检查，仅使用智能限流
+        const isRateLimited = await smartRateLimitService.isRateLimited(boundConsoleAccount.id)
         if (!isRateLimited) {
           logger.info(
             `[信息] 使用绑定的 Claude Console 账户：${boundConsoleAccount.name}（${apiKeyData.claudeConsoleAccountId}）`
@@ -409,7 +409,8 @@ class UnifiedClaudeScheduler {
           logger.info(`[信息] 账户 ${accountId} 不可调度`)
           return false
         }
-        return !(await claudeAccountService.isAccountRateLimited(accountId))
+        // 暂时屏蔽传统限流检查，仅使用智能限流
+        return !(await smartRateLimitService.isRateLimited(accountId))
       } else if (accountType === 'claude-console') {
         const account = await claudeConsoleAccountService.getAccount(accountId)
         if (!account || !account.isActive || account.status !== 'active') {
@@ -420,7 +421,8 @@ class UnifiedClaudeScheduler {
           logger.info(`[信息] Claude Console 账户 ${accountId} 不可调度`)
           return false
         }
-        return !(await claudeConsoleAccountService.isAccountRateLimited(accountId))
+        // 暂时屏蔽传统限流检查，仅使用智能限流
+        return !(await smartRateLimitService.isRateLimited(accountId))
       } else if (accountType === 'bedrock') {
         const accountResult = await bedrockAccountService.getAccount(accountId)
         if (!accountResult.success || !accountResult.data.isActive) {
@@ -522,12 +524,13 @@ class UnifiedClaudeScheduler {
   // 检查账户是否处于限流状态
   async isAccountRateLimited(accountId, accountType) {
     try {
-      if (accountType === 'claude-official') {
-        return await claudeAccountService.isAccountRateLimited(accountId)
-      } else if (accountType === 'claude-console') {
-        return await claudeConsoleAccountService.isAccountRateLimited(accountId)
-      }
-      return false
+      // 暂时屏蔽传统限流检查，仅使用智能限流
+      // if (accountType === 'claude-official') {
+      //   return await claudeAccountService.isAccountRateLimited(accountId)
+      // } else if (accountType === 'claude-console') {
+      //   return await claudeConsoleAccountService.isAccountRateLimited(accountId)
+      // }
+      return await smartRateLimitService.isRateLimited(accountId)
     } catch (error) {
       logger.error(`[错误] 检查限流状态失败：${accountId}（${accountType}）`, error)
       return false
@@ -724,12 +727,12 @@ class UnifiedClaudeScheduler {
         return true
       }
 
-      // 检查传统限流状态
-      if (accountType === 'claude-official') {
-        return await claudeAccountService.isAccountRateLimited(accountId)
-      } else if (accountType === 'claude-console') {
-        return await claudeConsoleAccountService.isAccountRateLimited(accountId)
-      }
+      // 检查传统限流状态 - 暂时屏蔽
+      // if (accountType === 'claude-official') {
+      //   return await claudeAccountService.isAccountRateLimited(accountId)
+      // } else if (accountType === 'claude-console') {
+      //   return await claudeConsoleAccountService.isAccountRateLimited(accountId)
+      // }
 
       return false
     } catch (error) {

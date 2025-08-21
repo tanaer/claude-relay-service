@@ -32,6 +32,21 @@
                 <i class="fas fa-arrow-up text-[10px]" />
                 <span>新版本</span>
               </a>
+              <!-- QQ群信息 -->
+              <span
+                class="inline-flex items-center gap-1 rounded-full border border-blue-400/40 bg-blue-500/20 px-2 py-0.5 text-xs text-blue-100"
+                title="欢迎加入QQ群"
+              >
+                <i class="fab fa-qq" />
+                <a
+                  class="underline hover:text-blue-300"
+                  href="https://qm.qq.com/q/8d3I1LutIQ"
+                  rel="noopener"
+                  target="_blank"
+                  title="点击加入QQ群"
+                  >QQ群：452758314</a
+                >
+              </span>
             </div>
           </template>
         </LogoTitle>

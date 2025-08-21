@@ -5667,6 +5667,118 @@ router.post('/key-logs/test', authenticateAdmin, async (req, res) => {
   }
 })
 
+// 获取上游错误统计
+router.get('/key-logs/upstream-errors', authenticateAdmin, async (req, res) => {
+  try {
+    const { date, accountId, sortBy, order } = req.query
+
+    const errorStats = await keyLogsService.getUpstreamErrorStats({
+      date,
+      accountId,
+      sortBy: sortBy || 'count',
+      order: order || 'desc'
+    })
+
+    res.json({
+      success: true,
+      data: errorStats
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get upstream error stats:', error)
+    res.status(500).json({ error: 'Failed to get upstream error stats', message: error.message })
+  }
+})
+
+// 获取可用的错误日期列表
+router.get('/key-logs/upstream-errors/dates', authenticateAdmin, async (req, res) => {
+  try {
+    const dates = await keyLogsService.getAvailableErrorDates()
+    res.json({
+      success: true,
+      data: dates
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get available dates:', error)
+    res.status(500).json({ error: 'Failed to get available dates', message: error.message })
+  }
+})
+
+// 获取上游错误的账户列表
+router.get('/key-logs/upstream-errors/accounts', authenticateAdmin, async (req, res) => {
+  try {
+    const { date } = req.query
+    const accounts = await keyLogsService.getUpstreamErrorAccounts(date)
+    res.json({
+      success: true,
+      data: accounts
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get upstream error accounts:', error)
+    res.status(500).json({ error: 'Failed to get upstream error accounts', message: error.message })
+  }
+})
+
+// 获取 API Key 的上游错误统计
+router.get('/api-keys/:keyId/upstream-errors', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyId } = req.params
+    const { date, sortBy, order } = req.query
+
+    const errorStats = await keyLogsService.getApiKeyErrorStats(keyId, {
+      date,
+      sortBy: sortBy || 'count',
+      order: order || 'desc'
+    })
+
+    res.json({
+      success: true,
+      data: errorStats
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get API Key upstream error stats:', error)
+    res
+      .status(500)
+      .json({ error: 'Failed to get API Key upstream error stats', message: error.message })
+  }
+})
+
+// 获取 API Key 的错误日期列表
+router.get('/api-keys/:keyId/upstream-errors/dates', authenticateAdmin, async (req, res) => {
+  try {
+    const { keyId } = req.params
+    const dates = await keyLogsService.getApiKeyErrorDates(keyId)
+
+    res.json({
+      success: true,
+      data: dates
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get API Key error dates:', error)
+    res.status(500).json({ error: 'Failed to get API Key error dates', message: error.message })
+  }
+})
+
+// 批量获取 API Keys 的错误计数
+router.post('/api-keys/error-counts', authenticateAdmin, async (req, res) => {
+  try {
+    const { apiKeyIds, date } = req.body
+
+    if (!Array.isArray(apiKeyIds)) {
+      return res.status(400).json({ error: 'apiKeyIds must be an array' })
+    }
+
+    const counts = await keyLogsService.getApiKeyErrorCounts(apiKeyIds, date)
+
+    res.json({
+      success: true,
+      data: counts
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get API Key error counts:', error)
+    res.status(500).json({ error: 'Failed to get API Key error counts', message: error.message })
+  }
+})
+
 // 切换策略引擎状态
 router.post('/redemption-policies/toggle-engine', authenticateAdmin, async (req, res) => {
   try {

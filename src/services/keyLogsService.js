@@ -8,12 +8,16 @@ class KeyLogsService {
     this.KEY_LOGS_INDEX = 'key_logs_index:'
     this.MAX_LOGS = 10000 // 最大保留日志数量
     this.LOG_RETENTION_DAYS = 30 // 日志保留天数
+    this.UPSTREAM_ERROR_PREFIX = 'upstream_error:'
+    this.UPSTREAM_ERROR_DAILY_PREFIX = 'upstream_error:daily:'
+    this.APIKEY_ERROR_PREFIX = 'apikey_error:' // API Key 报错前缀
+    this.APIKEY_ERROR_DAILY_PREFIX = 'apikey_error:daily:' // API Key 每日报错前缀
   }
 
   /**
    * 记录关键日志
    * @param {Object} logData 日志数据
-   * @param {string} logData.type 日志类型 (rate_limit, template_switch, account_status, redemption, system)
+   * @param {string} logData.type 日志类型 (rate_limit, template_switch, account_status, redemption, system, upstream_error)
    * @param {string} logData.level 日志级别 (error, warn, info, success)
    * @param {string} logData.title 日志标题
    * @param {string} logData.message 日志消息
@@ -142,7 +146,14 @@ class KeyLogsService {
       stats.total = await redis.zcard(this.KEY_LOGS_LIST)
 
       // 统计各类型数量
-      const types = ['rate_limit', 'template_switch', 'account_status', 'redemption', 'system']
+      const types = [
+        'rate_limit',
+        'template_switch',
+        'account_status',
+        'redemption',
+        'system',
+        'upstream_error'
+      ]
       for (const type of types) {
         const count = await redis.zcard(`${this.KEY_LOGS_INDEX}${type}`)
         stats.byType[type] = count
@@ -184,7 +195,14 @@ class KeyLogsService {
         await redis.zremrangebyrank(this.KEY_LOGS_LIST, 0, removeCount - 1)
 
         // 从类型索引中移除
-        const types = ['rate_limit', 'template_switch', 'account_status', 'redemption', 'system']
+        const types = [
+          'rate_limit',
+          'template_switch',
+          'account_status',
+          'redemption',
+          'system',
+          'upstream_error'
+        ]
         for (const type of types) {
           for (const logId of oldLogIds) {
             await redis.zrem(`${this.KEY_LOGS_INDEX}${type}`, logId)
@@ -208,7 +226,14 @@ class KeyLogsService {
         await redis.zremrangebyscore(this.KEY_LOGS_LIST, '-inf', retentionTime)
 
         // 从类型索引中移除
-        const types = ['rate_limit', 'template_switch', 'account_status', 'redemption', 'system']
+        const types = [
+          'rate_limit',
+          'template_switch',
+          'account_status',
+          'redemption',
+          'system',
+          'upstream_error'
+        ]
         for (const type of types) {
           for (const logId of expiredLogIds) {
             await redis.zrem(`${this.KEY_LOGS_INDEX}${type}`, logId)
@@ -238,7 +263,14 @@ class KeyLogsService {
       // 清空索引
       await redis.del(this.KEY_LOGS_LIST)
 
-      const types = ['rate_limit', 'template_switch', 'account_status', 'redemption', 'system']
+      const types = [
+        'rate_limit',
+        'template_switch',
+        'account_status',
+        'redemption',
+        'system',
+        'upstream_error'
+      ]
       for (const type of types) {
         await redis.del(`${this.KEY_LOGS_INDEX}${type}`)
       }
@@ -312,6 +344,358 @@ class KeyLogsService {
       message: event,
       details
     })
+  }
+
+  /**
+   * 记录上游API报错
+   * @param {Object} params
+   * @param {string} params.accountId - 账户ID
+   * @param {string} params.accountName - 账户名称
+   * @param {string} params.accountType - 账户类型
+   * @param {number} params.statusCode - HTTP状态码
+   * @param {string} params.errorMessage - 错误消息
+   * @param {Object} params.errorBody - 错误响应体
+   * @param {string} params.apiKeyId - API Key ID
+   * @param {string} params.apiKeyName - API Key名称
+   */
+  async logUpstreamError(params) {
+    const {
+      accountId,
+      accountName = 'unknown',
+      accountType = 'claude',
+      statusCode,
+      errorMessage = '',
+      errorBody = {},
+      apiKeyId,
+      apiKeyName = 'unknown'
+    } = params
+
+    // 生成错误内容的哈希（用于合并相同错误）
+    const errorContent = `${statusCode}_${errorMessage}`
+    const errorHash = require('crypto')
+      .createHash('md5')
+      .update(errorContent)
+      .digest('hex')
+      .substring(0, 8)
+
+    // 记录到关键日志
+    await this.logKeyEvent({
+      type: 'upstream_error',
+      level: 'error',
+      title: `上游API报错 ${statusCode}`,
+      message: `账户 ${accountName} 报错: ${errorMessage || 'Unknown error'}`,
+      details: {
+        accountId,
+        accountName,
+        accountType,
+        statusCode,
+        errorMessage,
+        errorBody,
+        apiKeyId,
+        apiKeyName,
+        errorHash,
+        errorContent
+      }
+    })
+
+    // 记录到按天统计的数据结构
+    const today = new Date().toISOString().split('T')[0]
+    const dailyKey = `${this.UPSTREAM_ERROR_DAILY_PREFIX}${today}`
+    const errorKey = `${accountId}:${errorHash}`
+
+    // 使用Redis哈希存储错误统计
+    const errorData = {
+      accountId,
+      accountName,
+      accountType,
+      statusCode,
+      errorMessage,
+      errorContent,
+      lastTime: new Date().toISOString(),
+      count: 0
+    }
+
+    // 获取现有记录
+    const existingData = await redis.hget(dailyKey, errorKey)
+    if (existingData) {
+      const parsed = JSON.parse(existingData)
+      errorData.count = (parsed.count || 0) + 1
+    } else {
+      errorData.count = 1
+    }
+
+    // 更新记录
+    await redis.hset(dailyKey, errorKey, JSON.stringify(errorData))
+
+    // 设置过期时间（保留30天）
+    await redis.expire(dailyKey, 30 * 24 * 60 * 60)
+
+    // 同时记录到 API Key 的报错统计（如果有 apiKeyId）
+    if (apiKeyId) {
+      const apiKeyDailyKey = `${this.APIKEY_ERROR_DAILY_PREFIX}${today}:${apiKeyId}`
+      const apiKeyErrorKey = `${accountId}:${errorHash}`
+
+      // 使用相同的错误数据结构
+      const apiKeyErrorData = { ...errorData }
+
+      // 获取现有记录
+      const existingApiKeyData = await redis.hget(apiKeyDailyKey, apiKeyErrorKey)
+      if (existingApiKeyData) {
+        const parsed = JSON.parse(existingApiKeyData)
+        apiKeyErrorData.count = (parsed.count || 0) + 1
+      } else {
+        apiKeyErrorData.count = 1
+      }
+
+      // 更新 API Key 的错误记录
+      await redis.hset(apiKeyDailyKey, apiKeyErrorKey, JSON.stringify(apiKeyErrorData))
+
+      // 设置过期时间（保留30天）
+      await redis.expire(apiKeyDailyKey, 30 * 24 * 60 * 60)
+
+      // 更新 API Key 的错误计数器（用于快速获取总数）
+      const apiKeyErrorCountKey = `${this.APIKEY_ERROR_PREFIX}count:${apiKeyId}`
+      await redis.hincrby(apiKeyErrorCountKey, today, 1)
+      await redis.expire(apiKeyErrorCountKey, 30 * 24 * 60 * 60)
+    }
+  }
+
+  /**
+   * 获取上游错误统计
+   * @param {Object} options
+   * @param {string} options.date - 日期 (YYYY-MM-DD)
+   * @param {string} options.accountId - 账户ID筛选
+   * @param {string} options.sortBy - 排序字段 (count, lastTime)
+   * @param {string} options.order - 排序方向 (desc, asc)
+   * @returns {Array} 错误统计列表
+   */
+  async getUpstreamErrorStats(options = {}) {
+    try {
+      const {
+        date = new Date().toISOString().split('T')[0],
+        accountId = null,
+        sortBy = 'count',
+        order = 'desc'
+      } = options
+
+      const dailyKey = `${this.UPSTREAM_ERROR_DAILY_PREFIX}${date}`
+
+      // 获取所有错误记录
+      const allErrors = await redis.hgetall(dailyKey)
+
+      if (!allErrors || Object.keys(allErrors).length === 0) {
+        return []
+      }
+
+      // 解析并过滤数据
+      const errorStats = []
+      for (const [_key, value] of Object.entries(allErrors)) {
+        try {
+          const errorData = JSON.parse(value)
+
+          // 如果指定了账户ID，则过滤
+          if (accountId && errorData.accountId !== accountId) {
+            continue
+          }
+
+          errorStats.push(errorData)
+        } catch (e) {
+          logger.warn(`解析上游错误统计失败: ${e.message}`)
+        }
+      }
+
+      // 排序
+      errorStats.sort((a, b) => {
+        if (sortBy === 'count') {
+          return order === 'desc' ? b.count - a.count : a.count - b.count
+        } else if (sortBy === 'lastTime') {
+          const timeA = new Date(a.lastTime).getTime()
+          const timeB = new Date(b.lastTime).getTime()
+          return order === 'desc' ? timeB - timeA : timeA - timeB
+        }
+        return 0
+      })
+
+      return errorStats
+    } catch (error) {
+      logger.error(`获取上游错误统计失败: ${error.message}`)
+      return []
+    }
+  }
+
+  /**
+   * 获取可用的日期列表（有数据的日期）
+   * @returns {Array} 日期列表
+   */
+  async getAvailableErrorDates() {
+    try {
+      const pattern = `${this.UPSTREAM_ERROR_DAILY_PREFIX}*`
+      const keys = await redis.keys(pattern)
+
+      const dates = keys
+        .map((key) => key.replace(this.UPSTREAM_ERROR_DAILY_PREFIX, ''))
+        .sort((a, b) => b.localeCompare(a)) // 降序排序
+
+      return dates
+    } catch (error) {
+      logger.error(`获取可用日期列表失败: ${error.message}`)
+      return []
+    }
+  }
+
+  /**
+   * 获取上游错误账户列表
+   * @param {string} date - 日期
+   * @returns {Array} 账户列表
+   */
+  async getUpstreamErrorAccounts(date = null) {
+    try {
+      const targetDate = date || new Date().toISOString().split('T')[0]
+      const dailyKey = `${this.UPSTREAM_ERROR_DAILY_PREFIX}${targetDate}`
+
+      const allErrors = await redis.hgetall(dailyKey)
+      if (!allErrors || Object.keys(allErrors).length === 0) {
+        return []
+      }
+
+      const accountMap = new Map()
+      for (const value of Object.values(allErrors)) {
+        try {
+          const errorData = JSON.parse(value)
+          if (!accountMap.has(errorData.accountId)) {
+            accountMap.set(errorData.accountId, {
+              accountId: errorData.accountId,
+              accountName: errorData.accountName,
+              accountType: errorData.accountType
+            })
+          }
+        } catch (e) {
+          // 忽略解析错误
+        }
+      }
+
+      return Array.from(accountMap.values())
+    } catch (error) {
+      logger.error(`获取上游错误账户列表失败: ${error.message}`)
+      return []
+    }
+  }
+
+  /**
+   * 获取 API Key 的上游错误统计
+   * @param {string} apiKeyId - API Key ID
+   * @param {Object} options
+   * @param {string} options.date - 日期 (YYYY-MM-DD)
+   * @param {string} options.sortBy - 排序字段 (count, lastTime)
+   * @param {string} options.order - 排序方向 (desc, asc)
+   * @returns {Array} 错误统计列表
+   */
+  async getApiKeyErrorStats(apiKeyId, options = {}) {
+    try {
+      const {
+        date = new Date().toISOString().split('T')[0],
+        sortBy = 'count',
+        order = 'desc'
+      } = options
+
+      const apiKeyDailyKey = `${this.APIKEY_ERROR_DAILY_PREFIX}${date}:${apiKeyId}`
+
+      // 获取该 API Key 的所有错误记录
+      const allErrors = await redis.hgetall(apiKeyDailyKey)
+
+      if (!allErrors || Object.keys(allErrors).length === 0) {
+        return []
+      }
+
+      // 解析数据
+      const errorStats = []
+      for (const [_key, value] of Object.entries(allErrors)) {
+        try {
+          const errorData = JSON.parse(value)
+          errorStats.push(errorData)
+        } catch (e) {
+          logger.warn(`解析 API Key 错误统计失败: ${e.message}`)
+        }
+      }
+
+      // 排序
+      errorStats.sort((a, b) => {
+        if (sortBy === 'count') {
+          return order === 'desc' ? b.count - a.count : a.count - b.count
+        } else if (sortBy === 'lastTime') {
+          const timeA = new Date(a.lastTime).getTime()
+          const timeB = new Date(b.lastTime).getTime()
+          return order === 'desc' ? timeB - timeA : timeA - timeB
+        }
+        return 0
+      })
+
+      return errorStats
+    } catch (error) {
+      logger.error(`获取 API Key 错误统计失败: ${error.message}`)
+      return []
+    }
+  }
+
+  /**
+   * 获取 API Key 的错误计数（用于列表显示）
+   * @param {Array} apiKeyIds - API Key ID 列表
+   * @param {string} date - 日期 (YYYY-MM-DD)，不传则获取所有日期的总和
+   * @returns {Object} 错误计数映射 { apiKeyId: count }
+   */
+  async getApiKeyErrorCounts(apiKeyIds, date = null) {
+    try {
+      const counts = {}
+
+      for (const apiKeyId of apiKeyIds) {
+        if (date) {
+          // 获取特定日期的错误数
+          const apiKeyErrorCountKey = `${this.APIKEY_ERROR_PREFIX}count:${apiKeyId}`
+          const dayCount = await redis.hget(apiKeyErrorCountKey, date)
+          counts[apiKeyId] = parseInt(dayCount) || 0
+        } else {
+          // 获取所有日期的总和
+          const apiKeyErrorCountKey = `${this.APIKEY_ERROR_PREFIX}count:${apiKeyId}`
+          const allCounts = await redis.hgetall(apiKeyErrorCountKey)
+          let total = 0
+          for (const count of Object.values(allCounts)) {
+            total += parseInt(count) || 0
+          }
+          counts[apiKeyId] = total
+        }
+      }
+
+      return counts
+    } catch (error) {
+      logger.error(`获取 API Key 错误计数失败: ${error.message}`)
+      return {}
+    }
+  }
+
+  /**
+   * 获取 API Key 的可用错误日期列表
+   * @param {string} apiKeyId - API Key ID
+   * @returns {Array} 日期列表
+   */
+  async getApiKeyErrorDates(apiKeyId) {
+    try {
+      const pattern = `${this.APIKEY_ERROR_DAILY_PREFIX}*:${apiKeyId}`
+      const keys = await redis.keys(pattern)
+
+      const dates = keys
+        .map((key) => {
+          // 提取日期部分
+          const match = key.match(/apikey_error:daily:(\d{4}-\d{2}-\d{2}):/)
+          return match ? match[1] : null
+        })
+        .filter((date) => date !== null)
+        .sort((a, b) => b.localeCompare(a)) // 降序排序
+
+      return dates
+    } catch (error) {
+      logger.error(`获取 API Key 错误日期列表失败: ${error.message}`)
+      return []
+    }
   }
 }
 

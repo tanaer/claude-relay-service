@@ -24,7 +24,7 @@
                 ? 'border-blue-500 bg-blue-50 text-blue-700'
                 : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
             ]"
-            @click="activeFilter = filter.key"
+            @click="handleFilterChange(filter.key)"
           >
             <i :class="[filter.icon, 'mr-1 sm:mr-2']" />
             {{ filter.name }}
@@ -35,7 +35,7 @@
         <button
           class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-all duration-200 hover:border-gray-300 hover:shadow-sm sm:px-4 sm:py-2 sm:text-sm"
           :disabled="loading"
-          @click="loadLogs"
+          @click="activeFilter === 'upstream_error' ? loadUpstreamErrorStats() : loadLogs()"
         >
           <i :class="['fas', loading ? 'fa-spinner fa-spin' : 'fa-sync-alt']" />
           刷新
@@ -47,6 +47,141 @@
     <div v-if="loading" class="py-12 text-center">
       <div class="loading-spinner mx-auto mb-4" />
       <p class="text-gray-500">正在加载日志...</p>
+    </div>
+
+    <!-- 上游报错统计视图 -->
+    <div v-else-if="activeFilter === 'upstream_error'">
+      <!-- 筛选栏 -->
+      <div class="mb-4 flex flex-col gap-3 rounded-lg bg-gray-50 p-4 sm:flex-row sm:items-center">
+        <!-- 日期选择 -->
+        <div class="flex items-center gap-2">
+          <label class="text-sm font-medium text-gray-700">日期：</label>
+          <select
+            v-model="selectedErrorDate"
+            class="rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+            @change="loadUpstreamErrorStats"
+          >
+            <option v-if="upstreamErrorDates.length === 0" :value="selectedErrorDate">
+              {{ selectedErrorDate }}
+            </option>
+            <option v-for="date in upstreamErrorDates" :key="date" :value="date">
+              {{ date }}
+            </option>
+          </select>
+        </div>
+
+        <!-- 账户筛选 -->
+        <div class="flex items-center gap-2">
+          <label class="text-sm font-medium text-gray-700">账户：</label>
+          <select
+            v-model="selectedErrorAccount"
+            class="rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+            @change="loadUpstreamErrorStats"
+          >
+            <option value="all">所有账户</option>
+            <option
+              v-for="account in upstreamErrorAccounts"
+              :key="account.accountId"
+              :value="account.accountId"
+            >
+              {{ account.accountName }} ({{ account.accountType }})
+            </option>
+          </select>
+        </div>
+
+        <!-- 排序选项 -->
+        <div class="flex items-center gap-2">
+          <label class="text-sm font-medium text-gray-700">排序：</label>
+          <select
+            v-model="errorStatsSortBy"
+            class="rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+            @change="loadUpstreamErrorStats"
+          >
+            <option value="count">按次数</option>
+            <option value="lastTime">按时间</option>
+          </select>
+          <button
+            class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50"
+            @click="
+              errorStatsOrder = errorStatsOrder === 'desc' ? 'asc' : 'desc'
+              loadUpstreamErrorStats()
+            "
+          >
+            <i
+              :class="[
+                'fas',
+                errorStatsOrder === 'desc' ? 'fa-sort-amount-down' : 'fa-sort-amount-up'
+              ]"
+            />
+          </button>
+        </div>
+      </div>
+
+      <!-- 统计表格 -->
+      <div v-if="upstreamErrorStats.length === 0" class="py-12 text-center">
+        <div
+          class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100"
+        >
+          <i class="fas fa-check text-xl text-gray-400" />
+        </div>
+        <p class="text-lg text-gray-500">暂无上游报错</p>
+        <p class="mt-2 text-sm text-gray-400">{{ selectedErrorDate }} 没有记录到上游API报错</p>
+      </div>
+
+      <div v-else class="overflow-x-auto">
+        <table class="w-full">
+          <thead>
+            <tr class="border-b border-gray-200 bg-gray-50">
+              <th
+                class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700"
+              >
+                报错账户
+              </th>
+              <th
+                class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700"
+              >
+                错误内容
+              </th>
+              <th
+                class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700"
+              >
+                最近时间
+              </th>
+              <th
+                class="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-700"
+              >
+                次数
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200 bg-white">
+            <tr v-for="(stat, index) in upstreamErrorStats" :key="index" class="hover:bg-gray-50">
+              <td class="px-4 py-3">
+                <div class="text-sm font-medium text-gray-900">{{ stat.accountName }}</div>
+                <div class="text-xs text-gray-500">{{ stat.accountType }}</div>
+              </td>
+              <td class="px-4 py-3">
+                <div class="text-sm text-gray-900">
+                  <span class="font-medium text-red-600">{{ stat.statusCode }}</span>
+                  {{ stat.errorMessage || '无错误消息' }}
+                </div>
+              </td>
+              <td class="px-4 py-3">
+                <div class="text-sm text-gray-600">
+                  {{ formatRecentTime(stat.lastTime) }}
+                </div>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <span
+                  class="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-sm font-semibold text-red-800"
+                >
+                  {{ stat.count }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <div v-else-if="filteredLogs.length === 0" class="py-12 text-center">
@@ -144,6 +279,15 @@ const currentPage = ref(1)
 const totalPages = ref(1)
 const pageSize = 20
 
+// 上游报错统计相关状态
+const upstreamErrorStats = ref([])
+const upstreamErrorDates = ref([])
+const upstreamErrorAccounts = ref([])
+const selectedErrorDate = ref(new Date().toISOString().split('T')[0])
+const selectedErrorAccount = ref('all')
+const errorStatsSortBy = ref('count')
+const errorStatsOrder = ref('desc')
+
 // 日志类型过滤器
 const logFilters = ref([
   { key: 'all', name: '全部', icon: 'fas fa-list' },
@@ -151,7 +295,8 @@ const logFilters = ref([
   { key: 'template_switch', name: '模板切换', icon: 'fas fa-exchange-alt' },
   { key: 'account_status', name: '账户状态', icon: 'fas fa-user-circle' },
   { key: 'redemption', name: '兑换码', icon: 'fas fa-ticket-alt' },
-  { key: 'system', name: '系统事件', icon: 'fas fa-cogs' }
+  { key: 'system', name: '系统事件', icon: 'fas fa-cogs' },
+  { key: 'upstream_error', name: '上游报错', icon: 'fas fa-exclamation-triangle' }
 ])
 
 // 计算属性
@@ -205,7 +350,8 @@ const getLogBorderColor = (type) => {
     template_switch: 'border-l-4 border-l-blue-400 border-r border-t border-b border-gray-200',
     account_status: 'border-l-4 border-l-green-400 border-r border-t border-b border-gray-200',
     redemption: 'border-l-4 border-l-purple-400 border-r border-t border-b border-gray-200',
-    system: 'border-l-4 border-l-gray-400 border-r border-t border-b border-gray-200'
+    system: 'border-l-4 border-l-gray-400 border-r border-t border-b border-gray-200',
+    upstream_error: 'border-l-4 border-l-red-400 border-r border-t border-b border-gray-200'
   }
   return colors[type] || 'border border-gray-200'
 }
@@ -217,7 +363,8 @@ const getLogIcon = (type) => {
     template_switch: 'fas fa-exchange-alt',
     account_status: 'fas fa-user-circle',
     redemption: 'fas fa-ticket-alt',
-    system: 'fas fa-cogs'
+    system: 'fas fa-cogs',
+    upstream_error: 'fas fa-exclamation-triangle'
   }
   return icons[type] || 'fas fa-info-circle'
 }
@@ -229,7 +376,8 @@ const getLogIconColor = (type) => {
     template_switch: 'text-blue-500',
     account_status: 'text-green-500',
     redemption: 'text-purple-500',
-    system: 'text-gray-500'
+    system: 'text-gray-500',
+    upstream_error: 'text-red-500'
   }
   return colors[type] || 'text-gray-500'
 }
@@ -266,6 +414,74 @@ const formatTime = (timestamp) => {
     minute: '2-digit',
     second: '2-digit'
   })
+}
+
+// 加载上游错误统计
+const loadUpstreamErrorStats = async () => {
+  loading.value = true
+  try {
+    // 加载统计数据
+    const params = {
+      date: selectedErrorDate.value,
+      accountId: selectedErrorAccount.value === 'all' ? undefined : selectedErrorAccount.value,
+      sortBy: errorStatsSortBy.value,
+      order: errorStatsOrder.value
+    }
+    const response = await apiClient.get('/admin/key-logs/upstream-errors', { params })
+    upstreamErrorStats.value = response.data || []
+
+    // 如果还没有加载过日期列表，加载它
+    if (upstreamErrorDates.value.length === 0) {
+      const datesResponse = await apiClient.get('/admin/key-logs/upstream-errors/dates')
+      upstreamErrorDates.value = datesResponse.data || []
+
+      // 如果有可用日期，设置第一个为选中
+      if (
+        upstreamErrorDates.value.length > 0 &&
+        !upstreamErrorDates.value.includes(selectedErrorDate.value)
+      ) {
+        selectedErrorDate.value = upstreamErrorDates.value[0]
+      }
+    }
+
+    // 加载账户列表
+    const accountsResponse = await apiClient.get('/admin/key-logs/upstream-errors/accounts', {
+      params: { date: selectedErrorDate.value }
+    })
+    upstreamErrorAccounts.value = accountsResponse.data || []
+  } catch (error) {
+    console.error('加载上游错误统计失败:', error)
+    upstreamErrorStats.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+// 监听过滤器变化
+const handleFilterChange = (filter) => {
+  activeFilter.value = filter
+  if (filter === 'upstream_error') {
+    loadUpstreamErrorStats()
+  } else {
+    loadLogs()
+  }
+}
+
+// 格式化最近时间
+const formatRecentTime = (timestamp) => {
+  const now = new Date()
+  const time = new Date(timestamp)
+  const diff = now - time
+
+  if (diff < 60000) {
+    return '刚刚'
+  } else if (diff < 3600000) {
+    return `${Math.floor(diff / 60000)} 分钟前`
+  } else if (diff < 86400000) {
+    return `${Math.floor(diff / 3600000)} 小时前`
+  } else {
+    return formatTime(timestamp)
+  }
 }
 
 // 组件挂载时加载数据

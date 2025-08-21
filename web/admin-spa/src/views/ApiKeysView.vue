@@ -182,7 +182,12 @@
                 <i v-else class="fas fa-sort ml-1 text-gray-400" />
               </th>
               <th
-                class="w-[20%] min-w-[180px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700"
+                class="w-[8%] min-w-[60px] px-3 py-4 text-center text-xs font-bold uppercase tracking-wider text-gray-700"
+              >
+                报错
+              </th>
+              <th
+                class="w-[12%] min-w-[120px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700"
               >
                 操作
               </th>
@@ -365,6 +370,17 @@
                       </svg>
                     </button>
                   </div>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-center">
+                  <button
+                    v-if="key.errorCount > 0"
+                    class="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-800 transition-all hover:bg-red-200"
+                    @click="showApiKeyErrors(key)"
+                  >
+                    <i class="fas fa-exclamation-triangle mr-1" />
+                    {{ key.errorCount }}
+                  </button>
+                  <span v-else class="text-xs text-gray-400">-</span>
                 </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm">
                   <div class="flex gap-1">
@@ -1023,11 +1039,88 @@
       :show="showUsageDetailModal"
       @close="showUsageDetailModal = false"
     />
+
+    <!-- API Key 报错详情弹窗 -->
+    <el-dialog
+      v-model="showApiKeyErrorsModal"
+      :close-on-click-modal="false"
+      :title="`${selectedApiKeyForErrors?.name || 'API Key'} - 上游报错详情`"
+      width="70%"
+    >
+      <div v-if="apiKeyErrorsLoading" class="py-8 text-center">
+        <div class="loading-spinner mx-auto mb-4" />
+        <p class="text-gray-500">正在加载报错详情...</p>
+      </div>
+
+      <div v-else-if="apiKeyErrorDetails.length === 0" class="py-8 text-center">
+        <div
+          class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100"
+        >
+          <i class="fas fa-check text-xl text-gray-400" />
+        </div>
+        <p class="text-lg text-gray-500">暂无报错记录</p>
+      </div>
+
+      <div v-else class="space-y-3">
+        <div class="mb-4 rounded-lg bg-blue-50 p-3">
+          <p class="text-sm text-blue-800">
+            <i class="fas fa-info-circle mr-1" />
+            共记录 {{ apiKeyErrorDetails.length }} 条不同的错误，相同错误已自动合并
+          </p>
+        </div>
+
+        <div class="max-h-[500px] overflow-y-auto">
+          <div
+            v-for="(error, index) in apiKeyErrorDetails"
+            :key="index"
+            class="rounded-lg border border-gray-200 p-4 hover:shadow-sm"
+          >
+            <div class="mb-2 flex items-start justify-between">
+              <div class="flex-1">
+                <div class="mb-2 flex items-center gap-2">
+                  <span class="rounded bg-red-100 px-2 py-1 text-sm font-medium text-red-800">
+                    {{ error.statusCode }}
+                  </span>
+                  <span class="text-sm font-medium text-gray-900">
+                    {{ error.accountName }}
+                  </span>
+                  <span class="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                    {{ error.accountType }}
+                  </span>
+                </div>
+
+                <div class="mb-2 text-sm text-gray-700">
+                  {{ error.errorMessage || '无错误消息' }}
+                </div>
+
+                <div class="flex items-center gap-4 text-xs text-gray-500">
+                  <span>
+                    <i class="fas fa-clock mr-1" />
+                    最近发生: {{ formatErrorTime(error.lastTime) }}
+                  </span>
+                  <span class="font-medium text-orange-600">
+                    <i class="fas fa-exclamation-triangle mr-1" />
+                    发生 {{ error.count }} 次
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showApiKeyErrorsModal = false">关闭</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { ElDialog, ElButton } from 'element-plus'
 import { showToast } from '@/utils/toast'
 import { apiClient } from '@/config/api'
 import { APP_CONFIG } from '@/config/app'
@@ -1058,6 +1151,12 @@ const editingExpiryKey = ref(null)
 const expiryEditModalRef = ref(null)
 const showUsageDetailModal = ref(false)
 const selectedApiKeyForDetail = ref(null)
+
+// API Key 报错详情弹窗
+const showApiKeyErrorsModal = ref(false)
+const selectedApiKeyForErrors = ref(null)
+const apiKeyErrorDetails = ref([])
+const apiKeyErrorsLoading = ref(false)
 
 // 标签相关
 const selectedTagFilter = ref('')
@@ -1237,6 +1336,9 @@ const loadApiKeys = async () => {
         }
       })
       availableTags.value = Array.from(tagsSet).sort()
+
+      // 加载报错统计
+      await loadApiKeyErrorCounts()
     }
   } catch (error) {
     showToast('加载 API Keys 失败', 'error')
@@ -1760,6 +1862,69 @@ const formatLastUsed = (dateString) => {
   if (diff < 86400000) return `${Math.floor(diff / 3600000)} 小时前`
   if (diff < 604800000) return `${Math.floor(diff / 86400000)} 天前`
   return date.toLocaleDateString('zh-CN')
+}
+
+// 加载 API Key 报错统计
+const loadApiKeyErrorCounts = async () => {
+  try {
+    const keyIds = apiKeys.value.map((key) => key.id)
+    if (keyIds.length === 0) return
+
+    const response = await apiClient.post('/admin/api-keys/error-counts', { apiKeyIds: keyIds })
+    if (response.success && response.data) {
+      // 更新每个 API Key 的错误计数
+      apiKeys.value.forEach((key) => {
+        key.errorCount = response.data[key.id] || 0
+      })
+    }
+  } catch (error) {
+    console.error('加载 API Key 报错统计失败:', error)
+  }
+}
+
+// 显示 API Key 报错详情
+const showApiKeyErrors = async (apiKey) => {
+  selectedApiKeyForErrors.value = apiKey
+  apiKeyErrorsLoading.value = true
+  showApiKeyErrorsModal.value = true
+
+  try {
+    const response = await apiClient.get(`/admin/api-keys/${apiKey.id}/upstream-errors`)
+    if (response.success) {
+      apiKeyErrorDetails.value = response.data || []
+    } else {
+      showToast('加载报错详情失败', 'error')
+      apiKeyErrorDetails.value = []
+    }
+  } catch (error) {
+    console.error('加载 API Key 报错详情失败:', error)
+    showToast('加载报错详情失败', 'error')
+    apiKeyErrorDetails.value = []
+  } finally {
+    apiKeyErrorsLoading.value = false
+  }
+}
+
+// 格式化错误时间
+const formatErrorTime = (timestamp) => {
+  const now = new Date()
+  const time = new Date(timestamp)
+  const diff = now - time
+
+  if (diff < 60000) {
+    return '刚刚'
+  } else if (diff < 3600000) {
+    return `${Math.floor(diff / 60000)} 分钟前`
+  } else if (diff < 86400000) {
+    return `${Math.floor(diff / 3600000)} 小时前`
+  } else {
+    return time.toLocaleString('zh-CN', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
 }
 
 // 监听筛选条件变化，重置页码

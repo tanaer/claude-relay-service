@@ -538,105 +538,251 @@ class RedisClient {
   }
 
   async getUsageStats(keyId) {
-    const totalKey = `usage:${keyId}`
-    const today = getDateStringInTimezone()
-    const dailyKey = `usage:daily:${keyId}:${today}`
-    const tzDate = getDateInTimezone()
-    const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
-    const monthlyKey = `usage:monthly:${keyId}:${currentMonth}`
+    try {
+      // 获取 API Key 信息以检查是否是日卡
+      const apiKeyData = await this.getApiKey(keyId)
+      let isDailyCard = false
 
-    const [total, daily, monthly] = await Promise.all([
-      this.client.hgetall(totalKey),
-      this.client.hgetall(dailyKey),
-      this.client.hgetall(monthlyKey)
-    ])
-
-    // 获取API Key的创建时间来计算平均值
-    const keyData = await this.client.hgetall(`apikey:${keyId}`)
-    const createdAt = keyData.createdAt ? new Date(keyData.createdAt) : new Date()
-    const now = new Date()
-    const daysSinceCreated = Math.max(1, Math.ceil((now - createdAt) / (1000 * 60 * 60 * 24)))
-
-    const totalTokens = parseInt(total.totalTokens) || 0
-    const totalRequests = parseInt(total.totalRequests) || 0
-
-    // 计算平均RPM (requests per minute) 和 TPM (tokens per minute)
-    const totalMinutes = Math.max(1, daysSinceCreated * 24 * 60)
-    const avgRPM = totalRequests / totalMinutes
-    const avgTPM = totalTokens / totalMinutes
-
-    // 处理旧数据兼容性（支持缓存token）
-    const handleLegacyData = (data) => {
-      // 优先使用total*字段（存储时使用的字段）
-      const tokens = parseInt(data.totalTokens) || parseInt(data.tokens) || 0
-      const inputTokens = parseInt(data.totalInputTokens) || parseInt(data.inputTokens) || 0
-      const outputTokens = parseInt(data.totalOutputTokens) || parseInt(data.outputTokens) || 0
-      const requests = parseInt(data.totalRequests) || parseInt(data.requests) || 0
-
-      // 新增缓存token字段
-      const cacheCreateTokens =
-        parseInt(data.totalCacheCreateTokens) || parseInt(data.cacheCreateTokens) || 0
-      const cacheReadTokens =
-        parseInt(data.totalCacheReadTokens) || parseInt(data.cacheReadTokens) || 0
-      const allTokens = parseInt(data.totalAllTokens) || parseInt(data.allTokens) || 0
-
-      const totalFromSeparate = inputTokens + outputTokens
-      // 计算实际的总tokens（包含所有类型）
-      const actualAllTokens =
-        allTokens || inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
-
-      if (totalFromSeparate === 0 && tokens > 0) {
-        // 旧数据：没有输入输出分离
-        return {
-          tokens, // 保持兼容性，但统一使用allTokens
-          inputTokens: Math.round(tokens * 0.3), // 假设30%为输入
-          outputTokens: Math.round(tokens * 0.7), // 假设70%为输出
-          cacheCreateTokens: 0, // 旧数据没有缓存token
-          cacheReadTokens: 0,
-          allTokens: tokens, // 对于旧数据，allTokens等于tokens
-          requests
+      if (apiKeyData && apiKeyData.tags) {
+        // 解析标签
+        let tags = []
+        try {
+          if (typeof apiKeyData.tags === 'string') {
+            const trimmedTags = apiKeyData.tags.trim()
+            if (trimmedTags.startsWith('[') && trimmedTags.endsWith(']')) {
+              try {
+                tags = JSON.parse(trimmedTags)
+              } catch {
+                // JSON解析失败，按逗号分割并移除引号
+                tags = trimmedTags
+                  .slice(1, -1)
+                  .split(',')
+                  .map((tag) => tag.replace(/['"]/g, '').trim())
+                  .filter((tag) => tag.length > 0)
+              }
+            } else {
+              // 逗号分隔格式
+              tags = trimmedTags
+                .split(',')
+                .map((tag) => tag.trim())
+                .filter((tag) => tag.length > 0)
+            }
+          } else if (Array.isArray(apiKeyData.tags)) {
+            tags = [...apiKeyData.tags]
+          }
+        } catch (error) {
+          logger.debug(`[使用统计] 标签解析失败: ${error.message}`)
         }
-      } else {
-        // 新数据或无数据 - 统一使用allTokens作为tokens的值
-        return {
-          tokens: actualAllTokens, // 统一使用allTokens作为总数
-          inputTokens,
-          outputTokens,
-          cacheCreateTokens,
-          cacheReadTokens,
-          allTokens: actualAllTokens,
-          requests
+
+        isDailyCard = tags.includes('daily-card')
+      }
+
+      const totalKey = `usage:${keyId}`
+      const today = getDateStringInTimezone()
+      const dailyKey = `usage:daily:${keyId}:${today}`
+      const tzDate = getDateInTimezone()
+      const currentMonth = `${tzDate.getUTCFullYear()}-${String(tzDate.getUTCMonth() + 1).padStart(2, '0')}`
+      const monthlyKey = `usage:monthly:${keyId}:${currentMonth}`
+
+      const [total, daily, monthly] = await Promise.all([
+        this.client.hgetall(totalKey),
+        this.client.hgetall(dailyKey),
+        this.client.hgetall(monthlyKey)
+      ])
+
+      // 获取API Key的创建时间来计算平均值
+      const keyData = await this.client.hgetall(`apikey:${keyId}`)
+      const createdAt = keyData.createdAt ? new Date(keyData.createdAt) : new Date()
+      const now = new Date()
+      const daysSinceCreated = Math.max(1, Math.ceil((now - createdAt) / (1000 * 60 * 60 * 24)))
+
+      const totalTokens = parseInt(total.totalTokens) || 0
+      const totalRequests = parseInt(total.totalRequests) || 0
+
+      // 计算平均RPM (requests per minute) 和 TPM (tokens per minute)
+      const totalMinutes = Math.max(1, daysSinceCreated * 24 * 60)
+      const avgRPM = totalRequests / totalMinutes
+      const avgTPM = totalTokens / totalMinutes
+
+      // 处理旧数据兼容性（支持缓存token）
+      const handleLegacyData = (data) => {
+        // 优先使用total*字段（存储时使用的字段）
+        const tokens = parseInt(data.totalTokens) || parseInt(data.tokens) || 0
+        const inputTokens = parseInt(data.totalInputTokens) || parseInt(data.inputTokens) || 0
+        const outputTokens = parseInt(data.totalOutputTokens) || parseInt(data.outputTokens) || 0
+        const requests = parseInt(data.totalRequests) || parseInt(data.requests) || 0
+
+        // 新增缓存token字段
+        const cacheCreateTokens =
+          parseInt(data.totalCacheCreateTokens) || parseInt(data.cacheCreateTokens) || 0
+        const cacheReadTokens =
+          parseInt(data.totalCacheReadTokens) || parseInt(data.cacheReadTokens) || 0
+        const allTokens = parseInt(data.totalAllTokens) || parseInt(data.allTokens) || 0
+
+        const totalFromSeparate = inputTokens + outputTokens
+        // 计算实际的总tokens（包含所有类型）
+        const actualAllTokens =
+          allTokens || inputTokens + outputTokens + cacheCreateTokens + cacheReadTokens
+
+        if (totalFromSeparate === 0 && tokens > 0) {
+          // 旧数据：没有输入输出分离
+          return {
+            tokens, // 保持兼容性，但统一使用allTokens
+            inputTokens: Math.round(tokens * 0.3), // 假设30%为输入
+            outputTokens: Math.round(tokens * 0.7), // 假设70%为输出
+            cacheCreateTokens: 0, // 旧数据没有缓存token
+            cacheReadTokens: 0,
+            allTokens: tokens, // 对于旧数据，allTokens等于tokens
+            requests
+          }
+        } else {
+          // 新数据或无数据 - 统一使用allTokens作为tokens的值
+          return {
+            tokens: actualAllTokens, // 统一使用allTokens作为总数
+            inputTokens,
+            outputTokens,
+            cacheCreateTokens,
+            cacheReadTokens,
+            allTokens: actualAllTokens,
+            requests
+          }
         }
       }
-    }
 
-    const totalData = handleLegacyData(total)
-    const dailyData = handleLegacyData(daily)
-    const monthlyData = handleLegacyData(monthly)
+      const totalData = handleLegacyData(total)
+      const dailyData = handleLegacyData(daily)
+      const monthlyData = handleLegacyData(monthly)
 
-    return {
-      total: totalData,
-      daily: dailyData,
-      monthly: monthlyData,
-      averages: {
-        rpm: Math.round(avgRPM * 100) / 100, // 保留2位小数
-        tpm: Math.round(avgTPM * 100) / 100,
-        dailyRequests: Math.round((totalRequests / daysSinceCreated) * 100) / 100,
-        dailyTokens: Math.round((totalTokens / daysSinceCreated) * 100) / 100
+      // 如果是日卡，daily 字段返回总使用量
+      if (isDailyCard) {
+        return {
+          total: totalData,
+          daily: totalData, // 日卡的 daily 显示总使用量
+          monthly: monthlyData,
+          averages: {
+            rpm: Math.round(avgRPM * 100) / 100, // 保留2位小数
+            tpm: Math.round(avgTPM * 100) / 100,
+            dailyRequests: Math.round((totalRequests / daysSinceCreated) * 100) / 100,
+            dailyTokens: Math.round((totalTokens / daysSinceCreated) * 100) / 100
+          }
+        }
+      }
+
+      return {
+        total: totalData,
+        daily: dailyData,
+        monthly: monthlyData,
+        averages: {
+          rpm: Math.round(avgRPM * 100) / 100, // 保留2位小数
+          tpm: Math.round(avgTPM * 100) / 100,
+          dailyRequests: Math.round((totalRequests / daysSinceCreated) * 100) / 100,
+          dailyTokens: Math.round((totalTokens / daysSinceCreated) * 100) / 100
+        }
+      }
+    } catch (error) {
+      logger.error(`获取使用统计失败: ${error.message}`)
+      // 出错时返回空统计
+      return {
+        total: {
+          tokens: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheCreateTokens: 0,
+          cacheReadTokens: 0,
+          allTokens: 0,
+          requests: 0
+        },
+        daily: {
+          tokens: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheCreateTokens: 0,
+          cacheReadTokens: 0,
+          allTokens: 0,
+          requests: 0
+        },
+        monthly: {
+          tokens: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheCreateTokens: 0,
+          cacheReadTokens: 0,
+          allTokens: 0,
+          requests: 0
+        },
+        averages: {
+          rpm: 0,
+          tpm: 0,
+          dailyRequests: 0,
+          dailyTokens: 0
+        }
       }
     }
   }
 
-  // 💰 获取当日费用
+  // 💰 获取当日费用（日卡需要累计所有天的费用）
   async getDailyCost(keyId) {
-    const today = getDateStringInTimezone()
-    const costKey = `usage:cost:daily:${keyId}:${today}`
-    const cost = await this.client.get(costKey)
-    const result = parseFloat(cost || 0)
-    logger.debug(
-      `💰 Getting daily cost for ${keyId}, date: ${today}, key: ${costKey}, value: ${cost}, result: ${result}`
-    )
-    return result
+    try {
+      // 获取 API Key 信息以检查是否是日卡
+      const apiKeyData = await this.getApiKey(keyId)
+
+      if (apiKeyData && apiKeyData.tags) {
+        // 解析标签
+        let tags = []
+        try {
+          if (typeof apiKeyData.tags === 'string') {
+            const trimmedTags = apiKeyData.tags.trim()
+            if (trimmedTags.startsWith('[') && trimmedTags.endsWith(']')) {
+              try {
+                tags = JSON.parse(trimmedTags)
+              } catch {
+                // JSON解析失败，按逗号分割并移除引号
+                tags = trimmedTags
+                  .slice(1, -1)
+                  .split(',')
+                  .map((tag) => tag.replace(/['"]/g, '').trim())
+                  .filter((tag) => tag.length > 0)
+              }
+            } else {
+              // 逗号分隔格式
+              tags = trimmedTags
+                .split(',')
+                .map((tag) => tag.trim())
+                .filter((tag) => tag.length > 0)
+            }
+          } else if (Array.isArray(apiKeyData.tags)) {
+            tags = [...apiKeyData.tags]
+          }
+        } catch (error) {
+          logger.debug(`[费用计算] 标签解析失败: ${error.message}`)
+        }
+
+        // 如果是日卡，获取总费用而不是今日费用
+        if (tags.includes('daily-card')) {
+          const totalCostKey = `usage:cost:total:${keyId}`
+          const totalCost = await this.client.get(totalCostKey)
+          const result = parseFloat(totalCost || 0)
+          logger.debug(
+            `💰 Getting total cost for daily-card ${keyId}, key: ${totalCostKey}, value: ${totalCost}, result: ${result}`
+          )
+          return result
+        }
+      }
+
+      // 非日卡，返回今日费用
+      const today = getDateStringInTimezone()
+      const costKey = `usage:cost:daily:${keyId}:${today}`
+      const cost = await this.client.get(costKey)
+      const result = parseFloat(cost || 0)
+      logger.debug(
+        `💰 Getting daily cost for ${keyId}, date: ${today}, key: ${costKey}, value: ${cost}, result: ${result}`
+      )
+      return result
+    } catch (error) {
+      logger.error(`获取费用失败: ${error.message}`)
+      // 出错时返回0，避免阻塞请求
+      return 0
+    }
   }
 
   // 💰 增加当日费用

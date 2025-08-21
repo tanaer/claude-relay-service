@@ -365,6 +365,9 @@ class Application {
             .replace(/__BASE_URL__/g, safeBaseUrl)
 
           res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+          res.setHeader('Pragma', 'no-cache')
+          res.setHeader('Expires', '0')
           return res.status(200).send(content)
         } catch (error) {
           logger.error('❌ Failed to generate install.ps1:', error)

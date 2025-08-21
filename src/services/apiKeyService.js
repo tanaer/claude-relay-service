@@ -44,6 +44,8 @@ class ApiKeyService {
         name,
         description,
         apiKey: hashedKey,
+        // 存储加密的原始API Key用于管理员查看
+        encryptedApiKey: this._encryptApiKey(apiKey),
         tokenLimit: String(tokenLimit ?? 0),
         concurrencyLimit: String(concurrencyLimit ?? 0),
         rateLimitWindow: String(rateLimitWindow ?? 0),

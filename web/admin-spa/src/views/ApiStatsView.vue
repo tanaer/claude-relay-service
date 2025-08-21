@@ -428,7 +428,7 @@ const windowsCommand = computed(() => {
   const key = redemptionResult.value?.apiKey || ''
   if (!key) return '请先兑换获取 API Key'
   const origin = window.location.origin
-  const psUrl = `${origin}/install.ps1?apiKey=${encodeURIComponent(key)}`
+  const psUrl = `${origin}/install.ps1?apiKey=${encodeURIComponent(key)}&t=${Date.now()}`
   return `irm '${psUrl}' | iex`
 })
 
@@ -436,7 +436,7 @@ const bashCommand = computed(() => {
   const key = redemptionResult.value?.apiKey || ''
   if (!key) return '请先兑换获取 API Key'
   const origin = window.location.origin
-  const shUrl = `${origin}/install.sh?apiKey=${encodeURIComponent(key)}`
+  const shUrl = `${origin}/install.sh?apiKey=${encodeURIComponent(key)}&t=${Date.now()}`
   return `curl -fsSL '${shUrl}' -o install.sh && bash install.sh`
 })
 

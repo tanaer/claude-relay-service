@@ -254,7 +254,7 @@ async function handleChatCompletion(req, res, apiKeyData) {
             const outputTokens = usage.output_tokens || 0
             const cacheCreateTokens = usage.cache_creation_input_tokens || 0
             const cacheReadTokens = usage.cache_read_input_tokens || 0
-            const model = usage.model || claudeRequest.model
+            const { model } = claudeRequest // 统一使用原始请求模型计费，确保模型映射不影响计费
 
             apiKeyService
               .recordUsage(
@@ -335,7 +335,7 @@ async function handleChatCompletion(req, res, apiKeyData) {
             usage.output_tokens || 0,
             usage.cache_creation_input_tokens || 0,
             usage.cache_read_input_tokens || 0,
-            claudeRequest.model,
+            claudeRequest.model, // 使用原始请求模型计费，与流式请求保持一致
             accountId
           )
           .catch((error) => {

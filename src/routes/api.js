@@ -98,7 +98,7 @@ async function handleMessagesRequest(req, res) {
               const outputTokens = usageData.output_tokens || 0
               const cacheCreateTokens = usageData.cache_creation_input_tokens || 0
               const cacheReadTokens = usageData.cache_read_input_tokens || 0
-              const model = usageData.model || 'unknown'
+              const model = requestedModel || 'unknown' // 使用原始请求模型计费
 
               // 记录真实的token使用量（包含模型信息和所有4种token以及账户ID）
               const { accountId: usageAccountId } = usageData
@@ -164,7 +164,7 @@ async function handleMessagesRequest(req, res) {
               const outputTokens = usageData.output_tokens || 0
               const cacheCreateTokens = usageData.cache_creation_input_tokens || 0
               const cacheReadTokens = usageData.cache_read_input_tokens || 0
-              const model = usageData.model || 'unknown'
+              const model = requestedModel || 'unknown' // 使用原始请求模型计费
 
               // 记录真实的token使用量（包含模型信息和所有4种token以及账户ID）
               const usageAccountId = usageData.accountId
@@ -228,7 +228,15 @@ async function handleMessagesRequest(req, res) {
             const outputTokens = result.usage.output_tokens || 0
 
             apiKeyService
-              .recordUsage(req.apiKey.id, inputTokens, outputTokens, 0, 0, result.model, accountId)
+              .recordUsage(
+                req.apiKey.id,
+                inputTokens,
+                outputTokens,
+                0,
+                0,
+                requestedModel,
+                accountId
+              )
               .catch((error) => {
                 logger.error('❌ Failed to record Bedrock stream usage:', error)
               })
@@ -386,7 +394,7 @@ async function handleMessagesRequest(req, res) {
           const outputTokens = jsonData.usage.output_tokens || 0
           const cacheCreateTokens = jsonData.usage.cache_creation_input_tokens || 0
           const cacheReadTokens = jsonData.usage.cache_read_input_tokens || 0
-          const model = jsonData.model || req.body.model || 'unknown'
+          const model = requestedModel || 'unknown' // 使用原始请求模型计费
 
           // 记录真实的token使用量（包含模型信息和所有4种token以及账户ID）
           const { accountId: responseAccountId } = response

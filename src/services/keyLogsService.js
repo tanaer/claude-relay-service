@@ -17,12 +17,14 @@ class KeyLogsService {
   /**
    * 记录关键日志
    * @param {Object} logData 日志数据
-   * @param {string} logData.type 日志类型 (rate_limit, template_switch, account_status, redemption, system, upstream_error)
+   * @param {string} logData.type 日志类型 (rate_limit, template_switch, account_status, redemption, system, upstream_error, api_error)
    * @param {string} logData.level 日志级别 (error, warn, info, success)
    * @param {string} logData.title 日志标题
    * @param {string} logData.message 日志消息
    * @param {Object} logData.details 详细信息对象
    * @param {string} logData.source 日志来源 (可选)
+   * @param {string} logData.apiKeyId API Key ID (用于 api_error 类型)
+   * @param {string} logData.apiKeyName API Key 名称 (用于 api_error 类型)
    */
   async logKeyEvent(logData) {
     try {
@@ -37,7 +39,9 @@ class KeyLogsService {
         message: logData.message,
         details: logData.details || {},
         source: logData.source || 'system',
-        timestamp
+        timestamp,
+        apiKeyId: logData.apiKeyId || null,
+        apiKeyName: logData.apiKeyName || null
       }
 
       // 存储日志详细信息
@@ -65,29 +69,22 @@ class KeyLogsService {
    * @param {number} options.page 页码
    * @param {number} options.pageSize 每页大小
    * @param {string} options.level 日志级别过滤
+   * @param {string} options.apiKeyName API Key 名称过滤
    * @returns {Object} 包含日志列表和分页信息
    */
   async getKeyLogs(options = {}) {
     try {
-      const { type, page = 1, pageSize = 20, level } = options
+      const { type, page = 1, pageSize = 20, level, apiKeyName } = options
 
       // 确定使用哪个索引
       const indexKey = type ? `${this.KEY_LOGS_INDEX}${type}` : this.KEY_LOGS_LIST
 
-      // 获取总数
-      const totalCount = await redis.zcard(indexKey)
-      const totalPages = Math.ceil(totalCount / pageSize)
+      // 获取所有匹配类型的日志ID（按时间倒序）
+      const allLogIds = await redis.zrevrange(indexKey, 0, -1)
 
-      // 计算分页偏移
-      const start = (page - 1) * pageSize
-      const end = start + pageSize - 1
-
-      // 获取日志ID列表（按时间倒序）
-      const logIds = await redis.zrevrange(indexKey, start, end)
-
-      // 获取日志详细信息
-      const logs = []
-      for (const logId of logIds) {
+      // 获取所有日志详细信息并进行筛选
+      const filteredLogs = []
+      for (const logId of allLogIds) {
         const logData = await redis.hgetall(`${this.KEY_LOGS_PREFIX}${logId}`)
         if (logData && Object.keys(logData).length > 0) {
           // 解析 details 字段
@@ -99,15 +96,39 @@ class KeyLogsService {
             }
           }
 
+          // 应用所有过滤条件
+          let shouldInclude = true
+
           // 级别过滤
-          if (!level || logData.level === level) {
-            logs.push(logData)
+          if (level && logData.level !== level) {
+            shouldInclude = false
+          }
+
+          // API Key 名称过滤
+          if (apiKeyName && shouldInclude) {
+            if (
+              !logData.apiKeyName ||
+              !logData.apiKeyName.toLowerCase().includes(apiKeyName.toLowerCase())
+            ) {
+              shouldInclude = false
+            }
+          }
+
+          if (shouldInclude) {
+            filteredLogs.push(logData)
           }
         }
       }
 
+      // 计算分页
+      const totalCount = filteredLogs.length
+      const totalPages = Math.ceil(totalCount / pageSize)
+      const start = (page - 1) * pageSize
+      const end = start + pageSize
+      const paginatedLogs = filteredLogs.slice(start, end)
+
       return {
-        logs,
+        logs: paginatedLogs,
         pagination: {
           currentPage: page,
           pageSize,
@@ -127,6 +148,31 @@ class KeyLogsService {
         }
       }
     }
+  }
+
+  /**
+   * 记录 API 错误日志
+   * @param {Object} errorData 错误数据
+   * @param {string} errorData.apiKeyId API Key ID
+   * @param {string} errorData.apiKeyName API Key 名称
+   * @param {string} errorData.error 错误信息
+   * @param {Object} errorData.request 请求详情
+   * @param {string} errorData.level 错误级别 (error, warn)
+   */
+  async logApiError(errorData) {
+    await this.logKeyEvent({
+      type: 'api_error',
+      level: errorData.level || 'error',
+      title: `API 请求错误`,
+      message: errorData.error,
+      details: {
+        request: errorData.request || {},
+        timestamp: new Date().toISOString()
+      },
+      source: 'api',
+      apiKeyId: errorData.apiKeyId,
+      apiKeyName: errorData.apiKeyName
+    })
   }
 
   /**

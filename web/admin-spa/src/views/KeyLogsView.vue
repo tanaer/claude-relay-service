@@ -181,6 +181,98 @@
       </div>
     </div>
 
+    <!-- API 报错日志视图 -->
+    <div v-else-if="activeFilter === 'api_error'">
+      <!-- API Key 名称筛选 -->
+      <div class="mb-4 flex flex-col gap-3 rounded-lg bg-gray-50 p-4 sm:flex-row sm:items-center">
+        <div class="flex items-center gap-2">
+          <label class="text-sm font-medium text-gray-700">API Key 名称：</label>
+          <input
+            v-model="apiKeyNameFilter"
+            class="rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+            placeholder="输入 API Key 名称筛选"
+            type="text"
+            @input="debounceLoadLogs"
+          />
+        </div>
+        <div class="flex items-center gap-2 text-xs text-gray-500">
+          <i class="fas fa-info-circle" />
+          支持模糊搜索，实时筛选
+        </div>
+      </div>
+
+      <!-- API 报错日志列表 -->
+      <div v-if="filteredLogs.length === 0" class="py-12 text-center">
+        <div
+          class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100"
+        >
+          <i class="fas fa-bug text-xl text-gray-400" />
+        </div>
+        <p class="text-lg text-gray-500">暂无 API 报错日志</p>
+        <p class="mt-2 text-sm text-gray-400">当前筛选条件下暂无 API 错误记录</p>
+      </div>
+
+      <div v-else class="space-y-3">
+        <div
+          v-for="log in filteredLogs"
+          :key="log.id"
+          class="rounded-lg border border-red-200 bg-red-50 p-4 transition-all duration-200 hover:shadow-sm"
+        >
+          <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-center gap-3">
+              <div class="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
+                <i class="fas fa-bug text-red-600" />
+              </div>
+              <div>
+                <div class="flex items-center gap-2 text-sm font-medium text-gray-900">
+                  {{ log.title }}
+                  <span
+                    v-if="log.apiKeyName"
+                    class="inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800"
+                  >
+                    <i class="fas fa-key mr-1" />
+                    {{ log.apiKeyName }}
+                  </span>
+                </div>
+                <div class="text-xs text-gray-500">{{ formatTime(log.timestamp) }}</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span
+                :class="[
+                  'inline-flex items-center rounded-full px-2 py-1 text-xs font-medium',
+                  log.level === 'error'
+                    ? 'bg-red-100 text-red-800'
+                    : log.level === 'warn'
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : 'bg-gray-100 text-gray-800'
+                ]"
+              >
+                {{ log.level.toUpperCase() }}
+              </span>
+            </div>
+          </div>
+
+          <div class="ml-11 text-sm text-gray-700">
+            {{ log.message }}
+          </div>
+
+          <div v-if="log.details && Object.keys(log.details).length > 0" class="ml-11 mt-2">
+            <details class="group">
+              <summary class="cursor-pointer text-xs text-gray-500 hover:text-gray-700">
+                <i class="fas fa-chevron-right transition-transform group-open:rotate-90" />
+                查看详情
+              </summary>
+              <pre
+                class="mt-2 max-h-32 overflow-auto rounded bg-gray-100 p-2 text-xs text-gray-600"
+                >{{ JSON.stringify(log.details, null, 2) }}</pre
+              >
+            </details>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-else-if="filteredLogs.length === 0" class="py-12 text-center">
       <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
         <i class="fas fa-search text-xl text-gray-400" />
@@ -285,6 +377,9 @@ const selectedErrorAccount = ref('all')
 const errorStatsSortBy = ref('count')
 const errorStatsOrder = ref('desc')
 
+// API Key 名称筛选
+const apiKeyNameFilter = ref('')
+
 // 日志类型过滤器
 const logFilters = ref([
   { key: 'all', name: '全部', icon: 'fas fa-list' },
@@ -293,7 +388,8 @@ const logFilters = ref([
   { key: 'account_status', name: '账户状态', icon: 'fas fa-user-circle' },
   { key: 'redemption', name: '兑换码', icon: 'fas fa-ticket-alt' },
   { key: 'system', name: '系统事件', icon: 'fas fa-cogs' },
-  { key: 'upstream_error', name: '上游报错', icon: 'fas fa-exclamation-triangle' }
+  { key: 'upstream_error', name: '上游报错', icon: 'fas fa-exclamation-triangle' },
+  { key: 'api_error', name: 'API报错', icon: 'fas fa-bug' }
 ])
 
 // 计算属性
@@ -314,9 +410,16 @@ const loadLogs = async () => {
       type: activeFilter.value === 'all' ? undefined : activeFilter.value
     }
 
+    // 如果是 API 报错分类，且有 API Key 名称筛选，添加筛选参数
+    if (activeFilter.value === 'api_error' && apiKeyNameFilter.value.trim()) {
+      params.apiKeyName = apiKeyNameFilter.value.trim()
+    }
+
     const response = await apiClient.get('/admin/key-logs', { params })
     logs.value = response.data.logs
-    totalPages.value = response.data.totalPages
+    totalPages.value = response.data.pagination
+      ? response.data.pagination.totalPages
+      : response.data.totalPages
   } catch (error) {
     console.error('加载关键日志失败:', error)
     logs.value = []
@@ -460,9 +563,26 @@ const toggleErrorSortOrder = () => {
   loadUpstreamErrorStats()
 }
 
+// 防抖搜索方法
+let searchTimeout = null
+const debounceLoadLogs = () => {
+  clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    currentPage.value = 1 // 重置到第一页
+    loadLogs()
+  }, 500)
+}
+
 // 监听过滤器变化
 const handleFilterChange = (filter) => {
   activeFilter.value = filter
+  currentPage.value = 1 // 重置页码
+
+  // 清空 API Key 名称筛选（除非是 API 报错分类）
+  if (filter !== 'api_error') {
+    apiKeyNameFilter.value = ''
+  }
+
   if (filter === 'upstream_error') {
     loadUpstreamErrorStats()
   } else {

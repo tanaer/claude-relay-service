@@ -47,6 +47,21 @@
               </div>
             </div>
 
+            <!-- 过期时间筛选器 -->
+            <div class="group relative min-w-[140px]">
+              <div
+                class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+              ></div>
+              <CustomDropdown
+                v-model="selectedExpiryFilter"
+                icon="fa-clock"
+                icon-color="text-orange-500"
+                :options="expiryOptions"
+                placeholder="过期状态"
+                @change="currentPage = 1"
+              />
+            </div>
+
             <!-- 刷新按钮 -->
             <button
               class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
@@ -1162,6 +1177,9 @@ const apiKeyErrorsLoading = ref(false)
 const selectedTagFilter = ref('')
 const availableTags = ref([])
 
+// 过期时间筛选相关
+const selectedExpiryFilter = ref('')
+
 // 下拉选项数据
 const timeRangeOptions = ref([
   { value: 'today', label: '今日', icon: 'fa-clock' },
@@ -1177,6 +1195,12 @@ const tagOptions = computed(() => {
   })
   return options
 })
+
+const expiryOptions = ref([
+  { value: '', label: '所有', icon: 'fa-asterisk' },
+  { value: 'expired', label: '已过期', icon: 'fa-times-circle' },
+  { value: 'active', label: '未过期', icon: 'fa-check-circle' }
+])
 
 const selectedTagCount = computed(() => {
   if (!selectedTagFilter.value) return 0
@@ -1205,9 +1229,24 @@ const sortedApiKeys = computed(() => {
   // 先进行标签筛选
   let filteredKeys = apiKeys.value
   if (selectedTagFilter.value) {
-    filteredKeys = apiKeys.value.filter(
+    filteredKeys = filteredKeys.filter(
       (key) => key.tags && key.tags.includes(selectedTagFilter.value)
     )
+  }
+
+  // 过期时间筛选
+  if (selectedExpiryFilter.value) {
+    const now = new Date()
+    filteredKeys = filteredKeys.filter((key) => {
+      if (selectedExpiryFilter.value === 'expired') {
+        // 已过期：有过期时间且已过期
+        return key.expiresAt && new Date(key.expiresAt) < now
+      } else if (selectedExpiryFilter.value === 'active') {
+        // 未过期：没有过期时间或未过期
+        return !key.expiresAt || new Date(key.expiresAt) >= now
+      }
+      return true
+    })
   }
 
   // 如果没有排序字段，返回筛选后的结果
@@ -1928,7 +1967,7 @@ const formatErrorTime = (timestamp) => {
 }
 
 // 监听筛选条件变化，重置页码
-watch([selectedTagFilter, apiKeyStatsTimeRange], () => {
+watch([selectedTagFilter, selectedExpiryFilter, apiKeyStatsTimeRange], () => {
   currentPage.value = 1
 })
 

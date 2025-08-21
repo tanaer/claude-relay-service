@@ -234,28 +234,55 @@
                 <span>过期时间:</span>
                 <span>{{ formatDateTime(redemptionResult.expiresAt) }}</span>
               </div>
-              <div class="flex items-center justify-between pt-2">
-                <span>安装脚本:</span>
-                <div class="flex items-center gap-3">
-                  <a
-                    class="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-white shadow transition-all duration-300"
-                    :class="
-                      redemptionResult.alreadyUsed
-                        ? 'bg-blue-600 hover:bg-blue-700'
-                        : 'bg-green-600 hover:bg-green-700'
-                    "
-                    :href="getSetupUrl(redemptionResult.apiKey)"
-                    rel="noopener"
-                    target="_blank"
-                  >
-                    <i class="fas fa-download"></i>
-                    下载安装脚本
-                  </a>
+
+              <div class="mt-3 rounded-xl bg-gray-50 p-3 md:p-4">
+                <h5 class="mb-2 text-sm font-medium text-gray-900">环境一键安装</h5>
+                <div class="space-y-3">
+                  <div class="flex items-start gap-2">
+                    <span class="min-w-[9rem] text-xs font-medium text-gray-700 md:text-sm"
+                      >Windows (PowerShell):</span
+                    >
+                    <div class="flex-1">
+                      <div class="relative">
+                        <code
+                          class="block w-full whitespace-pre-wrap break-all rounded bg-gray-800 p-2 text-xs text-green-100 md:text-sm"
+                          >{{ windowsCommand }}</code
+                        >
+                        <button
+                          class="absolute right-2 top-2 rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700"
+                          @click="copyToClipboard(windowsCommand)"
+                        >
+                          复制
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flex items-start gap-2">
+                    <span class="min-w-[9rem] text-xs font-medium text-gray-700 md:text-sm"
+                      >Linux / macOS:</span
+                    >
+                    <div class="flex-1">
+                      <div class="relative">
+                        <code
+                          class="block w-full whitespace-pre-wrap break-all rounded bg-gray-800 p-2 text-xs text-green-100 md:text-sm"
+                          >{{ bashCommand }}</code
+                        >
+                        <button
+                          class="absolute right-2 top-2 rounded bg-green-600 px-2 py-1 text-xs text-white hover:bg-green-700"
+                          @click="copyToClipboard(bashCommand)"
+                        >
+                          复制
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
+                <p class="mt-2 text-xs text-gray-600">
+                  执行后将自动配置 ANTHROPIC_AUTH_TOKEN 与 ANTHROPIC_BASE_URL。
+                </p>
               </div>
             </div>
           </div>
-
           <!-- 提示信息 -->
           <div class="rounded-xl bg-blue-50/50 p-4 backdrop-blur-sm">
             <h4 class="mb-2 flex items-center text-sm font-medium text-blue-900">
@@ -275,17 +302,17 @@
                   >如果您忘记API Key（密钥），可以使用兑换码重新兑换查看</span
                 >
               </li>
-              <li>• 兑换成功后可点击“下载安装脚本”，脚本会自动注入你的 API Key</li>
+              <li>• 兑换成功后可复制上方命令，一键安装并自动注入你的 API Key</li>
               <li>• 安装脚本为 Windows 系统专用，下载后右键点击文件，“使用管理员身份运行”</li>
               <li>
-                • 如果安装脚本无法使用，请
+                • 电脑环境千差万别，如果安装脚本无法使用，请自行<b>用点心</b>花2分钟
                 <a
                   class="cursor-pointer text-red-600 underline hover:text-red-800"
                   href="#"
                   role="button"
                   @click.prevent="currentTab = 'tutorial'"
                 >
-                  点击查看使用教程
+                  查看使用教程
                 </a>
               </li>
             </ul>
@@ -396,13 +423,22 @@ const handleRedeem = async () => {
   }
 }
 
-// 生成带 apiKey 的安装脚本下载链接
-const getSetupUrl = (key) => {
-  if (!key) return '#'
-  const url = new URL('/download/muskapi_com_setup.cmd', window.location.origin)
-  url.searchParams.set('apiKey', key)
-  return url.toString()
-}
+// 动态安装命令（带注入 apiKey）
+const windowsCommand = computed(() => {
+  const key = redemptionResult.value?.apiKey || ''
+  if (!key) return '请先兑换获取 API Key'
+  const origin = window.location.origin
+  const psUrl = `${origin}/install.ps1?apiKey=${encodeURIComponent(key)}`
+  return `irm '${psUrl}' | iex`
+})
+
+const bashCommand = computed(() => {
+  const key = redemptionResult.value?.apiKey || ''
+  if (!key) return '请先兑换获取 API Key'
+  const origin = window.location.origin
+  const shUrl = `${origin}/install.sh?apiKey=${encodeURIComponent(key)}`
+  return `curl -fsSL '${shUrl}' -o install.sh && bash install.sh`
+})
 
 // 处理键盘快捷键
 const handleKeyDown = (event) => {

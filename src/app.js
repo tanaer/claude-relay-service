@@ -342,6 +342,93 @@ class Application {
         }
       })
 
+      // 📥 PowerShell 在线安装脚本（支持 irm 直接执行，并可注入 API Key/BaseUrl）
+      this.app.get('/install.ps1', async (req, res) => {
+        try {
+          const { apiKey = '', baseUrl = '' } = req.query
+
+          const templatePath = path.join(__dirname, '..', 'resources', 'scripts', 'install.ps1')
+
+          if (!fs.existsSync(templatePath)) {
+            return res.status(404).send('install.ps1 template not found')
+          }
+
+          let content = fs.readFileSync(templatePath, 'utf8')
+
+          const safeApiKey = String(apiKey).replace(/`/g, '``')
+          const defaultBase = 'https://ccapi.muskapi.com/api/'
+          const selectedBase = baseUrl && typeof baseUrl === 'string' ? baseUrl : defaultBase
+          const safeBaseUrl = String(selectedBase).replace(/`/g, '``')
+
+          content = content
+            .replace(/__API_TOKEN__/g, safeApiKey)
+            .replace(/__BASE_URL__/g, safeBaseUrl)
+
+          res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+          return res.status(200).send(content)
+        } catch (error) {
+          logger.error('❌ Failed to generate install.ps1:', error)
+          return res.status(500).send('Failed to generate powershell install script')
+        }
+      })
+
+      // 📥 Bash 安装脚本（支持通过 curl 下载，并可注入 API Key/BaseUrl）
+      this.app.get('/install.sh', async (req, res) => {
+        try {
+          const { apiKey = '', baseUrl = '' } = req.query
+
+          const templatePath = path.join(__dirname, '..', 'resources', 'scripts', 'install.sh')
+
+          if (!fs.existsSync(templatePath)) {
+            return res.status(404).send('install.sh template not found')
+          }
+
+          let content = fs.readFileSync(templatePath, 'utf8')
+
+          // 若提供 apiKey/baseUrl，则在 shebang 后注入对应环境变量，兼容脚本内读取逻辑
+          const lines = content.split('\n')
+          const injections = []
+          if (apiKey) {
+            const safeKey = String(apiKey)
+              .replace(/\\/g, '\\\\')
+              .replace(/\$/g, '\\$')
+              .replace(/"/g, '\\"')
+            injections.push(`export CLAUDE_API_KEY="${safeKey}"`)
+          }
+          if (baseUrl) {
+            const safeUrl = String(baseUrl)
+              .replace(/\\/g, '\\\\')
+              .replace(/\$/g, '\\$')
+              .replace(/"/g, '\\"')
+            injections.push(`export CLAUDE_API_URL="${safeUrl}"`)
+          }
+
+          if (injections.length > 0) {
+            // 在 shebang 后插入注入行，并带上注释
+            const header = [
+              '',
+              '# --- injected by server: begin ---',
+              ...injections,
+              '# --- injected by server: end ---',
+              ''
+            ]
+            if (lines[0].startsWith('#!')) {
+              lines.splice(1, 0, ...header)
+            } else {
+              lines.splice(0, 0, ...header)
+            }
+            content = lines.join('\n')
+          }
+
+          res.setHeader('Content-Type', 'text/x-shellscript; charset=utf-8')
+          res.setHeader('Cache-Control', 'no-cache')
+          return res.status(200).send(content)
+        } catch (error) {
+          logger.error('❌ Failed to generate install.sh:', error)
+          return res.status(500).send('Failed to generate bash install script')
+        }
+      })
+
       // 🛣️ 路由
       this.app.use('/api', apiRoutes)
       this.app.use('/claude', apiRoutes) // /claude 路由别名，与 /api 功能相同

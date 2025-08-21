@@ -45,13 +45,13 @@ class KeyLogsService {
       }
 
       // 存储日志详细信息
-      await redis.hset(`${this.KEY_LOGS_PREFIX}${logId}`, logEntry)
+      await redis.client.hset(`${this.KEY_LOGS_PREFIX}${logId}`, logEntry)
 
       // 添加到有序列表（按时间戳排序）
-      await redis.zadd(this.KEY_LOGS_LIST, Date.now(), logId)
+      await redis.client.zadd(this.KEY_LOGS_LIST, Date.now(), logId)
 
       // 添加到类型索引
-      await redis.zadd(`${this.KEY_LOGS_INDEX}${logData.type}`, Date.now(), logId)
+      await redis.client.zadd(`${this.KEY_LOGS_INDEX}${logData.type}`, Date.now(), logId)
 
       // 清理旧日志
       await this.cleanupOldLogs()
@@ -80,12 +80,12 @@ class KeyLogsService {
       const indexKey = type ? `${this.KEY_LOGS_INDEX}${type}` : this.KEY_LOGS_LIST
 
       // 获取所有匹配类型的日志ID（按时间倒序）
-      const allLogIds = await redis.zrevrange(indexKey, 0, -1)
+      const allLogIds = await redis.client.zrevrange(indexKey, 0, -1)
 
       // 获取所有日志详细信息并进行筛选
       const filteredLogs = []
       for (const logId of allLogIds) {
-        const logData = await redis.hgetall(`${this.KEY_LOGS_PREFIX}${logId}`)
+        const logData = await redis.client.hgetall(`${this.KEY_LOGS_PREFIX}${logId}`)
         if (logData && Object.keys(logData).length > 0) {
           // 解析 details 字段
           if (logData.details && typeof logData.details === 'string') {
@@ -189,7 +189,7 @@ class KeyLogsService {
       }
 
       // 获取总数
-      stats.total = await redis.zcard(this.KEY_LOGS_LIST)
+      stats.total = await redis.client.zcard(this.KEY_LOGS_LIST)
 
       // 统计各类型数量
       const types = [
@@ -201,13 +201,13 @@ class KeyLogsService {
         'upstream_error'
       ]
       for (const type of types) {
-        const count = await redis.zcard(`${this.KEY_LOGS_INDEX}${type}`)
+        const count = await redis.client.zcard(`${this.KEY_LOGS_INDEX}${type}`)
         stats.byType[type] = count
       }
 
       // 统计最近24小时的日志
       const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000
-      stats.recent24h = await redis.zcount(this.KEY_LOGS_LIST, oneDayAgo, '+inf')
+      stats.recent24h = await redis.client.zcount(this.KEY_LOGS_LIST, oneDayAgo, '+inf')
 
       return stats
     } catch (error) {
@@ -227,18 +227,18 @@ class KeyLogsService {
   async cleanupOldLogs() {
     try {
       // 清理超过最大数量的日志
-      const totalCount = await redis.zcard(this.KEY_LOGS_LIST)
+      const totalCount = await redis.client.zcard(this.KEY_LOGS_LIST)
       if (totalCount > this.MAX_LOGS) {
         const removeCount = totalCount - this.MAX_LOGS
-        const oldLogIds = await redis.zrange(this.KEY_LOGS_LIST, 0, removeCount - 1)
+        const oldLogIds = await redis.client.zrange(this.KEY_LOGS_LIST, 0, removeCount - 1)
 
         // 删除旧日志
         for (const logId of oldLogIds) {
-          await redis.del(`${this.KEY_LOGS_PREFIX}${logId}`)
+          await redis.client.del(`${this.KEY_LOGS_PREFIX}${logId}`)
         }
 
         // 从有序集合中移除
-        await redis.zremrangebyrank(this.KEY_LOGS_LIST, 0, removeCount - 1)
+        await redis.client.zremrangebyrank(this.KEY_LOGS_LIST, 0, removeCount - 1)
 
         // 从类型索引中移除
         const types = [
@@ -251,7 +251,7 @@ class KeyLogsService {
         ]
         for (const type of types) {
           for (const logId of oldLogIds) {
-            await redis.zrem(`${this.KEY_LOGS_INDEX}${type}`, logId)
+            await redis.client.zrem(`${this.KEY_LOGS_INDEX}${type}`, logId)
           }
         }
 
@@ -260,16 +260,20 @@ class KeyLogsService {
 
       // 清理超过保留时间的日志
       const retentionTime = Date.now() - this.LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000
-      const expiredLogIds = await redis.zrangebyscore(this.KEY_LOGS_LIST, '-inf', retentionTime)
+      const expiredLogIds = await redis.client.zrangebyscore(
+        this.KEY_LOGS_LIST,
+        '-inf',
+        retentionTime
+      )
 
       if (expiredLogIds.length > 0) {
         // 删除过期日志
         for (const logId of expiredLogIds) {
-          await redis.del(`${this.KEY_LOGS_PREFIX}${logId}`)
+          await redis.client.del(`${this.KEY_LOGS_PREFIX}${logId}`)
         }
 
         // 从有序集合中移除
-        await redis.zremrangebyscore(this.KEY_LOGS_LIST, '-inf', retentionTime)
+        await redis.client.zremrangebyscore(this.KEY_LOGS_LIST, '-inf', retentionTime)
 
         // 从类型索引中移除
         const types = [
@@ -282,7 +286,7 @@ class KeyLogsService {
         ]
         for (const type of types) {
           for (const logId of expiredLogIds) {
-            await redis.zrem(`${this.KEY_LOGS_INDEX}${type}`, logId)
+            await redis.client.zrem(`${this.KEY_LOGS_INDEX}${type}`, logId)
           }
         }
 
@@ -299,15 +303,15 @@ class KeyLogsService {
   async clearAllLogs() {
     try {
       // 获取所有日志ID
-      const allLogIds = await redis.zrange(this.KEY_LOGS_LIST, 0, -1)
+      const allLogIds = await redis.client.zrange(this.KEY_LOGS_LIST, 0, -1)
 
       // 删除所有日志数据
       for (const logId of allLogIds) {
-        await redis.del(`${this.KEY_LOGS_PREFIX}${logId}`)
+        await redis.client.del(`${this.KEY_LOGS_PREFIX}${logId}`)
       }
 
       // 清空索引
-      await redis.del(this.KEY_LOGS_LIST)
+      await redis.client.del(this.KEY_LOGS_LIST)
 
       const types = [
         'rate_limit',
@@ -318,7 +322,7 @@ class KeyLogsService {
         'upstream_error'
       ]
       for (const type of types) {
-        await redis.del(`${this.KEY_LOGS_INDEX}${type}`)
+        await redis.client.del(`${this.KEY_LOGS_INDEX}${type}`)
       }
 
       logger.info(`[关键日志] 清空了所有日志`)
@@ -479,7 +483,7 @@ class KeyLogsService {
     }
 
     // 获取现有记录
-    const existingData = await redis.hget(dailyKey, errorKey)
+    const existingData = await redis.client.hget(dailyKey, errorKey)
     if (existingData) {
       const parsed = JSON.parse(existingData)
       errorData.count = (parsed.count || 0) + 1
@@ -489,10 +493,10 @@ class KeyLogsService {
     }
 
     // 更新记录
-    await redis.hset(dailyKey, errorKey, JSON.stringify(errorData))
+    await redis.client.hset(dailyKey, errorKey, JSON.stringify(errorData))
 
     // 设置过期时间（保留30天）
-    await redis.expire(dailyKey, 30 * 24 * 60 * 60)
+    await redis.client.expire(dailyKey, 30 * 24 * 60 * 60)
 
     // 同时记录到 API Key 的报错统计（如果有 apiKeyId）
     if (apiKeyId) {
@@ -503,7 +507,7 @@ class KeyLogsService {
       const apiKeyErrorData = { ...errorData }
 
       // 获取现有记录
-      const existingApiKeyData = await redis.hget(apiKeyDailyKey, apiKeyErrorKey)
+      const existingApiKeyData = await redis.client.hget(apiKeyDailyKey, apiKeyErrorKey)
       if (existingApiKeyData) {
         const parsed = JSON.parse(existingApiKeyData)
         apiKeyErrorData.count = (parsed.count || 0) + 1
@@ -512,15 +516,15 @@ class KeyLogsService {
       }
 
       // 更新 API Key 的错误记录
-      await redis.hset(apiKeyDailyKey, apiKeyErrorKey, JSON.stringify(apiKeyErrorData))
+      await redis.client.hset(apiKeyDailyKey, apiKeyErrorKey, JSON.stringify(apiKeyErrorData))
 
       // 设置过期时间（保留30天）
-      await redis.expire(apiKeyDailyKey, 30 * 24 * 60 * 60)
+      await redis.client.expire(apiKeyDailyKey, 30 * 24 * 60 * 60)
 
       // 更新 API Key 的错误计数器（用于快速获取总数）
       const apiKeyErrorCountKey = `${this.APIKEY_ERROR_PREFIX}count:${apiKeyId}`
-      await redis.hincrby(apiKeyErrorCountKey, today, 1)
-      await redis.expire(apiKeyErrorCountKey, 30 * 24 * 60 * 60)
+      await redis.client.hincrby(apiKeyErrorCountKey, today, 1)
+      await redis.client.expire(apiKeyErrorCountKey, 30 * 24 * 60 * 60)
     }
   }
 
@@ -545,7 +549,7 @@ class KeyLogsService {
       const dailyKey = `${this.UPSTREAM_ERROR_DAILY_PREFIX}${date}`
 
       // 获取所有错误记录
-      const allErrors = await redis.hgetall(dailyKey)
+      const allErrors = await redis.client.hgetall(dailyKey)
 
       if (!allErrors || Object.keys(allErrors).length === 0) {
         return []
@@ -594,7 +598,7 @@ class KeyLogsService {
   async getAvailableErrorDates() {
     try {
       const pattern = `${this.UPSTREAM_ERROR_DAILY_PREFIX}*`
-      const keys = await redis.keys(pattern)
+      const keys = await redis.client.keys(pattern)
 
       const dates = keys
         .map((key) => key.replace(this.UPSTREAM_ERROR_DAILY_PREFIX, ''))
@@ -617,7 +621,7 @@ class KeyLogsService {
       const targetDate = date || new Date().toISOString().split('T')[0]
       const dailyKey = `${this.UPSTREAM_ERROR_DAILY_PREFIX}${targetDate}`
 
-      const allErrors = await redis.hgetall(dailyKey)
+      const allErrors = await redis.client.hgetall(dailyKey)
       if (!allErrors || Object.keys(allErrors).length === 0) {
         return []
       }
@@ -665,7 +669,7 @@ class KeyLogsService {
       const apiKeyDailyKey = `${this.APIKEY_ERROR_DAILY_PREFIX}${date}:${apiKeyId}`
 
       // 获取该 API Key 的所有错误记录
-      const allErrors = await redis.hgetall(apiKeyDailyKey)
+      const allErrors = await redis.client.hgetall(apiKeyDailyKey)
 
       if (!allErrors || Object.keys(allErrors).length === 0) {
         return []
@@ -715,12 +719,12 @@ class KeyLogsService {
         if (date) {
           // 获取特定日期的错误数
           const apiKeyErrorCountKey = `${this.APIKEY_ERROR_PREFIX}count:${apiKeyId}`
-          const dayCount = await redis.hget(apiKeyErrorCountKey, date)
+          const dayCount = await redis.client.hget(apiKeyErrorCountKey, date)
           counts[apiKeyId] = parseInt(dayCount) || 0
         } else {
           // 获取所有日期的总和
           const apiKeyErrorCountKey = `${this.APIKEY_ERROR_PREFIX}count:${apiKeyId}`
-          const allCounts = await redis.hgetall(apiKeyErrorCountKey)
+          const allCounts = await redis.client.hgetall(apiKeyErrorCountKey)
           let total = 0
           for (const count of Object.values(allCounts)) {
             total += parseInt(count) || 0
@@ -744,7 +748,7 @@ class KeyLogsService {
   async getApiKeyErrorDates(apiKeyId) {
     try {
       const pattern = `${this.APIKEY_ERROR_DAILY_PREFIX}*:${apiKeyId}`
-      const keys = await redis.keys(pattern)
+      const keys = await redis.client.keys(pattern)
 
       const dates = keys
         .map((key) => {

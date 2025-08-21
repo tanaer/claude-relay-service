@@ -206,3 +206,14 @@ Write-Host "  echo \"BASE_URL=$env:ANTHROPIC_BASE_URL\""
 Write-Host "  echo \"TOKEN=$($env:ANTHROPIC_AUTH_TOKEN.Substring(0, [Math]::Min(10, $env:ANTHROPIC_AUTH_TOKEN.Length)))...\""
 
 
+# 安装完成后重要提示（醒目展示）
+Write-Host ""
+Write-Host "====================================================" -ForegroundColor Yellow
+Write-Host "  重要提示（安装完成后）" -ForegroundColor Yellow
+Write-Host "====================================================" -ForegroundColor Yellow
+Write-Host "• Windows（PowerShell）：建议 关闭并重新打开 PowerShell 再使用" -ForegroundColor Yellow
+Write-Host "  （当前会话已就绪，但为保证新会话也生效，需重新打开）" -ForegroundColor Yellow
+Write-Host "• 立即验证（当前窗口）：node -v  和  claude --version" -ForegroundColor Yellow
+Write-Host "• 如遇 Node 不是 v20，可新开窗口后重试" -ForegroundColor Yellow
+Write-Host "====================================================" -ForegroundColor Yellow
+

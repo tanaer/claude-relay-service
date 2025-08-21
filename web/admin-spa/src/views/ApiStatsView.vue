@@ -15,15 +15,17 @@
           "
           :title="oemSettings.siteName"
         />
-        <!-- <div class="flex items-center gap-3">
-          <router-link
-            class="admin-button flex items-center gap-2 rounded-xl px-3 py-2 text-white transition-all duration-300 md:px-4 md:py-2"
-            to="/dashboard"
+        <div class="flex items-center gap-3">
+          <button
+            class="relative inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 px-3 py-2 text-sm font-semibold text-white shadow-lg ring-2 ring-white/20 transition-all duration-300 hover:from-blue-700 hover:to-purple-700 hover:shadow-xl md:px-4 md:py-2 md:text-base"
+            title="点击复制QQ群号"
+            @click="copyToClipboard('452758314')"
           >
-            <i class="fas fa-cog text-sm" />
-            <span class="text-xs font-medium md:text-sm">管理后台</span>
-          </router-link>
-        </div> -->
+            <i class="fab fa-qq"></i>
+            <span class="whitespace-nowrap">QQ群：452758314</span>
+            <i class="fas fa-copy hidden md:inline"></i>
+          </button>
+        </div>
       </div>
     </div>
 

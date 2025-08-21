@@ -214,13 +214,7 @@
               <div class="flex justify-between">
                 <span>每日用量限制:</span>
                 <span>
-                  {{
-                    redemptionResult.name && redemptionResult.name.includes('日卡')
-                      ? '1000W Tokens'
-                      : redemptionResult.name && redemptionResult.name.includes('月卡')
-                        ? '7000W Tokens'
-                        : ''
-                  }}
+                  {{ getPackageTokenDisplay(redemptionResult.name) }}
                 </span>
               </div>
               <div
@@ -280,6 +274,50 @@
                 <p class="mt-2 text-xs text-gray-600">
                   执行后将自动配置 ANTHROPIC_AUTH_TOKEN 与 ANTHROPIC_BASE_URL。
                 </p>
+
+                <!-- 安装后重要提示（更醒目） -->
+                <div class="mt-4 rounded-2xl border-2 border-amber-400 bg-amber-50 p-3 md:p-4">
+                  <div class="mb-2 flex items-center text-amber-800">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    <span class="text-base font-bold md:text-lg">重要提示（安装完成后）</span>
+                  </div>
+                  <ul class="space-y-2 text-amber-800">
+                    <li class="text-sm md:text-base">
+                      <b>Windows（PowerShell）</b>：请<strong>关闭并重新打开 PowerShell</strong>
+                      再使用。
+                    </li>
+                    <li class="text-sm md:text-base">
+                      <b>Linux / macOS</b
+                      >：建议<strong>重新打开终端</strong>，或执行下方命令使当前会话生效：
+                    </li>
+                  </ul>
+                  <div class="mt-3 grid gap-3 md:grid-cols-2">
+                    <div class="relative">
+                      <code
+                        class="block w-full whitespace-pre-wrap break-all rounded bg-gray-800 p-2 text-xs text-green-100 md:text-sm"
+                        >{{ linuxReloadCmd }}</code
+                      >
+                      <button
+                        class="absolute right-2 top-2 rounded bg-amber-600 px-2 py-1 text-xs text-white hover:bg-amber-700"
+                        @click="copyToClipboard(linuxReloadCmd)"
+                      >
+                        复制
+                      </button>
+                    </div>
+                    <div class="relative">
+                      <code
+                        class="block w-full whitespace-pre-wrap break-all rounded bg-gray-800 p-2 text-xs text-green-100 md:text-sm"
+                        >{{ linuxNvmFixCmd }}</code
+                      >
+                      <button
+                        class="absolute right-2 top-2 rounded bg-amber-600 px-2 py-1 text-xs text-white hover:bg-amber-700"
+                        @click="copyToClipboard(linuxNvmFixCmd)"
+                      >
+                        复制
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -290,10 +328,15 @@
               兑换说明
             </h4>
             <ul class="space-y-1 text-xs text-blue-800 md:text-sm">
-              <li>• <strong>日卡 (D-xxxxxxxx):</strong> 有效期1天，每日用量限制1000W TOKENS</li>
               <li>
-                • <strong>月卡 (M-xxxxxxxx):</strong> 有效期30天，每日用量限制7000W TOKENS, 北京时间
-                00:00:00 重置用量
+                • <strong>日卡 (D-xxxxxxxx):</strong> 有效期1天，每日用量限制{{
+                  getPackageTokenDisplay('日卡')
+                }}
+              </li>
+              <li>
+                • <strong>月卡 (M-xxxxxxxx):</strong> 有效期30天，每日用量限制{{
+                  getPackageTokenDisplay('月卡')
+                }}, 北京时间 00:00:00 重置用量
               </li>
               <li>• 兑换成功后会自动生成对应的API Key</li>
               <li>
@@ -340,6 +383,7 @@ import LogoTitle from '@/components/common/LogoTitle.vue'
 import ApiKeyInput from '@/components/apistats/ApiKeyInput.vue'
 import StatsOverview from '@/components/apistats/StatsOverview.vue'
 import TutorialView from './TutorialView.vue'
+import { pricingService } from '@/services/pricingService'
 
 const route = useRoute()
 const apiStatsStore = useApiStatsStore()
@@ -351,6 +395,11 @@ const currentTab = ref('redeem') // 默认打开兑换码页面
 const redeemCode = ref('')
 const isRedeeming = ref(false)
 const redemptionResult = ref(null)
+
+// 动态价格配置
+const packages = ref([])
+const modelsInfo = ref([])
+const pricingLoaded = ref(false)
 
 const { apiKey, apiId, loading, oemLoading, error, statsData, oemSettings } =
   storeToRefs(apiStatsStore)
@@ -440,6 +489,79 @@ const bashCommand = computed(() => {
   return `curl -fsSL '${shUrl}' -o install.sh && bash install.sh`
 })
 
+// 安装后提示中的辅助命令
+const linuxReloadCmd = `source ~/.bashrc || source ~/.profile`
+const linuxNvmFixCmd = `export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"; nvm use 20 || true`
+
+// 加载定价数据
+const loadPricingData = async () => {
+  try {
+    const [packagesResponse, modelsResponse] = await Promise.all([
+      pricingService.getPackages(),
+      pricingService.getModels()
+    ])
+
+    if (packagesResponse?.success) {
+      packages.value = packagesResponse.data.packages || []
+    }
+
+    if (modelsResponse?.success) {
+      modelsInfo.value = modelsResponse.data.models || []
+    }
+
+    pricingLoaded.value = true
+  } catch (error) {
+    console.error('加载定价数据失败:', error)
+    // 使用默认值
+    const defaultTokens = pricingService.calculateDefaultPackageTokens()
+    packages.value = [
+      {
+        id: 'daily',
+        name: '日卡',
+        type: 'D',
+        defaultDailyTokens: defaultTokens.dailyCard.dailyTokens,
+        defaultFormattedDaily: defaultTokens.dailyCard.formattedDaily
+      },
+      {
+        id: 'monthly',
+        name: '月卡',
+        type: 'M',
+        defaultDailyTokens: defaultTokens.monthlyCard.dailyTokens,
+        defaultFormattedDaily: defaultTokens.monthlyCard.formattedDaily
+      }
+    ]
+    pricingLoaded.value = true
+  }
+}
+
+// 根据套餐类型获取token限制显示
+const getPackageTokenDisplay = (packageName) => {
+  if (!pricingLoaded.value || packages.value.length === 0) {
+    // 加载中或失败时使用用户标准的固定值
+    const defaultTokens = pricingService.calculateDefaultPackageTokens()
+    if (packageName?.includes('日卡')) {
+      return defaultTokens.dailyCard.formattedDaily // 1千500万
+    } else if (packageName?.includes('月卡')) {
+      return defaultTokens.monthlyCard.formattedDaily // 8千万
+    }
+    return ''
+  }
+
+  // 根据套餐名称匹配对应的package
+  let targetPackage = null
+  if (packageName?.includes('日卡')) {
+    targetPackage = packages.value.find((p) => p.type === 'D' || p.id === 'daily')
+  } else if (packageName?.includes('月卡')) {
+    targetPackage = packages.value.find((p) => p.type === 'M' || p.id === 'monthly')
+  }
+
+  if (targetPackage) {
+    return targetPackage.defaultFormattedDaily + ' Tokens'
+  }
+
+  return ''
+}
+
 // 处理键盘快捷键
 const handleKeyDown = (event) => {
   // Ctrl/Cmd + Enter 查询
@@ -491,6 +613,9 @@ onMounted(() => {
 
   // 添加键盘事件监听
   document.addEventListener('keydown', handleKeyDown)
+
+  // 加载定价配置
+  loadPricingData()
 })
 
 // 清理

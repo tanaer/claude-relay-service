@@ -61,17 +61,8 @@
               </div>
             </div>
 
-            <!-- 费用统计卡片 -->
-            <div
-              class="rounded-lg border border-yellow-200 bg-gradient-to-br from-yellow-50 to-yellow-100 p-4"
-            >
-              <div class="mb-3 flex items-center justify-between">
-                <span class="text-sm font-medium text-gray-700">总费用</span>
-                <i class="fas fa-dollar-sign text-yellow-600" />
-              </div>
-              <div class="text-2xl font-bold text-gray-900">${{ totalCost.toFixed(4) }}</div>
-              <div class="mt-1 text-xs text-gray-600">今日: ${{ dailyCost.toFixed(4) }}</div>
-            </div>
+            <!-- 隐藏费用统计卡片 -->
+            <!-- 费用显示已隐藏，用户只看Token使用情况 -->
 
             <!-- 平均统计卡片 -->
             <div
@@ -147,30 +138,8 @@
               限制设置
             </h4>
             <div class="space-y-3 rounded-lg bg-gray-50 p-4">
-              <div v-if="apiKey.dailyCostLimit > 0" class="space-y-2">
-                <div class="flex items-center justify-between text-sm">
-                  <span class="text-gray-600">每日费用限制</span>
-                  <span class="font-semibold text-gray-900">
-                    ${{ apiKey.dailyCostLimit.toFixed(2) }}
-                  </span>
-                </div>
-                <div class="h-2 w-full rounded-full bg-gray-200">
-                  <div
-                    class="h-2 rounded-full transition-all duration-300"
-                    :class="
-                      dailyCostPercentage >= 100
-                        ? 'bg-red-500'
-                        : dailyCostPercentage >= 80
-                          ? 'bg-yellow-500'
-                          : 'bg-green-500'
-                    "
-                    :style="{ width: Math.min(dailyCostPercentage, 100) + '%' }"
-                  />
-                </div>
-                <div class="text-right text-xs text-gray-500">
-                  已使用 {{ dailyCostPercentage.toFixed(1) }}%
-                </div>
-              </div>
+              <!-- 隐藏每日费用限制显示 -->
+              <!-- 费用限制显示已隐藏，用户只看Token限制 -->
 
               <div
                 v-if="apiKey.concurrencyLimit > 0"
@@ -238,8 +207,7 @@ const totalRequests = computed(() => props.apiKey.usage?.total?.requests || 0)
 const dailyRequests = computed(() => props.apiKey.usage?.daily?.requests || 0)
 const totalTokens = computed(() => props.apiKey.usage?.total?.tokens || 0)
 const dailyTokens = computed(() => props.apiKey.usage?.daily?.tokens || 0)
-const totalCost = computed(() => props.apiKey.usage?.total?.cost || 0)
-const dailyCost = computed(() => props.apiKey.dailyCost || 0)
+// 费用相关变量已移除，因为前端不再显示费用信息
 const inputTokens = computed(() => props.apiKey.usage?.total?.inputTokens || 0)
 const outputTokens = computed(() => props.apiKey.usage?.total?.outputTokens || 0)
 const cacheCreateTokens = computed(() => props.apiKey.usage?.total?.cacheCreateTokens || 0)
@@ -256,10 +224,7 @@ const hasLimits = computed(() => {
   )
 })
 
-const dailyCostPercentage = computed(() => {
-  if (!props.apiKey.dailyCostLimit || props.apiKey.dailyCostLimit === 0) return 0
-  return (dailyCost.value / props.apiKey.dailyCostLimit) * 100
-})
+// dailyCostPercentage 已移除，因为前端不再显示费用信息
 
 // 方法
 const formatNumber = (num) => {

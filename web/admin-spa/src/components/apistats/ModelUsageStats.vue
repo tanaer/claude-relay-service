@@ -31,10 +31,10 @@
             <p class="text-xs text-gray-600 md:text-sm">{{ model.requests }} 次请求</p>
           </div>
           <div class="ml-3 flex-shrink-0 text-right">
-            <div class="text-base font-bold text-green-600 md:text-lg">
-              {{ model.formatted?.total || '$0.000000' }}
+            <div class="text-base font-bold text-blue-600 md:text-lg">
+              {{ formatNumber(model.totalTokens || model.inputTokens + model.outputTokens) }}
             </div>
-            <div class="text-xs text-gray-600 md:text-sm">总费用</div>
+            <div class="text-xs text-gray-600 md:text-sm">总Token</div>
           </div>
         </div>
 

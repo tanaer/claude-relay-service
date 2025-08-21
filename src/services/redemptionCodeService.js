@@ -7,18 +7,18 @@ const keyLogsService = require('./keyLogsService')
 
 class RedemptionCodeService {
   constructor() {
-    // 兑换码类型配置
+    // 兑换码类型配置 - 按照用户要求：月卡每日$80限制
     this.codeTypes = {
       daily: {
         prefix: 'D-',
         duration: 1, // 1天
-        costLimit: 20, // $20
+        costLimit: 15, // $15/天
         name: '日卡'
       },
       monthly: {
         prefix: 'M-',
         duration: 30, // 30天
-        costLimit: 100, // $100
+        costLimit: 80, // $80/天 (不是总价)
         name: '月卡'
       }
     }

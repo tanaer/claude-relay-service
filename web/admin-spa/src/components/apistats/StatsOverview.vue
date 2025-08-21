@@ -61,37 +61,36 @@
       </div>
     </div>
 
-    <!-- 费用使用进度 -->
+    <!-- Token使用进度 -->
     <div class="card h-full p-4 md:p-6">
       <h3 class="mb-3 flex items-center text-lg font-bold text-gray-900 md:mb-4 md:text-xl">
         <i class="fas fa-chart-bar mr-2 text-sm text-green-500 md:mr-3 md:text-base" />
-        费用使用情况
+        Token使用情况
       </h3>
 
       <div class="space-y-4">
         <!-- 进度条 -->
         <div class="relative">
           <div class="mb-2 flex items-center justify-between">
-            <span class="text-sm text-gray-600">费用使用量</span>
+            <span class="text-sm text-gray-600">Token使用量</span>
             <span class="text-sm font-medium text-gray-900">
-              ${{ getCurrentDayCost().toFixed(2) }} / ${{
-                (statsData?.limits?.dailyCostLimit || 0).toFixed(2)
-              }}
+              {{ formatTokenDisplay(getCurrentDayTokens()) }} /
+              {{ formatTokenDisplay(getDailyTokenLimit()) }}
             </span>
           </div>
 
           <div class="h-3 w-full overflow-hidden rounded-full bg-gray-200">
             <div
               class="h-full rounded-full transition-all duration-500 ease-out"
-              :class="getProgressBarClass(costProgress)"
-              :style="{ width: costProgress + '%' }"
+              :class="getProgressBarClass(tokenProgress)"
+              :style="{ width: tokenProgress + '%' }"
             ></div>
           </div>
 
           <div class="mt-2 flex items-center justify-between text-xs text-gray-500">
-            <span>{{ costProgress.toFixed(1) }}%</span>
+            <span>{{ tokenProgress.toFixed(1) }}%</span>
             <span v-if="statsData?.usage?.daily?.tokens">
-              实际Token: {{ formatTokenDisplay(statsData.usage.daily.tokens) }}
+              今日已用: {{ formatTokenDisplay(statsData.usage.daily.tokens) }}
             </span>
           </div>
         </div>
@@ -108,21 +107,28 @@ import { computed } from 'vue'
 const apiStatsStore = useApiStatsStore()
 const { statsData, currentPeriodData } = storeToRefs(apiStatsStore)
 
-// 获取API Key的今日费用
-const getCurrentDayCost = () => {
-  // 优先使用statsData中的currentDailyCost（来自getDailyCost，已应用倍率）
-  // 如果没有，回退到从模型数据聚合的费用
-  return parseFloat(statsData.value?.limits?.currentDailyCost || currentPeriodData.value?.cost || 0)
+// 获取API Key的今日Token使用量
+const getCurrentDayTokens = () => {
+  // 优先使用statsData中的当日token使用量，如果没有则使用currentPeriodData中的tokens
+  return parseInt(statsData.value?.usage?.daily?.tokens || currentPeriodData.value?.tokens || 0)
 }
 
-// 计算费用使用进度百分比
-const costProgress = computed(() => {
-  const todayCost = getCurrentDayCost()
-  const costLimit = parseFloat(statsData.value?.limits?.dailyCostLimit || 0)
+// 获取每日Token限制
+const getDailyTokenLimit = () => {
+  // 从API Key配置中获取token限制，如果没有配置则返回一个默认的大值
+  return parseInt(
+    statsData.value?.limits?.tokenLimit || statsData.value?.limits?.dailyTokenLimit || 70000000
+  )
+}
 
-  if (costLimit === 0) return 0
+// 计算Token使用进度百分比
+const tokenProgress = computed(() => {
+  const todayTokens = getCurrentDayTokens()
+  const tokenLimit = getDailyTokenLimit()
 
-  const progress = (todayCost / costLimit) * 100
+  if (tokenLimit === 0) return 0
+
+  const progress = (todayTokens / tokenLimit) * 100
   return Math.min(progress, 100) // 限制最大100%
 })
 

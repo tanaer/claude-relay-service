@@ -7,35 +7,8 @@
         限制配置
       </h3>
       <div class="space-y-4 md:space-y-5">
-        <!-- 每日费用限制 -->
-        <div>
-          <div class="mb-2 flex items-center justify-between">
-            <span class="text-sm font-medium text-gray-600 md:text-base">每日费用限制</span>
-            <span class="text-xs text-gray-500 md:text-sm">
-              <span v-if="statsData.limits.dailyCostLimit > 0">
-                ${{ statsData.limits.currentDailyCost.toFixed(4) }} / ${{
-                  statsData.limits.dailyCostLimit.toFixed(2)
-                }}
-              </span>
-              <span v-else class="flex items-center gap-1">
-                ${{ statsData.limits.currentDailyCost.toFixed(4) }} / <i class="fas fa-infinity" />
-              </span>
-            </span>
-          </div>
-          <div
-            v-if="statsData.limits.dailyCostLimit > 0"
-            class="h-2 w-full rounded-full bg-gray-200"
-          >
-            <div
-              class="h-2 rounded-full transition-all duration-300"
-              :class="getDailyCostProgressColor()"
-              :style="{ width: getDailyCostProgress() + '%' }"
-            />
-          </div>
-          <div v-else class="h-2 w-full rounded-full bg-gray-200">
-            <div class="h-2 rounded-full bg-green-500" style="width: 0%" />
-          </div>
-        </div>
+        <!-- 隐藏每日费用限制显示，用户只看Token使用情况 -->
+        <!-- 每日费用限制显示已隐藏 -->
 
         <!-- 时间窗口限制 -->
         <div
@@ -248,22 +221,7 @@ const formatNumber = (num) => {
   }
 }
 
-// 获取每日费用进度
-const getDailyCostProgress = () => {
-  if (!statsData.value.limits.dailyCostLimit || statsData.value.limits.dailyCostLimit === 0)
-    return 0
-  const percentage =
-    (statsData.value.limits.currentDailyCost / statsData.value.limits.dailyCostLimit) * 100
-  return Math.min(percentage, 100)
-}
-
-// 获取每日费用进度条颜色
-const getDailyCostProgressColor = () => {
-  const progress = getDailyCostProgress()
-  if (progress >= 100) return 'bg-red-500'
-  if (progress >= 80) return 'bg-yellow-500'
-  return 'bg-green-500'
-}
+// getDailyCostProgress 和 getDailyCostProgressColor 已移除，因为前端不再显示费用信息
 
 // 获取窗口请求进度
 const getWindowRequestProgress = () => {

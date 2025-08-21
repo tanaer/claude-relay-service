@@ -48,6 +48,9 @@ class SmartRateLimitService {
    */
   async loadConfig() {
     try {
+      // 等待 Redis 连接就绪
+      await this._waitForRedis()
+
       const result = await smartRateLimitConfigService.getConfig()
       if (result.success) {
         this.config = result.data
@@ -59,10 +62,39 @@ class SmartRateLimitService {
         })
       } else {
         logger.error('加载智能限流配置失败:', result.error)
+        // 使用默认配置
+        this.config = smartRateLimitConfigService.defaultConfig
+        logger.info('使用默认智能限流配置')
       }
     } catch (error) {
       logger.error('加载配置异常:', error)
+      // 使用默认配置
+      this.config = smartRateLimitConfigService.defaultConfig
+      logger.warn('配置加载失败，使用默认配置')
     }
+  }
+
+  /**
+   * 等待 Redis 连接就绪
+   */
+  async _waitForRedis(maxRetries = 10, delayMs = 1000) {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const redis = require('../models/redis')
+        if (redis.isConnected) {
+          return true
+        }
+
+        // 如果未连接，等待一段时间后重试
+        logger.debug(`等待 Redis 连接就绪... (${i + 1}/${maxRetries})`)
+        await new Promise((resolve) => setTimeout(resolve, delayMs))
+      } catch (error) {
+        logger.debug(`Redis 连接检查失败: ${error.message}`)
+      }
+    }
+
+    logger.warn('Redis 连接等待超时，将使用默认配置')
+    return false
   }
 
   /**
@@ -70,6 +102,13 @@ class SmartRateLimitService {
    */
   subscribeConfigUpdates() {
     try {
+      // 如果 Redis 未连接，跳过订阅
+      const redis = require('../models/redis')
+      if (!redis.isConnected) {
+        logger.warn('Redis 未连接，跳过配置更新订阅')
+        return
+      }
+
       const client = redisClient.getClientSafe()
 
       // 创建订阅客户端
@@ -122,7 +161,13 @@ class SmartRateLimitService {
     apiKeyName = 'unknown',
     isFromUpstream = true
   }) {
-    if (!this.config || !this.config.enabled) {
+    // 检查服务是否已初始化和配置是否可用
+    if (!this.config) {
+      logger.debug('[智能限流] 服务未初始化，跳过处理')
+      return { shouldLimit: false, reason: 'not_initialized' }
+    }
+
+    if (!this.config.enabled) {
       return { shouldLimit: false, reason: 'disabled' }
     }
 
@@ -133,6 +178,18 @@ class SmartRateLimitService {
         `[智能限流] 跳过本地中间件错误处理: ${statusCode} ${errorMessage} - API Key: ${apiKeyName}`
       )
       return { shouldLimit: false, reason: 'not_upstream_error' }
+    }
+
+    // 检查 Redis 连接状态
+    try {
+      const redis = require('../models/redis')
+      if (!redis.isConnected) {
+        logger.warn('[智能限流] Redis 未连接，跳过智能限流处理')
+        return { shouldLimit: false, reason: 'redis_disconnected' }
+      }
+    } catch (error) {
+      logger.warn('[智能限流] Redis 连接检查失败，跳过智能限流处理:', error)
+      return { shouldLimit: false, reason: 'redis_error' }
     }
 
     // 组合错误信息用于匹配

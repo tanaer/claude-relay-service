@@ -5592,13 +5592,14 @@ router.post('/smart-rate-limit/import', authenticateAdmin, async (req, res) => {
 // 获取关键日志列表
 router.get('/key-logs', authenticateAdmin, async (req, res) => {
   try {
-    const { type, page, pageSize, level } = req.query
+    const { type, page, pageSize, level, apiKeyName } = req.query
 
     const options = {
       type: type && type !== 'all' ? type : undefined,
       page: parseInt(page) || 1,
       pageSize: parseInt(pageSize) || 20,
-      level: level && level !== 'all' ? level : undefined
+      level: level && level !== 'all' ? level : undefined,
+      apiKeyName: apiKeyName && apiKeyName.trim() ? apiKeyName.trim() : undefined
     }
 
     const result = await keyLogsService.getKeyLogs(options)

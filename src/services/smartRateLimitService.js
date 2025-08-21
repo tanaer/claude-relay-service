@@ -438,8 +438,8 @@ class SmartRateLimitService {
   }) {
     const limitKey = `smart_rate_limit:limited:${accountId}`
 
-    // 检查账户是否配置了上游重置时间
-    const finalDuration = duration
+    // 使用用户配置的限流时长，不被上游重置时间覆盖
+    const finalDuration = duration // 固定使用用户配置的时长
     let upstreamResetTime = null
 
     try {

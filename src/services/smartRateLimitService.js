@@ -439,7 +439,7 @@ class SmartRateLimitService {
     const limitKey = `smart_rate_limit:limited:${accountId}`
 
     // 检查账户是否配置了上游重置时间
-    let finalDuration = duration
+    const finalDuration = duration
     let upstreamResetTime = null
 
     try {
@@ -449,10 +449,10 @@ class SmartRateLimitService {
         const resetTime = this.parseUpstreamResetTime(upstreamResetTime)
 
         if (resetTime && resetTime > now) {
-          // 计算到重置时间的秒数
-          finalDuration = Math.ceil((resetTime.getTime() - now.getTime()) / 1000)
+          // 保留用户配置的限流时长，但记录重置时间用于自动解除
+          const resetDuration = Math.ceil((resetTime.getTime() - now.getTime()) / 1000)
           logger.info(
-            `⏰ Using upstream reset time for account ${accountId}: ${resetTime.toISOString()} (${finalDuration}s)`
+            `⏰ Account ${accountId} has upstream reset time: ${resetTime.toISOString()} (${resetDuration}s), but using configured duration: ${duration}s`
           )
         }
       }

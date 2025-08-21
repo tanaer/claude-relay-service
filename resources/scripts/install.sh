@@ -275,6 +275,88 @@ install_linux_packages() {
     esac
 }
 
+# 确保 Node.js >= 20（优先使用 nvm；否则使用系统包管理器/NodeSource）
+ensure_nodejs_v20() {
+    print_info "检查 Node.js 版本..."
+
+    local need_upgrade=false
+    local current_version=""
+    local current_major=0
+
+    if command -v node &> /dev/null; then
+        current_version=$(node -v 2>/dev/null | sed 's/^v//')
+        current_major=$(echo "$current_version" | cut -d. -f1)
+        if [ -z "$current_major" ]; then current_major=0; fi
+        if [ "$current_major" -lt 20 ]; then
+            need_upgrade=true
+            print_warning "已安装 Node.js v$current_version，低于 v20，准备升级"
+        else
+            print_success "已安装 Node.js v$current_version（>=20）"
+            return 0
+        fi
+    else
+        need_upgrade=true
+        print_warning "未检测到 Node.js，准备安装 v20"
+    fi
+
+    # 优先使用 nvm
+    if command -v nvm &> /dev/null; then
+        print_info "检测到 nvm，使用 nvm 安装 Node.js 20"
+        nvm install 20 || true
+        nvm use 20 || true
+        nvm alias default 20 || true
+    else
+        # 安装 nvm（仅限 Linux/macOS）
+        if [ "$(uname)" = "Linux" ] || [ "$(uname)" = "Darwin" ]; then
+            print_info "未检测到 nvm，开始安装 nvm..."
+            export NVM_DIR="$HOME/.nvm"
+            if command -v curl &> /dev/null; then
+                curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+            elif command -v wget &> /dev/null; then
+                wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+            else
+                print_warning "缺少 curl/wget，跳过 nvm 安装"
+            fi
+
+            # 载入 nvm
+            if [ -s "$HOME/.nvm/nvm.sh" ]; then
+                # shellcheck disable=SC1090
+                . "$HOME/.nvm/nvm.sh"
+                nvm install 20 || true
+                nvm use 20 || true
+                nvm alias default 20 || true
+            fi
+        fi
+    fi
+
+    # 如果依然没有 node 或版本仍 < 20，使用系统包管理器/NodeSource 兜底
+    if ! command -v node &> /dev/null || [ "$(node -v 2>/dev/null | sed 's/^v//; s/\..*$//')" -lt 20 ]; then
+        print_info "使用系统包管理器/NodeSource 安装 Node.js 20 作为兜底"
+        if command -v apt-get &> /dev/null; then
+            install_nodejs_universal
+            sudo apt-get install -y nodejs
+        elif command -v yum &> /dev/null; then
+            sudo yum install -y nodejs npm || true
+        elif command -v pacman &> /dev/null; then
+            sudo pacman -S --noconfirm nodejs npm || true
+        elif command -v brew &> /dev/null; then
+            brew install node || brew upgrade node || true
+        fi
+    fi
+
+    if command -v node &> /dev/null; then
+        current_version=$(node -v 2>/dev/null | sed 's/^v//')
+        current_major=$(echo "$current_version" | cut -d. -f1)
+        if [ "$current_major" -lt 20 ]; then
+            print_warning "Node.js 版本仍为 v$current_version，建议手动升级至 v20+"
+        else
+            print_success "Node.js 版本满足要求：v$current_version"
+        fi
+    else
+        print_warning "Node.js 安装失败，请手动安装 v20+ 后重试"
+    fi
+}
+
 # ========================================
 # Claude CLI 检测和修复功能
 # ========================================
@@ -1306,6 +1388,9 @@ main() {
             ;;
     esac
     
+    # 先确保 Node.js v20+
+    ensure_nodejs_v20
+
     # 安装 Claude Code
     if ! install_claude_code; then
         print_error "Claude Code 安装失败"

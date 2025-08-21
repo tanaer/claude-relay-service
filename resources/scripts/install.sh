@@ -357,6 +357,59 @@ ensure_nodejs_v20() {
     fi
 }
 
+# 将 nvm 自动加载与 Node.js 20 设为默认并在新会话自动启用（永久生效）
+persist_nvm_autouse_20() {
+    # 仅当 nvm 已安装时生效
+    if [ ! -s "$HOME/.nvm/nvm.sh" ]; then
+        return 0
+    fi
+
+    local rc_added=false
+    local nvm_block='\n# Claude CLI NVM Node.js v20\nexport NVM_DIR="$HOME/.nvm"\n[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"\n[ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"\n# 默认使用 Node.js v20\nnvm alias default 20 >/dev/null 2>&1 || true\nnvm use 20 >/dev/null 2>&1 || true\n'
+
+    # 写入 ~/.bashrc
+    if [ -f "$HOME/.bashrc" ]; then
+        if ! grep -q "Claude CLI NVM Node.js v20" "$HOME/.bashrc" 2>/dev/null; then
+            printf "$nvm_block" >> "$HOME/.bashrc"
+            rc_added=true
+        fi
+    else
+        printf "$nvm_block" >> "$HOME/.bashrc"
+        rc_added=true
+    fi
+
+    # 写入 ~/.profile（root 或非交互登录兜底）
+    if [ -f "$HOME/.profile" ]; then
+        if ! grep -q "Claude CLI NVM Node.js v20" "$HOME/.profile" 2>/devnull; then
+            printf "$nvm_block" >> "$HOME/.profile"
+            rc_added=true
+        fi
+    else
+        printf "$nvm_block" >> "$HOME/.profile"
+        rc_added=true
+    fi
+
+    # 写入 ~/.zshrc（如存在）
+    if [ -f "$HOME/.zshrc" ]; then
+        if ! grep -q "Claude CLI NVM Node.js v20" "$HOME/.zshrc" 2>/dev/null; then
+            printf "$nvm_block" >> "$HOME/.zshrc"
+            rc_added=true
+        fi
+    fi
+
+    # 立即在当前会话启用（不依赖重新登录）
+    # shellcheck disable=SC1090
+    . "$HOME/.nvm/nvm.sh" 2>/dev/null || true
+    nvm alias default 20 >/dev/null 2>&1 || true
+    nvm use 20 >/dev/null 2>&1 || true
+
+    if [ "$rc_added" = true ]; then
+        print_success "已配置 nvm 自动加载与默认使用 Node.js v20（新会话自动生效）"
+    else
+        print_info "nvm 自动加载已配置，无需重复设置"
+    fi
+}
+
 # ========================================
 # Claude CLI 检测和修复功能
 # ========================================
@@ -1399,6 +1452,9 @@ main() {
     
     # 配置 Claude Code
     configure_claude_code
+
+    # 若 nvm 存在，配置其在新会话自动启用 Node v20（永久）
+    persist_nvm_autouse_20
     
     # 显示使用说明
     show_usage

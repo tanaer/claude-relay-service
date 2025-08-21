@@ -102,17 +102,41 @@ class ApiClient {
 
   // GET 请求
   async get(url, options = {}) {
-    const fullUrl = createApiUrl(url)
+    let fullUrl = createApiUrl(url)
+
+    // 处理查询参数
+    if (options.params) {
+      const params = new URLSearchParams()
+      for (const [key, value] of Object.entries(options.params)) {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, value)
+        }
+      }
+      const queryString = params.toString()
+      if (queryString) {
+        fullUrl += (fullUrl.includes('?') ? '&' : '?') + queryString
+      }
+
+      // 调试日志
+      console.log('🔗 [API GET] Request URL:', fullUrl)
+      console.log('📦 [API GET] Query params:', options.params)
+    }
+
     const config = this.buildConfig({
       ...options,
       method: 'GET'
     })
 
+    // 删除 params，因为已经处理过了
+    delete config.params
+
     try {
       const response = await fetch(fullUrl, config)
-      return await this.handleResponse(response)
+      const data = await this.handleResponse(response)
+      console.log('✅ [API GET] Response:', data)
+      return data
     } catch (error) {
-      console.error('API GET Error:', error)
+      console.error('❌ [API GET] Error:', error)
       throw error
     }
   }

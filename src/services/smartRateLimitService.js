@@ -138,6 +138,18 @@ class SmartRateLimitService {
     // 组合错误信息用于匹配
     const errorText = `${statusCode} ${errorMessage} ${JSON.stringify(errorBody)}`
 
+    // 记录上游报错到关键日志（无论是否触发限流）
+    await keyLogsService.logUpstreamError({
+      accountId,
+      accountName,
+      accountType,
+      statusCode,
+      errorMessage,
+      errorBody,
+      apiKeyId,
+      apiKeyName
+    })
+
     // 1. 检查立即限流规则
     for (const rule of this.config.instantRules) {
       if (!rule.enabled) {

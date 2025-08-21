@@ -26,12 +26,21 @@ const routes = [
       const basePath = APP_CONFIG.basePath.replace(/\/$/, '') // 移除末尾斜杠
 
       // 如果当前路径已经是 basePath 或 basePath/，重定向到 api-stats
-      if (currentPath === basePath || currentPath === basePath + '/') {
-        return '/api-stats'
+      const searchParams = new URLSearchParams(window.location.search)
+      const query = Object.fromEntries(searchParams.entries())
+
+      // 支持使用 t=tutorial 简写，映射为 tab=tutorial
+      if (query.t && !query.tab) {
+        query.tab = query.t
+        delete query.t
       }
 
-      // 否则保持默认重定向
-      return '/api-stats'
+      if (currentPath === basePath || currentPath === basePath + '/') {
+        return { path: '/api-stats', query }
+      }
+
+      // 否则保持默认重定向，同时保留查询参数
+      return { path: '/api-stats', query }
     }
   },
   {

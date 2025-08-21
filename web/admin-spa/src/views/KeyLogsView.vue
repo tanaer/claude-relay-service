@@ -102,10 +102,7 @@
           </select>
           <button
             class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50"
-            @click="
-              errorStatsOrder = errorStatsOrder === 'desc' ? 'asc' : 'desc'
-              loadUpstreamErrorStats()
-            "
+            @click="toggleErrorSortOrder"
           >
             <i
               :class="[
@@ -455,6 +452,12 @@ const loadUpstreamErrorStats = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// 切换错误排序方向
+const toggleErrorSortOrder = () => {
+  errorStatsOrder.value = errorStatsOrder.value === 'desc' ? 'asc' : 'desc'
+  loadUpstreamErrorStats()
 }
 
 // 监听过滤器变化

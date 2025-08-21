@@ -416,11 +416,23 @@ class KeyLogsService {
       apiKeyName = 'unknown'
     } = params
 
+    // 构建完整的错误内容用于聚合（包含原始响应）
+    let fullErrorContent = ''
+    if (errorMessage) {
+      fullErrorContent = errorMessage
+    } else if (errorBody.rawResponse) {
+      fullErrorContent = errorBody.rawResponse
+    } else if (errorBody.error) {
+      fullErrorContent = errorBody.error
+    } else {
+      fullErrorContent = `HTTP ${statusCode} Error`
+    }
+
     // 生成错误内容的哈希（用于合并相同错误）
-    const errorContent = `${statusCode}_${errorMessage}`
+    const errorContentForHash = `${statusCode}_${fullErrorContent.trim()}`
     const errorHash = require('crypto')
       .createHash('md5')
-      .update(errorContent)
+      .update(errorContentForHash)
       .digest('hex')
       .substring(0, 8)
 
@@ -429,18 +441,20 @@ class KeyLogsService {
       type: 'upstream_error',
       level: 'error',
       title: `上游API报错 ${statusCode}`,
-      message: `账户 ${accountName} 报错: ${errorMessage || 'Unknown error'}`,
+      message: `账户 ${accountName} 报错: ${fullErrorContent}`,
       details: {
         accountId,
         accountName,
         accountType,
         statusCode,
-        errorMessage,
+        errorMessage: fullErrorContent,
+        rawResponse: errorBody.rawResponse || '',
+        parsedError: errorBody.parsedError || null,
         errorBody,
         apiKeyId,
         apiKeyName,
         errorHash,
-        errorContent
+        errorContent: fullErrorContent
       }
     })
 
@@ -455,9 +469,12 @@ class KeyLogsService {
       accountName,
       accountType,
       statusCode,
-      errorMessage,
-      errorContent,
+      errorMessage: fullErrorContent,
+      errorContent: fullErrorContent,
+      rawResponse: errorBody.rawResponse || '',
+      parsedError: errorBody.parsedError || null,
       lastTime: new Date().toISOString(),
+      firstTime: new Date().toISOString(),
       count: 0
     }
 
@@ -466,6 +483,7 @@ class KeyLogsService {
     if (existingData) {
       const parsed = JSON.parse(existingData)
       errorData.count = (parsed.count || 0) + 1
+      errorData.firstTime = parsed.firstTime || errorData.firstTime // 保留首次发生时间
     } else {
       errorData.count = 1
     }

@@ -51,6 +51,12 @@ const tabs = [
   { key: 'smart-rate-limit', name: '智能限流', shortName: '限流', icon: 'fas fa-brain' },
   { key: 'policy-monitoring', name: '策略监控', shortName: '策略', icon: 'fas fa-chart-line' },
   { key: 'key-logs', name: '关键日志', shortName: '日志', icon: 'fas fa-clipboard-list' },
+  {
+    key: 'upstream-errors',
+    name: '上游错误',
+    shortName: '上游错误',
+    icon: 'fas fa-exclamation-triangle'
+  },
   { key: 'settings', name: '其他设置', shortName: '设置', icon: 'fas fa-cogs' }
 ]
 </script>

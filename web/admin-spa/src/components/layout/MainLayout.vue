@@ -46,6 +46,7 @@ const tabRouteMap = {
   'smart-rate-limit': '/smart-rate-limit',
   'policy-monitoring': '/policy-monitoring',
   'key-logs': '/key-logs',
+  'upstream-errors': '/upstream-errors',
   settings: '/settings'
 }
 

@@ -171,10 +171,37 @@ class ClaudeRelayService {
 
       // 智能限流和传统限流的错误处理
       if (response.statusCode !== 200 && response.statusCode !== 201) {
-        // 构建错误信息对象
+        // 解析上游错误响应，提取有意义的错误信息
+        let errorMessage = ''
+        let parsedError = null
+
+        try {
+          // 尝试解析响应体为JSON
+          if (response.body) {
+            parsedError = JSON.parse(response.body)
+            // 从Claude API的错误格式中提取错误消息
+            if (parsedError && parsedError.error && parsedError.error.message) {
+              errorMessage = parsedError.error.message
+            } else if (parsedError && parsedError.message) {
+              errorMessage = parsedError.message
+            } else if (parsedError && parsedError.detail) {
+              errorMessage = parsedError.detail
+            } else {
+              // 如果无法提取具体消息，使用完整的响应内容
+              errorMessage = response.body
+            }
+          }
+        } catch (e) {
+          // 如果JSON解析失败，直接使用原始响应体
+          errorMessage = response.body || `HTTP ${response.statusCode} Error`
+        }
+
+        // 构建完整的错误信息对象（包含原始响应）
         const errorInfo = {
           statusCode: response.statusCode,
-          error: response.body || '未知错误',
+          error: errorMessage,
+          rawResponse: response.body || '',
+          parsedError,
           headers: response.headers,
           timestamp: new Date().toISOString()
         }
@@ -185,7 +212,7 @@ class ClaudeRelayService {
           accountName: accountId,
           accountType: 'claude',
           statusCode: response.statusCode,
-          errorMessage: response.body || '',
+          errorMessage,
           errorBody: errorInfo,
           apiKeyId: apiKeyData.id,
           apiKeyName: apiKeyData.name || 'unknown',

@@ -16,6 +16,7 @@ const RedemptionCodesView = () => import('@/views/RedemptionCodesView.vue')
 const RateTemplatesView = () => import('@/views/RateTemplates.vue')
 const PolicyMonitoringView = () => import('@/views/PolicyMonitoringView.vue')
 const SmartRateLimitView = () => import('@/views/SmartRateLimitView.vue')
+const UpstreamErrorsView = () => import('@/views/UpstreamErrorsView.vue')
 
 const routes = [
   {
@@ -154,6 +155,18 @@ const routes = [
         path: '',
         name: 'SmartRateLimit',
         component: SmartRateLimitView
+      }
+    ]
+  },
+  {
+    path: '/upstream-errors',
+    component: MainLayout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'UpstreamErrors',
+        component: UpstreamErrorsView
       }
     ]
   },

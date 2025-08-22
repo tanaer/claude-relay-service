@@ -1,5 +1,5 @@
 const express = require('express')
-const { authenticateAdmin } = require('../middleware/adminAuth')
+const { authenticateAdmin } = require('../middleware/auth')
 const CostCalculator = require('../utils/costCalculator')
 
 const router = express.Router()

@@ -280,6 +280,22 @@
                 <p class="mt-2 text-xs text-gray-600">
                   执行后将自动配置 ANTHROPIC_AUTH_TOKEN 与 ANTHROPIC_BASE_URL。
                 </p>
+                <div class="mt-2 rounded-xl border border-yellow-300 bg-yellow-50 p-3 md:p-4">
+                  <p class="text-xs text-yellow-800">
+                    如果打开出现错误提示：
+                    <code class="rounded bg-yellow-100 px-1 py-0.5"
+                      >Claude Code on Windows requires git-bash
+                      (https://git-scm.com/downloads/win).</code
+                    >
+                    请前往“使用教程” → 安装 Git 环境 按指引安装，或
+                    <a
+                      class="text-yellow-700 underline hover:text-yellow-900"
+                      href="#"
+                      @click.prevent="currentTab = 'tutorial'"
+                      >点击查看使用教程</a
+                    >。
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -303,7 +319,6 @@
                 >
               </li>
               <li>• 兑换成功后可复制上方命令，一键安装并自动注入你的 API Key</li>
-              <li>• 安装脚本为 Windows 系统专用，下载后右键点击文件，“使用管理员身份运行”</li>
               <li>
                 • 电脑环境千差万别，如果安装脚本无法使用，请自行<b>用点心</b>花2分钟
                 <a

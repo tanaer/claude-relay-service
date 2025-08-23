@@ -1590,6 +1590,50 @@ const oneClickShUrl = computed(() => {
   animation: fadeIn 0.3s ease-in-out;
 }
 
+/* 折叠样式优化：让步骤标题更像可点击的卡片 */
+.tutorial-content details {
+  margin-bottom: 1rem;
+}
+
+.tutorial-content details > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e5e7eb; /* gray-200 */
+  border-radius: 0.75rem; /* rounded-xl */
+  background: #ffffff;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tutorial-content details > summary:hover {
+  background: #f9fafb; /* gray-50 */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.tutorial-content details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.tutorial-content details > summary::after {
+  content: '点击展开 ▸';
+  font-size: 12px;
+  color: #6b7280; /* gray-500 */
+}
+
+.tutorial-content details[open] > summary::after {
+  content: '点击收起 ▾';
+  color: #2563eb; /* blue-600 */
+}
+
+.tutorial-content details[open] > summary {
+  background: #f9fafb;
+  border-bottom-left-radius: 0.75rem;
+  border-bottom-right-radius: 0.75rem;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

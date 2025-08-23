@@ -62,6 +62,35 @@
               />
             </div>
 
+            <!-- 搜索框 -->
+            <div class="group relative min-w-[200px]">
+              <div
+                class="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500 opacity-0 blur transition duration-300 group-hover:opacity-20"
+              ></div>
+              <div class="relative">
+                <i
+                  class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-teal-500"
+                />
+                <input
+                  v-model="searchQuery"
+                  class="relative w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm shadow-sm transition-all duration-200 focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
+                  placeholder="搜索名称或API Key..."
+                  type="text"
+                  @input="currentPage = 1"
+                />
+                <button
+                  v-if="searchQuery"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-gray-600"
+                  @click="
+                    searchQuery = ''
+                    currentPage = 1
+                  "
+                >
+                  <i class="fas fa-times text-xs" />
+                </button>
+              </div>
+            </div>
+
             <!-- 刷新按钮 -->
             <button
               class="group relative flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
@@ -1180,6 +1209,9 @@ const availableTags = ref([])
 // 过期时间筛选相关
 const selectedExpiryFilter = ref('')
 
+// 搜索相关
+const searchQuery = ref('')
+
 // 下拉选项数据
 const timeRangeOptions = ref([
   { value: 'today', label: '今日', icon: 'fa-clock' },
@@ -1246,6 +1278,20 @@ const sortedApiKeys = computed(() => {
         return !key.expiresAt || new Date(key.expiresAt) >= now
       }
       return true
+    })
+  }
+
+  // 搜索筛选
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase()
+    filteredKeys = filteredKeys.filter((key) => {
+      // 搜索名称
+      const nameMatch = key.name.toLowerCase().includes(query)
+      // 搜索ID（UUID）
+      const idMatch = key.id.toLowerCase().includes(query)
+      // 搜索API Key前缀（如果有的话）
+      // 注意：这里我们搜索的是 id，实际的API Key值目前后端不返回
+      return nameMatch || idMatch
     })
   }
 

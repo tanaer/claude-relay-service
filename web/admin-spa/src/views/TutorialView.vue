@@ -33,17 +33,47 @@
     <!-- Windows 教程 -->
     <div v-if="activeTutorialSystem === 'windows'" class="tutorial-content">
       <!-- 第一步：安装 Node.js -->
-      <div class="mb-4 sm:mb-10 sm:mb-6">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
-          <span
-            class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
-            >1</span
-          >
-          安装 Node.js 环境
-        </h4>
+      <details class="mb-4 sm:mb-10 sm:mb-6">
+        <summary>
+          <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+            <span
+              class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
+              >1</span
+            >
+            第一步、安装 Node.js 环境
+          </h4>
+        </summary>
         <p class="mb-4 text-sm text-gray-600 sm:mb-4 sm:mb-6 sm:text-base">
           Claude Code 需要 Node.js 环境才能运行。
         </p>
+
+        <!-- 一键安装（推荐） -->
+        <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:mb-6 sm:p-6">
+          <h5
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg"
+          >
+            <i class="fas fa-bolt mr-2 text-emerald-600" />
+            一键安装（推荐） — 无需 API Key
+          </h5>
+          <p class="mb-3 text-sm text-gray-700 sm:mb-4 sm:text-base">
+            自动安装 Node.js 20+、配置镜像并安装 Claude CLI。稍后可在“步骤三”设置 API
+            密钥。（或者在兑换完API Key后，在下方“一键安装”中重新复制命令执行，会自动写入API Key）
+          </p>
+          <div
+            class="mb-2 overflow-x-auto rounded-lg bg-gray-900 p-3 font-mono text-xs text-green-400 sm:p-4 sm:text-sm"
+          >
+            <div class="mb-2">
+              # 在 PowerShell 中执行（任意文件夹点鼠标右键，选择“在此处打开 PowerShell” 或者
+              “在终端中执行”）
+            </div>
+            <div class="whitespace-nowrap text-gray-300">irm {{ oneClickPsUrl }} | iex</div>
+            <div class="mb-2 mt-3"># 或</div>
+            <div class="whitespace-nowrap text-gray-300">iwr -useb {{ oneClickPsUrl }} | iex</div>
+          </div>
+          <p class="text-xs text-emerald-700">
+            可选：如果已有密钥，可在链接后追加 <code>?apiKey=cr_xxx</code> 自动写入。
+          </p>
+        </div>
 
         <div
           class="mb-4 rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 sm:mb-4 sm:mb-6 sm:p-6"
@@ -98,6 +128,77 @@
           </div>
         </div>
 
+        <!-- 安装 Git 环境 -->
+        <div
+          class="mb-4 rounded-xl border border-slate-200 bg-gradient-to-r from-slate-50 to-gray-50 p-4 sm:mb-6 sm:p-6"
+        >
+          <h5
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg"
+          >
+            <i class="fab fa-git-alt mr-2 text-rose-600" />
+            安装 Git 环境
+          </h5>
+          <div class="mb-3 sm:mb-4">
+            <p class="mb-2 text-sm text-gray-700 sm:mb-3 sm:text-base">
+              方法一：官网下载 (非大陆地区推荐)
+            </p>
+            <ol
+              class="ml-2 list-inside list-decimal space-y-1 text-xs text-gray-600 sm:ml-4 sm:space-y-2 sm:text-sm"
+            >
+              <li>
+                访问
+                <a
+                  class="text-blue-600 hover:text-blue-800"
+                  href="https://git-scm.com/download/win"
+                  rel="noopener"
+                  target="_blank"
+                  >Git for Windows</a
+                >
+              </li>
+              <li>
+                下载完成后双击安装包，安装时可<strong>一直点 Next</strong> 使用默认选项完成安装
+              </li>
+            </ol>
+          </div>
+          <div class="mb-3 sm:mb-4">
+            <p class="mb-2 text-sm text-gray-700 sm:mb-3 sm:text-base">
+              方法二：网盘镜像下载（大陆地区推荐）
+            </p>
+            <div class="space-y-2 text-sm">
+              <div>
+                夸克网盘：
+                <a
+                  class="text-blue-600 hover:text-blue-800"
+                  href="https://pan.quark.cn/s/12dec4fe6baa"
+                  rel="noopener"
+                  target="_blank"
+                  >下载链接</a
+                >
+              </div>
+              <div>
+                百度网盘：
+                <a
+                  class="text-blue-600 hover:text-blue-800"
+                  href="https://pan.baidu.com/s/1joKRmo1H4U3RxYVQuESwkw?pwd=d6x3"
+                  rel="noopener"
+                  target="_blank"
+                  >下载链接</a
+                >
+              </div>
+            </div>
+          </div>
+          <div class="rounded-lg border border-blue-200 bg-blue-50 p-3 sm:p-4">
+            <h6 class="mb-2 text-sm font-medium text-blue-800 sm:text-base">
+              验证 Git 是否安装成功
+            </h6>
+            <div
+              class="overflow-x-auto rounded bg-gray-900 p-2 font-mono text-xs text-green-400 sm:p-3 sm:text-sm"
+            >
+              <div class="whitespace-nowrap text-gray-300">git --version</div>
+            </div>
+          </div>
+        </div>
+
         <!-- 验证安装 -->
         <div class="rounded-lg border border-green-200 bg-green-50 p-3 sm:p-4">
           <h6 class="mb-2 text-sm font-medium text-green-800 sm:text-base">验证安装是否成功</h6>
@@ -112,17 +213,19 @@
           </div>
           <p class="mt-2 text-xs text-green-700 sm:text-sm">如果显示版本号，说明安装成功了！</p>
         </div>
-      </div>
+      </details>
 
       <!-- 第二步：安装 Claude Code -->
-      <div class="mb-4 sm:mb-10 sm:mb-6">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
-          <span
-            class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
-            >2</span
-          >
-          安装 Claude Code
-        </h4>
+      <details class="mb-4 sm:mb-10 sm:mb-6">
+        <summary>
+          <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+            <span
+              class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
+              >2</span
+            >
+            第二步、安装 Claude Code
+          </h4>
+        </summary>
 
         <div
           class="mb-4 rounded-xl border border-green-100 bg-gradient-to-r from-green-50 to-emerald-50 p-4 sm:mb-6 sm:p-6"
@@ -141,7 +244,7 @@
           >
             <div class="mb-2"># 全局安装 Claude Code</div>
             <div class="whitespace-nowrap text-gray-300">
-              npm install -g @anthropic-ai/claude-code
+              npm install -g @anthropic-ai/claude-code --registry=https://registry.npmmirror.com
             </div>
           </div>
           <p class="text-sm text-gray-600">
@@ -170,17 +273,19 @@
             如果显示版本号，恭喜你！Claude Code 已经成功安装了。
           </p>
         </div>
-      </div>
+      </details>
 
       <!-- 第三步：设置环境变量 -->
-      <div class="mb-6 sm:mb-10">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
-          <span
-            class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-purple-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
-            >3</span
-          >
-          设置环境变量
-        </h4>
+      <details class="mb-6 sm:mb-10">
+        <summary>
+          <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+            <span
+              class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-purple-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
+              >3</span
+            >
+            第三步、设置环境变量
+          </h4>
+        </summary>
 
         <div
           class="mb-4 rounded-xl border border-purple-100 bg-gradient-to-r from-purple-50 to-pink-50 p-4 sm:mb-6 sm:p-6"
@@ -382,17 +487,19 @@
             </div>
           </div>
         </div>
-      </div>
+      </details>
 
       <!-- 第四步：开始使用 -->
-      <div class="mb-6 sm:mb-8">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
-          <span
-            class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-orange-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
-            >4</span
-          >
-          开始使用 Claude Code
-        </h4>
+      <details class="mb-6 sm:mb-8">
+        <summary>
+          <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+            <span
+              class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-orange-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
+              >4</span
+            >
+            第四步、开始使用 Claude Code
+          </h4>
+        </summary>
         <div
           class="rounded-xl border border-orange-100 bg-gradient-to-r from-orange-50 to-yellow-50 p-4 sm:p-6"
         >
@@ -423,7 +530,7 @@
             </div>
           </div>
         </div>
-      </div>
+      </details>
 
       <!-- Windows 故障排除 -->
       <div class="mb-8">
@@ -496,15 +603,41 @@
     <!-- macOS 教程 -->
     <div v-else-if="activeTutorialSystem === 'macos'" class="tutorial-content">
       <!-- 第一步：安装 Node.js -->
-      <div class="mb-6 sm:mb-10">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
-          <span
-            class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
-            >1</span
-          >
-          安装 Node.js 环境
-        </h4>
+      <details class="mb-6 sm:mb-10">
+        <summary>
+          <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+            <span
+              class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
+              >1</span
+            >
+            安装 Node.js 环境
+          </h4>
+        </summary>
         <p class="mb-4 text-gray-600 sm:mb-6">Claude Code 需要 Node.js 环境才能运行。</p>
+
+        <!-- 一键安装（推荐） -->
+        <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:mb-6 sm:p-6">
+          <h5
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg"
+          >
+            <i class="fas fa-bolt mr-2 text-emerald-600" />
+            一键安装（推荐） — 无需 API Key
+          </h5>
+          <p class="mb-3 text-sm text-gray-700 sm:mb-4 sm:text-base">
+            自动安装 Node.js 20+ 并安装 Claude CLI。
+          </p>
+          <div
+            class="mb-2 overflow-x-auto rounded-lg bg-gray-900 p-3 font-mono text-xs text-green-400 sm:p-4 sm:text-sm"
+          >
+            <div class="mb-2"># 在 Terminal 中执行</div>
+            <div class="whitespace-nowrap text-gray-300">curl -fsSL {{ oneClickShUrl }} | bash</div>
+            <div class="mb-2 mt-3"># 或</div>
+            <div class="whitespace-nowrap text-gray-300">wget -qO- {{ oneClickShUrl }} | bash</div>
+          </div>
+          <p class="text-xs text-emerald-700">
+            可选：如果已有密钥，可在链接后追加 <code>?apiKey=cr_xxx</code> 自动写入。
+          </p>
+        </div>
 
         <div
           class="mb-4 rounded-xl border border-gray-200 bg-gradient-to-r from-gray-50 to-slate-50 p-4 sm:mb-6 sm:p-6"
@@ -574,17 +707,19 @@
           </div>
           <p class="mt-2 text-sm text-green-700">如果显示版本号，说明安装成功了！</p>
         </div>
-      </div>
+      </details>
 
       <!-- 第二步：安装 Claude Code -->
-      <div class="mb-6 sm:mb-10">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
-          <span
-            class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
-            >2</span
-          >
-          安装 Claude Code
-        </h4>
+      <details class="mb-6 sm:mb-10">
+        <summary>
+          <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+            <span
+              class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
+              >2</span
+            >
+            安装 Claude Code
+          </h4>
+        </summary>
 
         <div
           class="mb-4 rounded-xl border border-purple-100 bg-gradient-to-r from-purple-50 to-pink-50 p-4 sm:mb-6 sm:p-6"
@@ -603,7 +738,7 @@
           >
             <div class="mb-2"># 全局安装 Claude Code</div>
             <div class="whitespace-nowrap text-gray-300">
-              npm install -g @anthropic-ai/claude-code
+              npm install -g @anthropic-ai/claude-code --registry=https://registry.npmmirror.com
             </div>
           </div>
           <p class="mb-2 text-sm text-gray-600">如果遇到权限问题，可以使用 sudo：</p>
@@ -612,6 +747,7 @@
           >
             <div class="whitespace-nowrap text-gray-300">
               sudo npm install -g @anthropic-ai/claude-code
+              --registry=https://registry.npmmirror.com
             </div>
           </div>
         </div>
@@ -629,17 +765,19 @@
             如果显示版本号，恭喜你！Claude Code 已经成功安装了。
           </p>
         </div>
-      </div>
+      </details>
 
       <!-- 第三步：设置环境变量 -->
-      <div class="mb-6 sm:mb-10">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
-          <span
-            class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-orange-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
-            >3</span
-          >
-          设置环境变量
-        </h4>
+      <details class="mb-6 sm:mb-10">
+        <summary>
+          <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+            <span
+              class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-orange-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
+              >3</span
+            >
+            设置环境变量
+          </h4>
+        </summary>
 
         <div
           class="mb-4 rounded-xl border border-orange-100 bg-gradient-to-r from-orange-50 to-yellow-50 p-4 sm:mb-6 sm:p-6"
@@ -790,17 +928,19 @@
             </div>
           </div>
         </div>
-      </div>
+      </details>
 
       <!-- 第四步：开始使用 -->
-      <div class="mb-8">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
-          <span
-            class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-yellow-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
-            >4</span
-          >
-          开始使用 Claude Code
-        </h4>
+      <details class="mb-8">
+        <summary>
+          <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+            <span
+              class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-yellow-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
+              >4</span
+            >
+            开始使用 Claude Code
+          </h4>
+        </summary>
         <div
           class="rounded-xl border border-yellow-100 bg-gradient-to-r from-yellow-50 to-amber-50 p-4 sm:p-6"
         >
@@ -831,7 +971,7 @@
             </div>
           </div>
         </div>
-      </div>
+      </details>
 
       <!-- macOS 故障排除 -->
       <div class="mb-8">
@@ -851,7 +991,8 @@
               <ul class="list-inside list-disc space-y-1 text-sm">
                 <li>
                   使用 sudo 安装：<code class="rounded bg-gray-200 px-1 text-xs sm:text-sm"
-                    >sudo npm install -g @anthropic-ai/claude-code</code
+                    >sudo npm install -g @anthropic-ai/claude-code
+                    --registry=https://registry.npmmirror.com</code
                   >
                 </li>
                 <li>
@@ -910,15 +1051,41 @@
     <!-- Linux 教程 -->
     <div v-else-if="activeTutorialSystem === 'linux'" class="tutorial-content">
       <!-- 第一步：安装 Node.js -->
-      <div class="mb-6 sm:mb-10">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
-          <span
-            class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
-            >1</span
-          >
-          安装 Node.js 环境
-        </h4>
+      <details class="mb-6 sm:mb-10">
+        <summary>
+          <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+            <span
+              class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
+              >1</span
+            >
+            安装 Node.js 环境
+          </h4>
+        </summary>
         <p class="mb-4 text-gray-600 sm:mb-6">Claude Code 需要 Node.js 环境才能运行。</p>
+
+        <!-- 一键安装（推荐） -->
+        <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:mb-6 sm:p-6">
+          <h5
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg"
+          >
+            <i class="fas fa-bolt mr-2 text-emerald-600" />
+            一键安装（推荐） — 无需 API Key
+          </h5>
+          <p class="mb-3 text-sm text-gray-700 sm:mb-4 sm:text-base">
+            自动安装 Node.js 20+ 并安装 Claude CLI。
+          </p>
+          <div
+            class="mb-2 overflow-x-auto rounded-lg bg-gray-900 p-3 font-mono text-xs text-green-400 sm:p-4 sm:text-sm"
+          >
+            <div class="mb-2"># 在终端中执行</div>
+            <div class="whitespace-nowrap text-gray-300">curl -fsSL {{ oneClickShUrl }} | bash</div>
+            <div class="mb-2 mt-3"># 或</div>
+            <div class="whitespace-nowrap text-gray-300">wget -qO- {{ oneClickShUrl }} | bash</div>
+          </div>
+          <p class="text-xs text-emerald-700">
+            可选：如果已有密钥，可在链接后追加 <code>?apiKey=cr_xxx</code> 自动写入。
+          </p>
+        </div>
 
         <div
           class="mb-4 rounded-xl border border-orange-100 bg-gradient-to-r from-orange-50 to-red-50 p-4 sm:mb-6 sm:p-6"
@@ -979,17 +1146,19 @@
           </div>
           <p class="mt-2 text-sm text-green-700">如果显示版本号，说明安装成功了！</p>
         </div>
-      </div>
+      </details>
 
       <!-- 第二步：安装 Claude Code -->
-      <div class="mb-6 sm:mb-10">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
-          <span
-            class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
-            >2</span
-          >
-          安装 Claude Code
-        </h4>
+      <details class="mb-6 sm:mb-10">
+        <summary>
+          <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+            <span
+              class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
+              >2</span
+            >
+            安装 Claude Code
+          </h4>
+        </summary>
 
         <div
           class="mb-4 rounded-xl border border-purple-100 bg-gradient-to-r from-purple-50 to-pink-50 p-4 sm:mb-6 sm:p-6"
@@ -1006,7 +1175,7 @@
           >
             <div class="mb-2"># 全局安装 Claude Code</div>
             <div class="whitespace-nowrap text-gray-300">
-              npm install -g @anthropic-ai/claude-code
+              npm install -g @anthropic-ai/claude-code --registry=https://registry.npmmirror.com
             </div>
           </div>
           <p class="mb-2 text-sm text-gray-600">如果遇到权限问题，可以使用 sudo：</p>
@@ -1015,6 +1184,7 @@
           >
             <div class="whitespace-nowrap text-gray-300">
               sudo npm install -g @anthropic-ai/claude-code
+              --registry=https://registry.npmmirror.com
             </div>
           </div>
         </div>
@@ -1032,17 +1202,19 @@
             如果显示版本号，恭喜你！Claude Code 已经成功安装了。
           </p>
         </div>
-      </div>
+      </details>
 
       <!-- 第三步：设置环境变量 -->
-      <div class="mb-6 sm:mb-10">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
-          <span
-            class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-orange-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
-            >3</span
-          >
-          设置环境变量
-        </h4>
+      <details class="mb-6 sm:mb-10">
+        <summary>
+          <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+            <span
+              class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-orange-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
+              >3</span
+            >
+            设置环境变量
+          </h4>
+        </summary>
 
         <div
           class="mb-4 rounded-xl border border-orange-100 bg-gradient-to-r from-orange-50 to-yellow-50 p-4 sm:mb-6 sm:p-6"
@@ -1191,17 +1363,19 @@
             </div>
           </div>
         </div>
-      </div>
+      </details>
 
       <!-- 第四步：开始使用 -->
-      <div class="mb-8">
-        <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
-          <span
-            class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-yellow-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
-            >4</span
-          >
-          开始使用 Claude Code
-        </h4>
+      <details class="mb-8">
+        <summary>
+          <h4 class="mb-3 flex items-center text-lg font-semibold text-gray-800 sm:mb-4 sm:text-xl">
+            <span
+              class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-yellow-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
+              >4</span
+            >
+            开始使用 Claude Code
+          </h4>
+        </summary>
         <div
           class="rounded-xl border border-yellow-100 bg-gradient-to-r from-yellow-50 to-amber-50 p-4 sm:p-6"
         >
@@ -1232,7 +1406,7 @@
             </div>
           </div>
         </div>
-      </div>
+      </details>
 
       <!-- Linux 故障排除 -->
       <div class="mb-8">
@@ -1252,7 +1426,8 @@
               <ul class="list-inside list-disc space-y-1 text-sm">
                 <li>
                   使用 sudo 安装：<code class="rounded bg-gray-200 px-1 text-xs sm:text-sm"
-                    >sudo npm install -g @anthropic-ai/claude-code</code
+                    >sudo npm install -g @anthropic-ai/claude-code
+                    --registry=https://registry.npmmirror.com</code
                   >
                 </li>
                 <li>
@@ -1395,6 +1570,15 @@ const currentBaseUrl = computed(() => {
 const geminiBaseUrl = computed(() => {
   return getBaseUrlPrefix() + '/gemini'
 })
+
+// 一键安装脚本地址（基于当前服务域名）
+const oneClickPsUrl = computed(() => {
+  return getBaseUrlPrefix() + '/install.ps1'
+})
+
+const oneClickShUrl = computed(() => {
+  return getBaseUrlPrefix() + '/install.sh'
+})
 </script>
 
 <style scoped>
@@ -1404,6 +1588,50 @@ const geminiBaseUrl = computed(() => {
 
 .tutorial-content {
   animation: fadeIn 0.3s ease-in-out;
+}
+
+/* 折叠样式优化：让步骤标题更像可点击的卡片 */
+.tutorial-content details {
+  margin-bottom: 1rem;
+}
+
+.tutorial-content details > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e5e7eb; /* gray-200 */
+  border-radius: 0.75rem; /* rounded-xl */
+  background: #ffffff;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tutorial-content details > summary:hover {
+  background: #f9fafb; /* gray-50 */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.tutorial-content details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.tutorial-content details > summary::after {
+  content: '点击展开 ▸';
+  font-size: 12px;
+  color: #6b7280; /* gray-500 */
+}
+
+.tutorial-content details[open] > summary::after {
+  content: '点击收起 ▾';
+  color: #2563eb; /* blue-600 */
+}
+
+.tutorial-content details[open] > summary {
+  background: #f9fafb;
+  border-bottom-left-radius: 0.75rem;
+  border-bottom-right-radius: 0.75rem;
 }
 
 @keyframes fadeIn {

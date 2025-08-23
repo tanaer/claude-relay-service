@@ -14,6 +14,39 @@ readonly CLAUDE_DIR="$HOME/.claude"
 # API 配置 - 默认值
 API_KEY=""
 API_BASE_URL="https://ccapi.muskapi.com/api/"
+USE_CN_MIRROR=""
+# 解析镜像选择：环境变量优先，未设置则交互询问（默认使用国内镜像）
+resolve_mirror_choice() {
+    # 环境变量优先（INSTALL_MIRROR / CN_MIRROR / USE_CN_MIRROR）
+    local val="${INSTALL_MIRROR:-${CN_MIRROR:-${USE_CN_MIRROR}}}"
+    case "$(echo "$val" | tr '[:upper:]' '[:lower:]')" in
+        cn|china|domestic|1|true)
+            USE_CN_MIRROR="1" ;;
+        global|intl|international|0|false)
+            USE_CN_MIRROR="0" ;;
+        *)
+            # 未设置则交互询问
+            if [ -t 0 ]; then
+                echo -ne "是否使用国内镜像(更快更稳)? [Y/n]: "
+                read -r reply
+                if [ -z "$reply" ] || [[ "$reply" =~ ^[Yy]$ ]]; then
+                    USE_CN_MIRROR="1"
+                else
+                    USE_CN_MIRROR="0"
+                fi
+            else
+                # 非交互默认启用国内镜像
+                USE_CN_MIRROR="1"
+            fi
+            ;;
+    esac
+
+    if [ "$USE_CN_MIRROR" = "1" ]; then
+        print_info "已选择：使用国内镜像"
+    else
+        print_info "已选择：使用国外官方源"
+    fi
+}
 
 # ANSI 颜色代码
 readonly RED='\033[0;31m'
@@ -130,7 +163,7 @@ install_nodejs_universal() {
     
     # 检测架构
     local arch=$(uname -m)
-    local node_version="20"  # LTS 版本
+    local node_version="22"  # 最新 LTS 版本
     
     # NodeSource 安装脚本
     if command -v curl &> /dev/null; then
@@ -275,8 +308,8 @@ install_linux_packages() {
     esac
 }
 
-# 确保 Node.js >= 20（优先使用 nvm；否则使用系统包管理器/NodeSource）
-ensure_nodejs_v20() {
+# 确保 Node.js >= 22（优先使用 nvm；否则使用系统包管理器/NodeSource）
+ensure_nodejs_v22() {
     print_info "检查 Node.js 版本..."
 
     local need_upgrade=false
@@ -287,33 +320,46 @@ ensure_nodejs_v20() {
         current_version=$(node -v 2>/dev/null | sed 's/^v//')
         current_major=$(echo "$current_version" | cut -d. -f1)
         if [ -z "$current_major" ]; then current_major=0; fi
-        if [ "$current_major" -lt 20 ]; then
+        if [ "$current_major" -lt 22 ]; then
             need_upgrade=true
-            print_warning "已安装 Node.js v$current_version，低于 v20，准备升级"
+            print_warning "已安装 Node.js v$current_version，低于 v22，准备升级"
         else
-            print_success "已安装 Node.js v$current_version（>=20）"
+            print_success "已安装 Node.js v$current_version（>=22）"
             return 0
         fi
     else
         need_upgrade=true
-        print_warning "未检测到 Node.js，准备安装 v20"
+        print_warning "未检测到 Node.js，准备安装 v22"
     fi
 
-    # 优先使用 nvm
+    # 优先使用 nvm（按镜像选择）
     if command -v nvm &> /dev/null; then
-        print_info "检测到 nvm，使用 nvm 安装 Node.js 20"
-        nvm install 20 || true
-        nvm use 20 || true
-        nvm alias default 20 || true
+        print_info "检测到 nvm，使用 nvm 安装 Node.js 22"
+        if [ "$USE_CN_MIRROR" = "1" ]; then
+            export NVM_NODEJS_ORG_MIRROR="https://npmmirror.com/mirrors/node"
+        else
+            unset NVM_NODEJS_ORG_MIRROR
+        fi
+        nvm install 22 || true
+        nvm use 22 || true
+        nvm alias default 22 || true
     else
         # 安装 nvm（仅限 Linux/macOS）
         if [ "$(uname)" = "Linux" ] || [ "$(uname)" = "Darwin" ]; then
             print_info "未检测到 nvm，开始安装 nvm..."
             export NVM_DIR="$HOME/.nvm"
             if command -v curl &> /dev/null; then
-                curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+                if [ "$USE_CN_MIRROR" = "1" ]; then
+                    curl -fsSL https://cdn.jsdelivr.net/gh/nvm-sh/nvm@v0.40.3/install.sh | bash
+                else
+                    curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+                fi
             elif command -v wget &> /dev/null; then
-                wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+                if [ "$USE_CN_MIRROR" = "1" ]; then
+                    wget -qO- https://cdn.jsdelivr.net/gh/nvm-sh/nvm@v0.40.3/install.sh | bash
+                else
+                    wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+                fi
             else
                 print_warning "缺少 curl/wget，跳过 nvm 安装"
             fi
@@ -322,16 +368,21 @@ ensure_nodejs_v20() {
             if [ -s "$HOME/.nvm/nvm.sh" ]; then
                 # shellcheck disable=SC1090
                 . "$HOME/.nvm/nvm.sh"
-                nvm install 20 || true
-                nvm use 20 || true
-                nvm alias default 20 || true
+                if [ "$USE_CN_MIRROR" = "1" ]; then
+                    export NVM_NODEJS_ORG_MIRROR="https://npmmirror.com/mirrors/node"
+                else
+                    unset NVM_NODEJS_ORG_MIRROR
+                fi
+                nvm install 22 || true
+                nvm use 22 || true
+                nvm alias default 22 || true
             fi
         fi
     fi
 
-    # 如果依然没有 node 或版本仍 < 20，使用系统包管理器/NodeSource 兜底
-    if ! command -v node &> /dev/null || [ "$(node -v 2>/dev/null | sed 's/^v//; s/\..*$//')" -lt 20 ]; then
-        print_info "使用系统包管理器/NodeSource 安装 Node.js 20 作为兜底"
+    # 如果依然没有 node 或版本仍 < 22，使用系统包管理器/NodeSource 兜底
+    if ! command -v node &> /dev/null || [ "$(node -v 2>/dev/null | sed 's/^v//; s/\..*$//')" -lt 22 ]; then
+        print_info "使用系统包管理器/NodeSource 安装 Node.js 22 作为兜底"
         if command -v apt-get &> /dev/null; then
             install_nodejs_universal
             sudo apt-get install -y nodejs
@@ -347,29 +398,40 @@ ensure_nodejs_v20() {
     if command -v node &> /dev/null; then
         current_version=$(node -v 2>/dev/null | sed 's/^v//')
         current_major=$(echo "$current_version" | cut -d. -f1)
-        if [ "$current_major" -lt 20 ]; then
-            print_warning "Node.js 版本仍为 v$current_version，建议手动升级至 v20+"
+        if [ "$current_major" -lt 22 ]; then
+            print_warning "Node.js 版本仍为 v$current_version，建议手动升级至 v22+"
         else
             print_success "Node.js 版本满足要求：v$current_version"
         fi
     else
-        print_warning "Node.js 安装失败，请手动安装 v20+ 后重试"
+        print_warning "Node.js 安装失败，请手动安装 v22+ 后重试"
+    fi
+
+    # 按选择配置 npm registry
+    if command -v npm &> /dev/null; then
+        if [ "$USE_CN_MIRROR" = "1" ]; then
+            print_info "配置 npm registry 使用国内源（npmmirror）..."
+            npm config set registry https://registry.npmmirror.com --location=global 2>/dev/null || npm config set registry https://registry.npmmirror.com || true
+        else
+            print_info "配置 npm registry 使用官方源（npmjs）..."
+            npm config set registry https://registry.npmjs.org --location=global 2>/dev/null || npm config set registry https://registry.npmjs.org || true
+        fi
     fi
 }
 
-# 将 nvm 自动加载与 Node.js 20 设为默认并在新会话自动启用（永久生效）
-persist_nvm_autouse_20() {
+# 将 nvm 自动加载与 Node.js 22 设为默认并在新会话自动启用（永久生效）
+persist_nvm_autouse_22() {
     # 仅当 nvm 已安装时生效
     if [ ! -s "$HOME/.nvm/nvm.sh" ]; then
         return 0
     fi
 
     local rc_added=false
-    local nvm_block='\n# Claude CLI NVM Node.js v20\nexport NVM_DIR="$HOME/.nvm"\n[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"\n[ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"\n# 默认使用 Node.js v20\nnvm alias default 20 >/dev/null 2>&1 || true\nnvm use 20 >/dev/null 2>&1 || true\n'
+    local nvm_block='\n# Claude CLI NVM Node.js v22\nexport NVM_DIR="$HOME/.nvm"\n[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"\n[ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"\n# 默认使用 Node.js v22\nnvm alias default 22 >/dev/null 2>&1 || true\nnvm use 22 >/dev/null 2>&1 || true\n'
 
     # 写入 ~/.bashrc
     if [ -f "$HOME/.bashrc" ]; then
-        if ! grep -q "Claude CLI NVM Node.js v20" "$HOME/.bashrc" 2>/dev/null; then
+        if ! grep -q "Claude CLI NVM Node.js v22" "$HOME/.bashrc" 2>/dev/null; then
             printf "$nvm_block" >> "$HOME/.bashrc"
             rc_added=true
         fi
@@ -380,7 +442,7 @@ persist_nvm_autouse_20() {
 
     # 写入 ~/.profile（root 或非交互登录兜底）
     if [ -f "$HOME/.profile" ]; then
-        if ! grep -q "Claude CLI NVM Node.js v20" "$HOME/.profile" 2>/devnull; then
+        if ! grep -q "Claude CLI NVM Node.js v22" "$HOME/.profile" 2>/devnull; then
             printf "$nvm_block" >> "$HOME/.profile"
             rc_added=true
         fi
@@ -391,7 +453,7 @@ persist_nvm_autouse_20() {
 
     # 写入 ~/.zshrc（如存在）
     if [ -f "$HOME/.zshrc" ]; then
-        if ! grep -q "Claude CLI NVM Node.js v20" "$HOME/.zshrc" 2>/dev/null; then
+        if ! grep -q "Claude CLI NVM Node.js v22" "$HOME/.zshrc" 2>/dev/null; then
             printf "$nvm_block" >> "$HOME/.zshrc"
             rc_added=true
         fi
@@ -400,11 +462,11 @@ persist_nvm_autouse_20() {
     # 立即在当前会话启用（不依赖重新登录）
     # shellcheck disable=SC1090
     . "$HOME/.nvm/nvm.sh" 2>/dev/null || true
-    nvm alias default 20 >/dev/null 2>&1 || true
-    nvm use 20 >/dev/null 2>&1 || true
+    nvm alias default 22 >/dev/null 2>&1 || true
+    nvm use 22 >/dev/null 2>&1 || true
 
     if [ "$rc_added" = true ]; then
-        print_success "已配置 nvm 自动加载与默认使用 Node.js v20（新会话自动生效）"
+        print_success "已配置 nvm 自动加载与默认使用 Node.js v22（新会话自动生效）"
     else
         print_info "nvm 自动加载已配置，无需重复设置"
     fi
@@ -1075,7 +1137,9 @@ EOF
     echo "" >> "$shell_config"
     echo "# Anthropic API Configuration" >> "$shell_config"
     echo "export ANTHROPIC_BASE_URL=\"$API_BASE_URL\"" >> "$shell_config"
-    echo "export ANTHROPIC_AUTH_TOKEN=\"$API_KEY\"" >> "$shell_config"
+    if [ -n "$API_KEY" ]; then
+        echo "export ANTHROPIC_AUTH_TOKEN=\"$API_KEY\"" >> "$shell_config"
+    fi
     
     # 对于root用户，同时写入.profile以确保环境变量生效
     if [ "$EUID" -eq 0 ] || [ "$(whoami)" = "root" ]; then
@@ -1086,7 +1150,7 @@ EOF
             echo "" >> "$HOME/.profile"
             echo "# Anthropic API Configuration" >> "$HOME/.profile"
             echo "export ANTHROPIC_BASE_URL=\"$API_BASE_URL\"" >> "$HOME/.profile"
-            echo "export ANTHROPIC_AUTH_TOKEN=\"$API_KEY\"" >> "$HOME/.profile"
+            if [ -n "$API_KEY" ]; then echo "export ANTHROPIC_AUTH_TOKEN=\"$API_KEY\"" >> "$HOME/.profile"; fi
         fi
     fi
     
@@ -1107,12 +1171,12 @@ EOF
                 sed -i '/ANTHROPIC_BASE_URL/d' /etc/environment 2>/dev/null || true
                 sed -i '/ANTHROPIC_AUTH_TOKEN/d' /etc/environment 2>/dev/null || true
                 echo "ANTHROPIC_BASE_URL=\"$API_BASE_URL\"" >> /etc/environment
-                echo "ANTHROPIC_AUTH_TOKEN=\"$API_KEY\"" >> /etc/environment
+                if [ -n "$API_KEY" ]; then echo "ANTHROPIC_AUTH_TOKEN=\"$API_KEY\"" >> /etc/environment; fi
             elif command -v sudo &> /dev/null; then
                 sudo sed -i '/ANTHROPIC_BASE_URL/d' /etc/environment 2>/dev/null || true
                 sudo sed -i '/ANTHROPIC_AUTH_TOKEN/d' /etc/environment 2>/dev/null || true
                 echo "ANTHROPIC_BASE_URL=\"$API_BASE_URL\"" | sudo tee -a /etc/environment > /dev/null
-                echo "ANTHROPIC_AUTH_TOKEN=\"$API_KEY\"" | sudo tee -a /etc/environment > /dev/null
+                if [ -n "$API_KEY" ]; then echo "ANTHROPIC_AUTH_TOKEN=\"$API_KEY\"" | sudo tee -a /etc/environment > /dev/null; fi
             fi
             
             print_success "系统级环境变量配置完成"
@@ -1130,7 +1194,7 @@ EOF
     
     # 1. 立即导出环境变量到当前会话
     export ANTHROPIC_BASE_URL="$API_BASE_URL"
-    export ANTHROPIC_AUTH_TOKEN="$API_KEY"
+    if [ -n "$API_KEY" ]; then export ANTHROPIC_AUTH_TOKEN="$API_KEY"; fi
     
     # 2. 如果 Claude 正在运行，终止它以使用新配置
     if pgrep -f claude > /dev/null 2>&1; then
@@ -1293,6 +1357,16 @@ EOF
     echo
     print_info "如需恢复原始命令，运行："
     echo "  claude-restore"
+
+    # 更醒目的安装完成后提示
+    echo
+    echo -e "\033[1;33m====================================================\033[0m"
+    echo -e "\033[1;33m  重要提示（安装完成后）\033[0m"
+    echo -e "\033[1;33m====================================================\033[0m"
+    echo -e "\033[1;33m• Linux / macOS：建议 重新打开终端，使 nvm/Node v22 自动生效\033[0m"
+    echo -e "\033[1;33m• 若需当前会话立刻生效：source ~/.bashrc || source ~/.profile\033[0m"
+    echo -e "\033[1;33m• 验证：node -v  和  claude --version\033[0m"
+    echo -e "\033[1;33m====================================================\033[0m"
 }
 
 # 显示使用说明
@@ -1441,8 +1515,11 @@ main() {
             ;;
     esac
     
-    # 先确保 Node.js v20+
-    ensure_nodejs_v20
+    # 选择镜像
+    resolve_mirror_choice
+
+    # 先确保 Node.js v22+
+    ensure_nodejs_v22
 
     # 安装 Claude Code
     if ! install_claude_code; then
@@ -1453,8 +1530,8 @@ main() {
     # 配置 Claude Code
     configure_claude_code
 
-    # 若 nvm 存在，配置其在新会话自动启用 Node v20（永久）
-    persist_nvm_autouse_20
+    # 若 nvm 存在，配置其在新会话自动启用 Node v22（永久）
+    persist_nvm_autouse_22
     
     # 显示使用说明
     show_usage

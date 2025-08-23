@@ -3,20 +3,20 @@ Param(
     [string]$BaseUrl = "__BASE_URL__"
 )
 # =============================================
-# 检查并安装 Node.js 20+
+# 检查并安装 Node.js 22+
 # =============================================
-function Install-NodeV20 {
+function Install-NodeV22 {
     try {
         $node = Get-Command node -ErrorAction SilentlyContinue
         if ($null -ne $node) {
             $ver = (node -v) -replace '^v', ''
             $major = [int]($ver.Split('.')[0])
-            if ($major -ge 20) {
-                Write-Success "已安装 Node.js v$ver (>=20)"
+            if ($major -ge 22) {
+                Write-Success "已安装 Node.js v$ver (>=22)"
                 return
             }
             else {
-                Write-Warn "检测到 Node.js v$ver，低于 v20，将尝试升级"
+                Write-Warn "检测到 Node.js v$ver，低于 v22，将尝试升级"
             }
         }
         else {
@@ -37,7 +37,7 @@ function Install-NodeV20 {
         try {
             $ver2 = (node -v) -replace '^v', ''
             $major2 = [int]($ver2.Split('.')[0])
-            if ($major2 -ge 20) { $nodeOk = $true }
+            if ($major2 -ge 22) { $nodeOk = $true }
         }
         catch {}
 
@@ -59,11 +59,11 @@ function Install-NodeV20 {
         try {
             $ver3 = (node -v) -replace '^v', ''
             $major3 = [int]($ver3.Split('.')[0])
-            if ($major3 -ge 20) {
+            if ($major3 -ge 22) {
                 Write-Success "Node.js v$ver3 安装就绪"
             }
             else {
-                Write-Warn "Node.js 版本仍低于 20，请手动安装最新 LTS (v22+) 后重试"
+                Write-Warn "Node.js 版本仍低于 22，请手动安装最新 LTS (v22+) 后重试"
             }
         }
         catch {
@@ -71,7 +71,7 @@ function Install-NodeV20 {
         }
     }
     catch {
-        Write-Warn "Install-NodeV20 出错：$($_.Exception.Message)"
+        Write-Warn "Install-NodeV22 出错：$($_.Exception.Message)"
     }
 }
  
@@ -174,7 +174,7 @@ function Install-ClaudeCLI {
     }
 }
 
-# 让 Node.js v20 永久生效（将 nvm 自动加载/使用的指令写入用户配置）
+# 让 Node.js v22 永久生效（将 nvm 自动加载/使用的指令写入用户配置）
 function Set-NvmDefaultNode {
     try {
         $nvmDir = "$HOME/.nvm"
@@ -224,8 +224,11 @@ if ([string]::IsNullOrWhiteSpace($ApiKey)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($ApiKey)) {
-    Write-ErrorMsg "API Key 不能为空。您也可以使用：irm <url>?apiKey=... | iex"
-    exit 1
+    Write-Warn "未提供 API Key，将仅安装/校验 Node.js 与 Claude CLI，并配置 BaseUrl。可稍后在 PowerShell 中设置：$env:ANTHROPIC_AUTH_TOKEN"
+    $skipApiKey = $true
+}
+else {
+    $skipApiKey = $false
 }
 
 Write-Info "即将配置环境变量："
@@ -242,20 +245,24 @@ try {
         Write-Info "已选择：使用国外官方源"
     }
     # 设置当前进程环境变量（立即生效）
-    $env:ANTHROPIC_AUTH_TOKEN = $ApiKey
-    $env:ANTHROPIC_API_KEY = $ApiKey
+    if (-not $skipApiKey) {
+        $env:ANTHROPIC_AUTH_TOKEN = $ApiKey
+        $env:ANTHROPIC_API_KEY = $ApiKey
+    }
     $env:ANTHROPIC_BASE_URL = $BaseUrl
 
     # 永久写入当前用户环境变量
-    [Environment]::SetEnvironmentVariable('ANTHROPIC_AUTH_TOKEN', $ApiKey, 'User')
-    [Environment]::SetEnvironmentVariable('ANTHROPIC_API_KEY', $ApiKey, 'User')
+    if (-not $skipApiKey) {
+        [Environment]::SetEnvironmentVariable('ANTHROPIC_AUTH_TOKEN', $ApiKey, 'User')
+        [Environment]::SetEnvironmentVariable('ANTHROPIC_API_KEY', $ApiKey, 'User')
+    }
     [Environment]::SetEnvironmentVariable('ANTHROPIC_BASE_URL', $BaseUrl, 'User')
 
     Write-Success "环境变量已写入当前用户配置"
 
     # 可选：写入机器级（需要管理员权限）
     $isAdmin = ([bool](New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))
-    if ($isAdmin) {
+    if ($isAdmin -and (-not $skipApiKey)) {
         try {
             [Environment]::SetEnvironmentVariable('ANTHROPIC_AUTH_TOKEN', $ApiKey, 'Machine')
             [Environment]::SetEnvironmentVariable('ANTHROPIC_API_KEY', $ApiKey, 'Machine')
@@ -266,14 +273,23 @@ try {
             Write-Warn "系统级环境变量写入失败：$($_.Exception.Message)"
         }
     }
+    elseif ($isAdmin) {
+        try {
+            [Environment]::SetEnvironmentVariable('ANTHROPIC_BASE_URL', $BaseUrl, 'Machine')
+            Write-Success "检测到管理员权限，已写入系统级 BaseUrl"
+        }
+        catch {
+            Write-Warn "系统级 BaseUrl 写入失败：$($_.Exception.Message)"
+        }
+    }
     else {
         Write-Info "如需对所有用户生效，可右键以管理员身份运行后再执行本命令"
     }
 
-    # 先确保 Node.js 20 可用，避免 ReadableStream 报错
+    # 先确保 Node.js 22 可用，避免 ReadableStream 报错
     # 对于 Windows，无需镜像变量；对于 WSL/Git Bash/nvm，会在 bash 里处理
-    Install-NodeV20
-    # 配置 nvm 在新会话自动启用 Node.js v20（若存在）
+    Install-NodeV22
+    # 配置 nvm 在新会话自动启用 Node.js v22（若存在）
     Set-NvmDefaultNode
 
     # 配置 npm registry（根据镜像选择）
@@ -307,6 +323,6 @@ Write-Host "====================================================" -ForegroundCol
 Write-Host "• Windows（PowerShell）：建议 关闭并重新打开 PowerShell 再使用" -ForegroundColor Yellow
 Write-Host "  （当前会话已就绪，但为保证新会话也生效，需重新打开）" -ForegroundColor Yellow
 Write-Host "• 立即验证（当前窗口）：node -v  和  claude --version" -ForegroundColor Yellow
-Write-Host "• 如遇 Node 不是 v20，可新开窗口后重试" -ForegroundColor Yellow
+Write-Host "• 如遇 Node 不是 v22，可新开窗口后重试" -ForegroundColor Yellow
 Write-Host "====================================================" -ForegroundColor Yellow
 

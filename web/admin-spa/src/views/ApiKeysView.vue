@@ -81,10 +81,7 @@
                 <button
                   v-if="searchQuery"
                   class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-gray-600"
-                  @click="
-                    searchQuery = ''
-                    currentPage = 1
-                  "
+                  @click="clearSearch"
                 >
                   <i class="fas fa-times text-xs" />
                 </button>
@@ -1688,6 +1685,12 @@ const resetApiKeyDateFilter = (keyId) => {
   // 重新加载数据
   loadApiKeyModelStats(keyId, true)
   showToast('已重置筛选条件并刷新数据', 'info')
+}
+
+// 清除搜索
+const clearSearch = () => {
+  searchQuery.value = ''
+  currentPage.value = 1
 }
 
 // 打开创建模态框

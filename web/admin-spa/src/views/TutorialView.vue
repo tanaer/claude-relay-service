@@ -47,6 +47,34 @@
           Claude Code 需要 Node.js 环境才能运行。
         </p>
 
+        <!-- 一键安装（推荐） -->
+        <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:mb-6 sm:p-6">
+          <h5
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg"
+          >
+            <i class="fas fa-bolt mr-2 text-emerald-600" />
+            一键安装（推荐） — 无需 API Key
+          </h5>
+          <p class="mb-3 text-sm text-gray-700 sm:mb-4 sm:text-base">
+            自动安装 Node.js 20+、配置镜像并安装 Claude CLI。稍后可在“步骤三”设置 API
+            密钥。（或者在兑换完API Key后，在下方“一键安装”中重新复制命令执行，会自动写入API Key）
+          </p>
+          <div
+            class="mb-2 overflow-x-auto rounded-lg bg-gray-900 p-3 font-mono text-xs text-green-400 sm:p-4 sm:text-sm"
+          >
+            <div class="mb-2">
+              # 在 PowerShell 中执行（任意文件夹点鼠标右键，选择“在此处打开 PowerShell” 或者
+              “在终端中执行”）
+            </div>
+            <div class="whitespace-nowrap text-gray-300">irm {{ oneClickPsUrl }} | iex</div>
+            <div class="mb-2 mt-3"># 或</div>
+            <div class="whitespace-nowrap text-gray-300">iwr -useb {{ oneClickPsUrl }} | iex</div>
+          </div>
+          <p class="text-xs text-emerald-700">
+            可选：如果已有密钥，可在链接后追加 <code>?apiKey=cr_xxx</code> 自动写入。
+          </p>
+        </div>
+
         <div
           class="mb-4 rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 sm:mb-4 sm:mb-6 sm:p-6"
         >
@@ -587,6 +615,30 @@
         </summary>
         <p class="mb-4 text-gray-600 sm:mb-6">Claude Code 需要 Node.js 环境才能运行。</p>
 
+        <!-- 一键安装（推荐） -->
+        <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:mb-6 sm:p-6">
+          <h5
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg"
+          >
+            <i class="fas fa-bolt mr-2 text-emerald-600" />
+            一键安装（推荐） — 无需 API Key
+          </h5>
+          <p class="mb-3 text-sm text-gray-700 sm:mb-4 sm:text-base">
+            自动安装 Node.js 20+ 并安装 Claude CLI。
+          </p>
+          <div
+            class="mb-2 overflow-x-auto rounded-lg bg-gray-900 p-3 font-mono text-xs text-green-400 sm:p-4 sm:text-sm"
+          >
+            <div class="mb-2"># 在 Terminal 中执行</div>
+            <div class="whitespace-nowrap text-gray-300">curl -fsSL {{ oneClickShUrl }} | bash</div>
+            <div class="mb-2 mt-3"># 或</div>
+            <div class="whitespace-nowrap text-gray-300">wget -qO- {{ oneClickShUrl }} | bash</div>
+          </div>
+          <p class="text-xs text-emerald-700">
+            可选：如果已有密钥，可在链接后追加 <code>?apiKey=cr_xxx</code> 自动写入。
+          </p>
+        </div>
+
         <div
           class="mb-4 rounded-xl border border-gray-200 bg-gradient-to-r from-gray-50 to-slate-50 p-4 sm:mb-6 sm:p-6"
         >
@@ -1010,6 +1062,30 @@
           </h4>
         </summary>
         <p class="mb-4 text-gray-600 sm:mb-6">Claude Code 需要 Node.js 环境才能运行。</p>
+
+        <!-- 一键安装（推荐） -->
+        <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:mb-6 sm:p-6">
+          <h5
+            class="mb-2 flex items-center text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg"
+          >
+            <i class="fas fa-bolt mr-2 text-emerald-600" />
+            一键安装（推荐） — 无需 API Key
+          </h5>
+          <p class="mb-3 text-sm text-gray-700 sm:mb-4 sm:text-base">
+            自动安装 Node.js 20+ 并安装 Claude CLI。
+          </p>
+          <div
+            class="mb-2 overflow-x-auto rounded-lg bg-gray-900 p-3 font-mono text-xs text-green-400 sm:p-4 sm:text-sm"
+          >
+            <div class="mb-2"># 在终端中执行</div>
+            <div class="whitespace-nowrap text-gray-300">curl -fsSL {{ oneClickShUrl }} | bash</div>
+            <div class="mb-2 mt-3"># 或</div>
+            <div class="whitespace-nowrap text-gray-300">wget -qO- {{ oneClickShUrl }} | bash</div>
+          </div>
+          <p class="text-xs text-emerald-700">
+            可选：如果已有密钥，可在链接后追加 <code>?apiKey=cr_xxx</code> 自动写入。
+          </p>
+        </div>
 
         <div
           class="mb-4 rounded-xl border border-orange-100 bg-gradient-to-r from-orange-50 to-red-50 p-4 sm:mb-6 sm:p-6"
@@ -1493,6 +1569,15 @@ const currentBaseUrl = computed(() => {
 // Gemini CLI 基础URL
 const geminiBaseUrl = computed(() => {
   return getBaseUrlPrefix() + '/gemini'
+})
+
+// 一键安装脚本地址（基于当前服务域名）
+const oneClickPsUrl = computed(() => {
+  return getBaseUrlPrefix() + '/install.ps1'
+})
+
+const oneClickShUrl = computed(() => {
+  return getBaseUrlPrefix() + '/install.sh'
 })
 </script>
 

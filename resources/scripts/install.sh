@@ -14,6 +14,39 @@ readonly CLAUDE_DIR="$HOME/.claude"
 # API 配置 - 默认值
 API_KEY=""
 API_BASE_URL="https://ccapi.muskapi.com/api/"
+USE_CN_MIRROR=""
+# 解析镜像选择：环境变量优先，未设置则交互询问（默认使用国内镜像）
+resolve_mirror_choice() {
+    # 环境变量优先（INSTALL_MIRROR / CN_MIRROR / USE_CN_MIRROR）
+    local val="${INSTALL_MIRROR:-${CN_MIRROR:-${USE_CN_MIRROR}}}"
+    case "$(echo "$val" | tr '[:upper:]' '[:lower:]')" in
+        cn|china|domestic|1|true)
+            USE_CN_MIRROR="1" ;;
+        global|intl|international|0|false)
+            USE_CN_MIRROR="0" ;;
+        *)
+            # 未设置则交互询问
+            if [ -t 0 ]; then
+                echo -ne "是否使用国内镜像(更快更稳)? [Y/n]: "
+                read -r reply
+                if [ -z "$reply" ] || [[ "$reply" =~ ^[Yy]$ ]]; then
+                    USE_CN_MIRROR="1"
+                else
+                    USE_CN_MIRROR="0"
+                fi
+            else
+                # 非交互默认启用国内镜像
+                USE_CN_MIRROR="1"
+            fi
+            ;;
+    esac
+
+    if [ "$USE_CN_MIRROR" = "1" ]; then
+        print_info "已选择：使用国内镜像"
+    else
+        print_info "已选择：使用国外官方源"
+    fi
+}
 
 # ANSI 颜色代码
 readonly RED='\033[0;31m'
@@ -299,9 +332,14 @@ ensure_nodejs_v20() {
         print_warning "未检测到 Node.js，准备安装 v20"
     fi
 
-    # 优先使用 nvm
+    # 优先使用 nvm（按镜像选择）
     if command -v nvm &> /dev/null; then
         print_info "检测到 nvm，使用 nvm 安装 Node.js 20"
+        if [ "$USE_CN_MIRROR" = "1" ]; then
+            export NVM_NODEJS_ORG_MIRROR="https://npmmirror.com/mirrors/node"
+        else
+            unset NVM_NODEJS_ORG_MIRROR
+        fi
         nvm install 20 || true
         nvm use 20 || true
         nvm alias default 20 || true
@@ -311,9 +349,17 @@ ensure_nodejs_v20() {
             print_info "未检测到 nvm，开始安装 nvm..."
             export NVM_DIR="$HOME/.nvm"
             if command -v curl &> /dev/null; then
-                curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+                if [ "$USE_CN_MIRROR" = "1" ]; then
+                    curl -fsSL https://cdn.jsdelivr.net/gh/nvm-sh/nvm@v0.40.3/install.sh | bash
+                else
+                    curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+                fi
             elif command -v wget &> /dev/null; then
-                wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+                if [ "$USE_CN_MIRROR" = "1" ]; then
+                    wget -qO- https://cdn.jsdelivr.net/gh/nvm-sh/nvm@v0.40.3/install.sh | bash
+                else
+                    wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+                fi
             else
                 print_warning "缺少 curl/wget，跳过 nvm 安装"
             fi
@@ -322,6 +368,11 @@ ensure_nodejs_v20() {
             if [ -s "$HOME/.nvm/nvm.sh" ]; then
                 # shellcheck disable=SC1090
                 . "$HOME/.nvm/nvm.sh"
+                if [ "$USE_CN_MIRROR" = "1" ]; then
+                    export NVM_NODEJS_ORG_MIRROR="https://npmmirror.com/mirrors/node"
+                else
+                    unset NVM_NODEJS_ORG_MIRROR
+                fi
                 nvm install 20 || true
                 nvm use 20 || true
                 nvm alias default 20 || true
@@ -354,6 +405,17 @@ ensure_nodejs_v20() {
         fi
     else
         print_warning "Node.js 安装失败，请手动安装 v20+ 后重试"
+    fi
+
+    # 按选择配置 npm registry
+    if command -v npm &> /dev/null; then
+        if [ "$USE_CN_MIRROR" = "1" ]; then
+            print_info "配置 npm registry 使用国内源（npmmirror）..."
+            npm config set registry https://registry.npmmirror.com --location=global 2>/dev/null || npm config set registry https://registry.npmmirror.com || true
+        else
+            print_info "配置 npm registry 使用官方源（npmjs）..."
+            npm config set registry https://registry.npmjs.org --location=global 2>/dev/null || npm config set registry https://registry.npmjs.org || true
+        fi
     fi
 }
 
@@ -1451,6 +1513,9 @@ main() {
             ;;
     esac
     
+    # 选择镜像
+    resolve_mirror_choice
+
     # 先确保 Node.js v20+
     ensure_nodejs_v20
 

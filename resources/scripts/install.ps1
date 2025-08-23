@@ -5,7 +5,7 @@ Param(
 # =============================================
 # 检查并安装 Node.js 20+
 # =============================================
-function Ensure-NodeV20 {
+function Install-NodeV20 {
     try {
         $node = Get-Command node -ErrorAction SilentlyContinue
         if ($null -ne $node) {
@@ -20,10 +20,10 @@ function Ensure-NodeV20 {
             }
         }
         else {
-            Write-Info "未检测到 Node.js，将尝试安装 v20"
+            Write-Info "未检测到 Node.js，将尝试安装 v22"
         }
 
-        # 优先尝试 winget
+        # 优先尝试 winget（Windows 环境）
         $winget = Get-Command winget -ErrorAction SilentlyContinue
         if ($null -ne $winget) {
             try {
@@ -43,9 +43,10 @@ function Ensure-NodeV20 {
 
         if (-not $nodeOk) {
             try {
-                $msiUrl = 'https://nodejs.org/dist/v20.17.0/node-v20.17.0-x64.msi'
-                $msiPath = Join-Path $env:TEMP 'node-v20-x64.msi'
-                Write-Info "下载 Node.js v20 安装包..."
+                # 使用 jsDelivr 镜像加速 Node.js 下载（国内更快）
+                $msiUrl = 'https://npmmirror.com/mirrors/node/v22.18.0/node-v22.18.0-x64.msi'
+                $msiPath = Join-Path $env:TEMP 'node-v22-x64.msi'
+                Write-Info "下载 Node.js v22 安装包..."
                 Invoke-WebRequest -Uri $msiUrl -OutFile $msiPath -UseBasicParsing
                 Write-Info "静默安装 Node.js..."
                 Start-Process msiexec.exe -ArgumentList '/i', $msiPath, '/quiet', '/norestart' -Wait
@@ -62,15 +63,15 @@ function Ensure-NodeV20 {
                 Write-Success "Node.js v$ver3 安装就绪"
             }
             else {
-                Write-Warn "Node.js 版本仍低于 20，请手动安装最新 LTS (v20+) 后重试"
+                Write-Warn "Node.js 版本仍低于 20，请手动安装最新 LTS (v22+) 后重试"
             }
         }
         catch {
-            Write-Warn "未能检测到 Node.js，请手动安装 v20+ 后重试"
+            Write-Warn "未能检测到 Node.js，请手动安装 v22+ 后重试"
         }
     }
     catch {
-        Write-Warn "Ensure-NodeV20 出错：$($_.Exception.Message)"
+        Write-Warn "Install-NodeV20 出错：$($_.Exception.Message)"
     }
 }
  
@@ -96,20 +97,97 @@ if ($ApiKey -eq "__API_TOKEN__" -or [string]::IsNullOrWhiteSpace($ApiKey)) {
     elseif ($env:ANTHROPIC_API_KEY) { $ApiKey = $env:ANTHROPIC_API_KEY }
 }
 
+# 镜像选择：允许用户选择使用国内/国外源
+function Resolve-MirrorChoice {
+    param([string]$Mirror = "")
+
+    if ([string]::IsNullOrWhiteSpace($Mirror)) {
+        $Mirror = $env:INSTALL_MIRROR
+    }
+    if ([string]::IsNullOrWhiteSpace($Mirror)) {
+        $Mirror = $env:CN_MIRROR
+    }
+    if ([string]::IsNullOrWhiteSpace($Mirror)) {
+        $Mirror = $env:USE_CN_MIRROR
+    }
+
+    $Mirror = ($Mirror + "").ToLower()
+    if ($Mirror -in @('cn', 'china', 'domestic', '1', 'true')) { return 'cn' }
+    if ($Mirror -in @('global', 'intl', 'international', '0', 'false')) { return 'global' }
+
+    # 交互选择
+    try {
+        if ($Host.UI.RawUI.KeyAvailable) {
+            $reply = Read-Host "是否使用国内镜像(更快更稳)? [Y/n]"
+            if ([string]::IsNullOrWhiteSpace($reply) -or $reply -match '^[Yy]$') { return 'cn' }
+            else { return 'global' }
+        }
+    }
+    catch {}
+    return 'cn'
+}
+
+# 配置 npm registry（根据镜像选择）
+function Set-NpmRegistry {
+    param([string]$MirrorChoice = "")
+    try {
+        $npm = Get-Command npm -ErrorAction SilentlyContinue
+        if ($null -eq $npm) { return }
+        if ($MirrorChoice -eq 'cn') {
+            Write-Info "配置 npm registry 到国内源 (npmmirror)"
+            npm config set registry https://registry.npmmirror.com --location=global | Out-Null
+        }
+        else {
+            Write-Info "配置 npm registry 到官方源 (npmjs)"
+            npm config set registry https://registry.npmjs.org --location=global | Out-Null
+        }
+    }
+    catch {}
+}
+
+# 安装 Claude CLI（若未安装）
+function Install-ClaudeCLI {
+    try {
+        $claude = Get-Command claude -ErrorAction SilentlyContinue
+        if ($null -ne $claude) {
+            Write-Info "检测到 Claude CLI: $($claude.Source)"
+            try {
+                $ver = (claude --version) 2>$null
+                Write-Info "Claude CLI 版本: $ver"
+            }
+            catch {}
+            return
+        }
+
+        Write-Info "安装 Claude CLI..."
+        npm install -g @anthropic-ai/claude-code | Out-Null
+        $claude2 = Get-Command claude -ErrorAction SilentlyContinue
+        if ($null -ne $claude2) {
+            Write-Success "Claude CLI 安装成功"
+        }
+        else {
+            Write-Warn "Claude CLI 安装失败，请手动执行：npm i -g @anthropic-ai/claude-code"
+        }
+    }
+    catch {
+        Write-Warn "安装 Claude CLI 失败：$($_.Exception.Message)"
+    }
+}
+
 # 让 Node.js v20 永久生效（将 nvm 自动加载/使用的指令写入用户配置）
-function Persist-NvmUse20 {
+function Set-NvmDefaultNode {
     try {
         $nvmDir = "$HOME/.nvm"
         $nvmScript = Join-Path $nvmDir 'nvm.sh'
         if (-not (Test-Path $nvmScript)) { return }
 
         $block = @'
-# Claude CLI NVM Node.js v20
+# Claude CLI NVM Node.js v22
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 [ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
-nvm alias default 20 >/dev/null 2>&1 || true
-nvm use 20 >/dev/null 2>&1 || true
+nvm alias default 22 >/dev/null 2>&1 || true
+nvm use 22 >/dev/null 2>&1 || true
 '@
 
         $rcFiles = @("$HOME/.bashrc", "$HOME/.profile", "$HOME/.zshrc")
@@ -117,7 +195,7 @@ nvm use 20 >/dev/null 2>&1 || true
             try {
                 if (-not (Test-Path $rc)) { New-Item -ItemType File -Path $rc -Force | Out-Null }
                 $content = Get-Content -Raw -ErrorAction SilentlyContinue -Path $rc
-                if ($content -notmatch 'Claude CLI NVM Node.js v20') {
+                if ($content -notmatch 'Claude CLI NVM Node.js v22') {
                     Add-Content -Path $rc -Value $block
                 }
             }
@@ -155,6 +233,14 @@ Write-Host "  API_KEY: $($ApiKey.Substring(0, [Math]::Min(10, $ApiKey.Length))).
 Write-Host "  BASE_URL: $BaseUrl"
 
 try {
+    # 选择镜像
+    $mirrorChoice = Resolve-MirrorChoice
+    if ($mirrorChoice -eq 'cn') {
+        Write-Info "已选择：使用国内镜像"
+    }
+    else {
+        Write-Info "已选择：使用国外官方源"
+    }
     # 设置当前进程环境变量（立即生效）
     $env:ANTHROPIC_AUTH_TOKEN = $ApiKey
     $env:ANTHROPIC_API_KEY = $ApiKey
@@ -185,9 +271,16 @@ try {
     }
 
     # 先确保 Node.js 20 可用，避免 ReadableStream 报错
-    Ensure-NodeV20
+    # 对于 Windows，无需镜像变量；对于 WSL/Git Bash/nvm，会在 bash 里处理
+    Install-NodeV20
     # 配置 nvm 在新会话自动启用 Node.js v20（若存在）
-    Persist-NvmUse20
+    Set-NvmDefaultNode
+
+    # 配置 npm registry（根据镜像选择）
+    Set-NpmRegistry -MirrorChoice $mirrorChoice
+
+    # 安装 Claude CLI（若未安装）
+    Install-ClaudeCLI
 
     Write-Host ""
     Write-Success "配置完成！请关闭并重新打开 PowerShell 使其在新会话生效。"

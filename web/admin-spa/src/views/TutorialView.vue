@@ -40,7 +40,7 @@
               class="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white sm:mr-3 sm:h-8 sm:w-8 sm:text-sm"
               >1</span
             >
-            第一步、安装 Node.js 环境
+            第一步、安装 Node.js & Git 环境
           </h4>
         </summary>
         <p class="mb-4 text-sm text-gray-600 sm:mb-4 sm:mb-6 sm:text-base">

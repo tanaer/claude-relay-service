@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MuskAPI AI 对话</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .status-bar {
+            background: #34495e;
+            color: white;
+            padding: 0.5rem 1rem;
+            text-align: center;
+            font-size: 12px;
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+
+        .status-connected { background: #2ecc71; }
+        .status-disconnected { background: #e74c3c; }
+        .status-connecting { background: #f39c12; }
+
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+
+        .messages-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            word-wrap: break-word;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        .message.user {
+            background: #007AFF;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.assistant {
+            background: #f1f1f1;
+            color: #333;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message.system {
+            background: #ff6b6b;
+            color: white;
+            align-self: center;
+            font-size: 14px;
+        }
+
+        .message.streaming {
+            border: 2px solid #007AFF;
+            animation: pulse 2s infinite;
+        }
+
+        .message-header {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 4px;
+            opacity: 0.7;
+        }
+
+        .message-content {
+            white-space: pre-wrap;
+            line-height: 1.4;
+        }
+
+        .input-area {
+            padding: 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        .input-area textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 20px;
+            resize: none;
+            font-family: inherit;
+            font-size: 14px;
+            line-height: 1.4;
+            max-height: 120px;
+            min-height: 44px;
+            transition: border-color 0.2s;
+        }
+
+        .input-area textarea:focus {
+            outline: none;
+            border-color: #007AFF;
+        }
+
+        .input-area textarea:disabled {
+            background-color: #f8f9fa;
+            cursor: not-allowed;
+        }
+
+        .send-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 20px;
+            background: #007AFF;
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .send-btn:hover:not(:disabled) {
+            background: #0056cc;
+            transform: translateY(-1px);
+        }
+
+        .send-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 16px;
+            background: white;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .control-btn:hover {
+            background: #f8f9fa;
+            border-color: #007AFF;
+        }
+
+        .model-select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 16px;
+            background: white;
+            font-size: 12px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: #666;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 2px;
+        }
+
+        .typing-dot {
+            width: 4px;
+            height: 4px;
+            background: #666;
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: 0s; }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: scale(1); opacity: 0.5; }
+            30% { transform: scale(1.2); opacity: 1; }
+        }
+
+        @media (max-width: 600px) {
+            .chat-container {
+                height: 100vh;
+                margin: 0;
+                border-radius: 0;
+            }
+            
+            .message {
+                max-width: 90%;
+            }
+            
+            .controls {
+                flex-direction: column;
+                gap: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🤖 MuskAPI AI 对话助手</h1>
+        <p>基于 Claude 的智能对话系统</p>
+    </div>
+
+    <div class="status-bar">
+        <span class="status-dot status-disconnected" id="statusDot"></span>
+        <span id="statusText">正���连接...</span>
+    </div>
+
+    <div class="chat-container">
+        <div class="messages-area" id="messagesArea">
+            <div class="message assistant">
+                <div class="message-header">AI</div>
+                <div class="message-content">你好！我是基于 Claude 的 AI 助手。有什么可以帮助你的吗？</div>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <div class="input-wrapper">
+                <div class="controls">
+                    <button class="control-btn" onclick="clearChat()">🗑️ 清空对话</button>
+                    <button class="control-btn" onclick="exportChat()">📄 导出对话</button>
+                    <button class="control-btn" onclick="checkModels()">🔍 检查模型</button>
+                    <select class="model-select" id="modelSelect">
+                        <option value="claude-opus-4-20250514">Claude Opus 4</option>
+                        <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+                    </select>
+                </div>
+                <textarea 
+                    id="messageInput" 
+                    placeholder="输入你的消息... (Shift+Enter 换行, Enter 发送)"
+                    rows="1"
+                ></textarea>
+            </div>
+            <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                发送
+            </button>
+        </div>
+    </div>
+
+    <script>
+        class MuskAPIChatBot {
+            constructor(apiKey) {
+                // 修正的 API 基础路径（不需要 /api 前缀）
+                this.baseUrl = 'https://muskapi.com'
+                this.apiKey = apiKey
+                this.messages = []
+            }
+
+            async sendMessage(message, options = {}) {
+                const {
+                    stream = true,
+                    model = 'claude-opus-4-20250514',
+                    maxTokens = 2000,
+                    temperature = 0.7
+                } = options
+
+                const messages = [
+                    ...this.messages,
+                    { role: 'user', content: message }
+                ]
+
+                try {
+                    const response = await fetch(`${this.baseUrl}/openai/claude/v1/chat/completions`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${this.apiKey}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            model,
+                            messages,
+                            stream,
+                            max_tokens: maxTokens,
+                            temperature
+                        })
+                    })
+
+                    if (!response.ok) {
+                        const errorText = await response.text()
+                        console.error('API Error Response:', errorText)
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+                    }
+
+                    this.messages.push({ role: 'user', content: message })
+
+                    if (stream) {
+                        return this.handleStreamResponse(response)
+                    } else {
+                        const data = await response.json()
+                        const reply = data.choices[0].message.content
+                        this.messages.push({ role: 'assistant', content: reply })
+                        return reply
+                    }
+                } catch (error) {
+                    console.error('发送消息失败:', error)
+                    throw error
+                }
+            }
+
+            async handleStreamResponse(response) {
+                const reader = response.body.getReader()
+                const decoder = new TextDecoder()
+                let fullResponse = ''
+
+                try {
+                    while (true) {
+                        const { done, value } = await reader.read()
+                        if (done) break
+
+                        const chunk = decoder.decode(value, { stream: true })
+                        const lines = chunk.split('\n')
+
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                const data = line.slice(6)
+                                if (data === '[DONE]') {
+                                    this.messages.push({ role: 'assistant', content: fullResponse })
+                                    return fullResponse
+                                }
+
+                                try {
+                                    const parsed = JSON.parse(data)
+                                    const content = parsed.choices[0]?.delta?.content
+                                    if (content) {
+                                        fullResponse += content
+                                        if (this.onStreamChunk) {
+                                            this.onStreamChunk(content, fullResponse)
+                                        }
+                                    }
+                                } catch (e) {
+                                    // 忽略JSON解析错误
+                                    console.log('Parse error for line:', data)
+                                }
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('流式响应处理错误:', error)
+                    throw error
+                }
+
+                return fullResponse
+            }
+
+            async getModels() {
+                try {
+                    const response = await fetch(`${this.baseUrl}/openai/claude/v1/models`, {
+                        headers: {
+                            'Authorization': `Bearer ${this.apiKey}`
+                        }
+                    })
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+                    }
+
+                    const data = await response.json()
+                    return data.data
+                } catch (error) {
+                    console.error('获取模型列表失败:', error)
+                    throw error
+                }
+            }
+
+            clearHistory() {
+                this.messages = []
+            }
+
+            getHistory() {
+                return [...this.messages]
+            }
+        }
+
+        // 全局变量
+        let chatBot = null
+        let currentStreamingDiv = null
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', async function() {
+            // 使用提供的 API Key
+            const API_KEY = 'cr_ad7c9141f426961bbf8538a83e7a62b0e0930ab3c102ad2c8da9422eb0f8e50a'
+            
+            chatBot = new MuskAPIChatBot(API_KEY)
+            
+            // 测试连接
+            try {
+                updateStatus('connecting', '正在连接到 MuskAPI...')
+                const models = await chatBot.getModels()
+                updateStatus('connected', `已连接 - 可用模型: ${models.length} 个`)
+                console.log('Available models:', models)
+            } catch (error) {
+                updateStatus('disconnected', `连接失败: ${error.message}`)
+                console.error('Connection failed:', error)
+            }
+            
+            // 设置流式回调
+            chatBot.onStreamChunk = (chunk, fullResponse) => {
+                if (currentStreamingDiv) {
+                    const contentDiv = currentStreamingDiv.querySelector('.message-content')
+                    if (contentDiv) {
+                        contentDiv.textContent = fullResponse
+                    }
+                }
+            }
+
+            // 输入框事件
+            const messageInput = document.getElementById('messageInput')
+            messageInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    sendMessage()
+                } else if (e.key === 'Enter' && e.shiftKey) {
+                    // 允许 Shift+Enter 换行
+                    return
+                }
+            })
+
+            // 自动调整输入框高度
+            messageInput.addEventListener('input', function() {
+                this.style.height = 'auto'
+                this.style.height = Math.min(this.scrollHeight, 120) + 'px'
+            })
+        })
+
+        // 更新状态显示
+        function updateStatus(status, message) {
+            const statusDot = document.getElementById('statusDot')
+            const statusText = document.getElementById('statusText')
+            
+            statusDot.className = `status-dot status-${status}`
+            statusText.textContent = message
+        }
+
+        // 发送消息
+        async function sendMessage() {
+            const messageInput = document.getElementById('messageInput')
+            const sendBtn = document.getElementById('sendBtn')
+            const modelSelect = document.getElementById('modelSelect')
+            
+            const message = messageInput.value.trim()
+            if (!message || !chatBot) return
+
+            // 禁用输入
+            messageInput.disabled = true
+            sendBtn.disabled = true
+            sendBtn.textContent = '发送中...'
+
+            // 添加用户消息到界面
+            addMessageToUI('user', message)
+            messageInput.value = ''
+            messageInput.style.height = 'auto'
+
+            // 创建流式响应消息框
+            currentStreamingDiv = addMessageToUI('assistant', '', true)
+
+            try {
+                const selectedModel = modelSelect.value
+                updateStatus('connecting', '正在发送消息...')
+                
+                await chatBot.sendMessage(message, { 
+                    model: selectedModel,
+                    stream: true 
+                })
+                
+                updateStatus('connected', '消息发送完成')
+                
+                // 移除流式样式
+                if (currentStreamingDiv) {
+                    currentStreamingDiv.classList.remove('streaming')
+                    const headerDiv = currentStreamingDiv.querySelector('.message-header')
+                    if (headerDiv) {
+                        headerDiv.textContent = 'AI'
+                    }
+                }
+            } catch (error) {
+                console.error('发送失败:', error)
+                updateStatus('disconnected', `发送失败: ${error.message}`)
+                
+                // 移除流式消息框
+                if (currentStreamingDiv) {
+                    currentStreamingDiv.remove()
+                }
+                
+                // 添加错误消息
+                addMessageToUI('system', `发送失败: ${error.message}`)
+            } finally {
+                // 恢复输入
+                messageInput.disabled = false
+                sendBtn.disabled = false
+                sendBtn.textContent = '发送'
+                messageInput.focus()
+                currentStreamingDiv = null
+            }
+        }
+
+        // 添加消息到界面
+        function addMessageToUI(role, content, isStreaming = false) {
+            const messagesArea = document.getElementById('messagesArea')
+            
+            const messageDiv = document.createElement('div')
+            messageDiv.className = `message ${role} ${isStreaming ? 'streaming' : ''}`
+            
+            let headerText = role === 'user' ? '你' : role === 'assistant' ? 'AI' : '系统'
+            if (isStreaming) {
+                headerText += ' (正在输入...)'
+            }
+            
+            messageDiv.innerHTML = `
+                <div class="message-header">${headerText}</div>
+                <div class="message-content">${content}</div>
+            `
+            
+            messagesArea.appendChild(messageDiv)
+            messagesArea.scrollTop = messagesArea.scrollHeight
+            
+            return messageDiv
+        }
+
+        // 清空对话
+        function clearChat() {
+            if (confirm('确定要清空所有对话吗？')) {
+                if (chatBot) {
+                    chatBot.clearHistory()
+                }
+                
+                const messagesArea = document.getElementById('messagesArea')
+                messagesArea.innerHTML = `
+                    <div class="message assistant">
+                        <div class="message-header">AI</div>
+                        <div class="message-content">对话已清空。有什么可以帮助你的吗？</div>
+                    </div>
+                `
+            }
+        }
+
+        // 导出对话
+        function exportChat() {
+            if (!chatBot) return
+            
+            const history = chatBot.getHistory()
+            if (history.length === 0) {
+                alert('暂无对话记录')
+                return
+            }
+            
+            let exportText = `MuskAPI AI 对话记录\n生成时间: ${new Date().toLocaleString()}\n\n`
+            
+            history.forEach((msg, index) => {
+                const role = msg.role === 'user' ? '用户' : msg.role === 'assistant' ? 'AI' : '系统'
+                exportText += `${index + 1}. ${role}:\n${msg.content}\n\n`
+            })
+            
+            // 创建下载
+            const blob = new Blob([exportText], { type: 'text/plain;charset=utf-8' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `AI对话记录_${new Date().toISOString().slice(0, 10)}.txt`
+            a.click()
+            URL.revokeObjectURL(url)
+        }
+
+        // 检查模型
+        async function checkModels() {
+            if (!chatBot) return
+            
+            try {
+                updateStatus('connecting', '正在获取模型列表...')
+                const models = await chatBot.getModels()
+                
+                let modelInfo = '可用模型:\n'
+                models.forEach(model => {
+                    modelInfo += `• ${model.id} (${model.owned_by})\n`
+                })
+                
+                alert(modelInfo)
+                updateStatus('connected', `模型检查完成 - ${models.length} 个可用`)
+            } catch (error) {
+                alert(`获取模型列表失败: ${error.message}`)
+                updateStatus('disconnected', `模型检查失败: ${error.message}`)
+            }
+        }
+    </script>
+</body>
+</html>

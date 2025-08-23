@@ -42,6 +42,8 @@ const tabRouteMap = {
   apiKeys: '/api-keys',
   accounts: '/accounts',
   'redemption-codes': '/redemption-codes',
+  'card-types': '/card-types',
+  'card-type-migration': '/card-type-migration',
   'rate-templates': '/rate-templates',
   'smart-rate-limit': '/smart-rate-limit',
   'policy-monitoring': '/policy-monitoring',

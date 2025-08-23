@@ -433,6 +433,15 @@ class Application {
         }
       })
 
+      // 🔗 卡类型系统集成中间件
+      const cardTypeIntegration = require('./middleware/cardTypeIntegration')
+
+      // 为管理员API应用卡类型集成
+      this.app.use('/admin', cardTypeIntegration.preprocessCardTypeRequests)
+      this.app.use('/admin', cardTypeIntegration.forAll())
+
+      logger.info('✅ 卡类型系统集成中间件已加载')
+
       // 🛣️ 路由
       this.app.use('/api', apiRoutes)
       this.app.use('/claude', apiRoutes) // /claude 路由别名，与 /api 功能相同

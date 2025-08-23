@@ -554,6 +554,31 @@ class RateTemplateService {
             }
           }
 
+          // 检查API Key是否来自卡类型兑换（新增：卡类型倍率查找）
+          if (!templateId && apiKeyData?.cardTypeId) {
+            const cardTypeService = require('./cardTypeService')
+            const cardType = await cardTypeService.getCardType(apiKeyData.cardTypeId)
+
+            if (cardType) {
+              // 如果卡类型有自定义倍率，直接使用
+              if (cardType.customRates && Object.keys(cardType.customRates).length > 0) {
+                logger.info(
+                  `🔍 API Key ${entityId} using card type custom rates: ${JSON.stringify(cardType.customRates)}`
+                )
+                return cardType.customRates
+              }
+
+              // 否则使用卡类型关联的模版
+              templateId = cardType.rateTemplateId
+              searchPath.push(`Card type ${apiKeyData.cardTypeId}: ${templateId || 'null'}`)
+              logger.info(
+                `🔍 API Key bound to card type ${apiKeyData.cardTypeId}: rateTemplateId=${templateId || 'null'}`
+              )
+            } else {
+              searchPath.push(`Card type ${apiKeyData.cardTypeId}: not found`)
+            }
+          }
+
           // 如果API Key没有绑定任何账户，默认使用共享账户池的倍率模板
           if (
             !templateId &&
@@ -638,6 +663,26 @@ class RateTemplateService {
         // 直接获取系统分组的倍率模板
         templateId = await this.getSystemGroupRateTemplate(entityId)
         searchPath.push(`System group direct: ${templateId || 'null'}`)
+      } else if (entityType === 'card_type') {
+        // 新增：卡类型倍率查找支持
+        const cardTypeService = require('./cardTypeService')
+        const cardType = await cardTypeService.getCardType(entityId)
+
+        if (cardType) {
+          // 优先使用卡类型的关联模版
+          templateId = cardType.rateTemplateId
+          searchPath.push(`Card type template: ${templateId || 'null'}`)
+
+          // 如果卡类型有自定义倍率，直接返回自定义倍率
+          if (cardType.customRates && Object.keys(cardType.customRates).length > 0) {
+            logger.info(
+              `🔍 Card type ${entityId} using custom rates: ${JSON.stringify(cardType.customRates)}`
+            )
+            return cardType.customRates
+          }
+        } else {
+          searchPath.push(`Card type not found`)
+        }
       }
 
       logger.info(
@@ -784,6 +829,224 @@ class RateTemplateService {
         groupsWithTemplates: 0,
         totalApiKeys: 0,
         totalGroups: 0
+      }
+    }
+  }
+
+  // ==================== 卡类型倍率支持方法 ====================
+
+  /**
+   * 获取卡类型的有效倍率（自定义倍率优先，然后是关联模版）
+   * @param {string} cardTypeId - 卡类型ID
+   * @returns {Promise<Object>} 倍率配置
+   */
+  async getCardTypeRates(cardTypeId) {
+    try {
+      return await this.getRatesForEntity(cardTypeId, 'card_type')
+    } catch (error) {
+      logger.error(`❌ Failed to get card type rates for ${cardTypeId}:`, error)
+      return {}
+    }
+  }
+
+  /**
+   * 为卡类型推荐适合的计费模版
+   * @param {Object} cardType - 卡类型数据
+   * @returns {Promise<Array>} 推荐的模版列表
+   */
+  async recommendTemplatesForCardType(cardType) {
+    try {
+      const templates = await this.getTemplates()
+      const recommendations = []
+
+      // 基于卡类型分类推荐模版
+      const categoryKeywords = {
+        daily: ['daily', 'day', '日', '天'],
+        monthly: ['monthly', 'month', '月'],
+        unlimited: ['unlimited', 'premium', '不限', '无限']
+      }
+
+      const keywords = categoryKeywords[cardType.category] || []
+
+      for (const template of templates) {
+        let score = 0
+
+        // 名称匹配
+        const templateName = template.name.toLowerCase()
+        for (const keyword of keywords) {
+          if (templateName.includes(keyword.toLowerCase())) {
+            score += 10
+          }
+        }
+
+        // 描述匹配
+        if (template.description) {
+          const templateDesc = template.description.toLowerCase()
+          for (const keyword of keywords) {
+            if (templateDesc.includes(keyword.toLowerCase())) {
+              score += 5
+            }
+          }
+        }
+
+        // 如果是默认模版，额外加分
+        if (template.isDefault) {
+          score += 3
+        }
+
+        if (score > 0) {
+          recommendations.push({
+            template,
+            score,
+            reason: `匹配${cardType.category}类型，评分: ${score}`
+          })
+        }
+      }
+
+      // 按评分排序
+      recommendations.sort((a, b) => b.score - a.score)
+
+      // 如果没有匹配的推荐，返回默认模版
+      if (recommendations.length === 0) {
+        const defaultTemplate = await this.getDefaultTemplate()
+        if (defaultTemplate) {
+          recommendations.push({
+            template: defaultTemplate,
+            score: 1,
+            reason: '默认模版'
+          })
+        }
+      }
+
+      return recommendations
+    } catch (error) {
+      logger.error('❌ Failed to recommend templates for card type:', error)
+      return []
+    }
+  }
+
+  /**
+   * 批量更新使用指定模版的卡类型
+   * @param {string} templateId - 模版ID
+   * @param {Object} updates - 更新数据
+   * @returns {Promise<Object>} 更新结果
+   */
+  async updateCardTypesUsingTemplate(templateId, updates) {
+    try {
+      const cardTypeService = require('./cardTypeService')
+      const client = redis.getClientSafe()
+
+      // 查找使用该模版的卡类型
+      const cardTypeIds = await client.smembers(`card_types:template:${templateId}`)
+      const results = { updated: [], failed: [] }
+
+      for (const cardTypeId of cardTypeIds) {
+        try {
+          const result = await cardTypeService.updateCardType(cardTypeId, updates)
+          if (result.success) {
+            results.updated.push(cardTypeId)
+          } else {
+            results.failed.push({ cardTypeId, error: result.error })
+          }
+        } catch (error) {
+          results.failed.push({ cardTypeId, error: error.message })
+        }
+      }
+
+      logger.info(
+        `✅ Batch updated card types using template ${templateId}: ${results.updated.length} updated, ${results.failed.length} failed`
+      )
+
+      return {
+        success: true,
+        results
+      }
+    } catch (error) {
+      logger.error(`❌ Failed to batch update card types using template ${templateId}:`, error)
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  }
+
+  /**
+   * 获取模版使用统计（包括卡类型）
+   * @param {string} templateId - 模版ID
+   * @returns {Promise<Object>} 使用统计
+   */
+  async getTemplateUsageStats(templateId) {
+    try {
+      const client = redis.getClientSafe()
+
+      // 统计各种实体的使用情况
+      const stats = {
+        templateId,
+        cardTypes: 0,
+        apiKeys: 0,
+        accountGroups: 0,
+        claudeAccounts: 0,
+        geminiAccounts: 0
+      }
+
+      // 统计卡类型使用
+      const cardTypeIds = await client.smembers(`card_types:template:${templateId}`)
+      stats.cardTypes = cardTypeIds.length
+
+      // 统计API Key使用
+      const apiKeys = await client.keys('api_key:*')
+      for (const keyPath of apiKeys) {
+        const data = await client.hgetall(keyPath)
+        if (data.rateTemplateId === templateId) {
+          stats.apiKeys++
+        }
+      }
+
+      // 统计账户分组使用
+      const accountGroups = await client.keys('account_group:*')
+      for (const groupPath of accountGroups) {
+        const data = await client.hgetall(groupPath)
+        if (data.rateTemplateId === templateId) {
+          stats.accountGroups++
+        }
+      }
+
+      // 统计Claude账户使用
+      const claudeAccounts = await client.keys('claude_account:*')
+      for (const accountPath of claudeAccounts) {
+        const data = await client.hgetall(accountPath)
+        if (data.rateTemplateId === templateId) {
+          stats.claudeAccounts++
+        }
+      }
+
+      // 统计Gemini账户使用
+      const geminiAccounts = await client.keys('gemini_account:*')
+      for (const accountPath of geminiAccounts) {
+        const data = await client.hgetall(accountPath)
+        if (data.rateTemplateId === templateId) {
+          stats.geminiAccounts++
+        }
+      }
+
+      stats.total =
+        stats.cardTypes +
+        stats.apiKeys +
+        stats.accountGroups +
+        stats.claudeAccounts +
+        stats.geminiAccounts
+
+      return stats
+    } catch (error) {
+      logger.error(`❌ Failed to get template usage stats for ${templateId}:`, error)
+      return {
+        templateId,
+        cardTypes: 0,
+        apiKeys: 0,
+        accountGroups: 0,
+        claudeAccounts: 0,
+        geminiAccounts: 0,
+        total: 0
       }
     }
   }

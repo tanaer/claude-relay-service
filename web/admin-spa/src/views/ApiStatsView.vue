@@ -556,7 +556,7 @@ const getPackageTokenDisplay = (packageName) => {
   }
 
   if (targetPackage) {
-    return targetPackage.defaultFormattedDaily + ' Tokens'
+    return targetPackage.defaultFormattedDaily // 后端已经包含 " Tokens" 后缀
   }
 
   return ''

@@ -44,25 +44,25 @@ export const pricingService = {
       tokens = parseInt(tokens) || 0
     }
 
-    if (tokens === 0) return '0'
+    if (tokens === 0) return '0 Tokens'
 
     // 大数字使用简化格式，与后端保持一致
     if (tokens >= 100000000) {
       // 1亿以上
-      return Math.floor(tokens / 10000000) + '千万'
+      return Math.floor(tokens / 10000000) + '千万 Tokens'
     } else if (tokens >= 10000000) {
       // 1千万以上
-      return Math.floor(tokens / 10000000) + '千万'
+      return Math.floor(tokens / 10000000) + '千万 Tokens'
     } else if (tokens >= 1000000) {
       // 百万以上
-      return Math.floor(tokens / 1000000) + '百万'
+      return Math.floor(tokens / 1000000) + '百万 Tokens'
     } else if (tokens >= 10000) {
       // 万以上
-      return Math.floor(tokens / 10000) + '万'
+      return Math.floor(tokens / 10000) + '万 Tokens'
     } else if (tokens >= 1000) {
-      return (tokens / 1000).toFixed(1) + 'K'
+      return (tokens / 1000).toFixed(1) + 'K Tokens'
     } else {
-      return tokens.toLocaleString()
+      return tokens.toLocaleString() + ' Tokens'
     }
   },
 

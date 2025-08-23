@@ -27,6 +27,10 @@ const path = require('path')
 const config = require('../../config/config')
 const { v4: uuidv4 } = require('uuid')
 
+// 导入卡类型相关路由
+const cardTypeRoutes = require('./cardTypeRoutes')
+const cardTypeMigrationRoutes = require('./cardTypeMigrationRoutes')
+
 const router = express.Router()
 // ================ 上游错误聚合与自定义文案 ================
 
@@ -5831,5 +5835,13 @@ router.post('/redemption-policies/toggle-scheduler', authenticateAdmin, async (r
     })
   }
 })
+
+// ==================== 卡类型管理路由 ====================
+
+// 挂载卡类型迁移路由（更具体的路径要放在前面）
+router.use('/card-types/migration', cardTypeMigrationRoutes)
+
+// 挂载卡类型管理路由
+router.use('/card-types', cardTypeRoutes)
 
 module.exports = router

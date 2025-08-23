@@ -47,6 +47,13 @@ const tabs = [
   { key: 'apiKeys', name: 'API Keys', shortName: 'API', icon: 'fas fa-key' },
   { key: 'accounts', name: '账户管理', shortName: '账户', icon: 'fas fa-user-circle' },
   { key: 'redemption-codes', name: '兑换码', shortName: '兑换码', icon: 'fas fa-ticket-alt' },
+  { key: 'card-types', name: '卡类型管理', shortName: '卡类型', icon: 'fas fa-credit-card' },
+  {
+    key: 'card-type-migration',
+    name: '卡类型迁移',
+    shortName: '迁移',
+    icon: 'fas fa-exchange-alt'
+  },
   { key: 'rate-templates', name: '计费倍率', shortName: '倍率', icon: 'fas fa-percentage' },
   { key: 'smart-rate-limit', name: '智能限流', shortName: '限流', icon: 'fas fa-brain' },
   { key: 'policy-monitoring', name: '策略监控', shortName: '策略', icon: 'fas fa-chart-line' },

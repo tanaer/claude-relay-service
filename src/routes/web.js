@@ -28,6 +28,54 @@ function sanitizeRedemptionCode(raw) {
 // 🏠 服务静态文件
 router.use('/assets', express.static(path.join(__dirname, '../../web/assets')))
 
+// 📦 一键安装脚本下载（PowerShell）
+router.get('/install.ps1', (req, res) => {
+  try {
+    const scriptPath = path.join(__dirname, '../../resources/scripts/install.ps1')
+    if (!fs.existsSync(scriptPath)) {
+      return res.status(404).send('install.ps1 not found')
+    }
+
+    let content = fs.readFileSync(scriptPath, 'utf8')
+    const apiKey = req.query.apiKey || ''
+    const baseUrl = `${req.protocol}://${req.get('host')}/api`
+
+    // 注入占位符
+    content = content.replace(/__API_TOKEN__/g, apiKey).replace(/__BASE_URL__/g, baseUrl)
+
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+    res.setHeader('Content-Disposition', 'attachment; filename="install.ps1"')
+    return res.send(content)
+  } catch (e) {
+    logger.error('❌ Failed to serve install.ps1:', e)
+    return res.status(500).send('Internal Server Error')
+  }
+})
+
+// 🐧 一键安装脚本下载（bash）
+router.get('/install.sh', (req, res) => {
+  try {
+    const scriptPath = path.join(__dirname, '../../resources/scripts/install.sh')
+    if (!fs.existsSync(scriptPath)) {
+      return res.status(404).send('install.sh not found')
+    }
+
+    let content = fs.readFileSync(scriptPath, 'utf8')
+    const _apiKey = req.query.apiKey || ''
+    const baseUrl = `${req.protocol}://${req.get('host')}/api/`
+
+    // 简单注入：替换默认的 API 基础地址；API Key 仅通过环境变量/交互提供
+    content = content.replace(/https:\/\/ccapi\.muskapi\.com\/api\//g, baseUrl)
+
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+    res.setHeader('Content-Disposition', 'attachment; filename="install.sh"')
+    return res.send(content)
+  } catch (e) {
+    logger.error('❌ Failed to serve install.sh:', e)
+    return res.status(500).send('Internal Server Error')
+  }
+})
+
 // 🌐 页面路由重定向到新版 admin-spa
 router.get('/', (req, res) => {
   res.redirect(301, '/admin-next/api-stats')

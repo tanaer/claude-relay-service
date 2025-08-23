@@ -66,3 +66,13 @@ export function showToast(message, type = 'info', title = '', duration = 3000) {
 
   return id
 }
+
+// Vue 3 Composition API hook
+export function useToast() {
+  return {
+    success: (message, title, duration) => showToast(message, 'success', title, duration),
+    error: (message, title, duration) => showToast(message, 'error', title, duration),
+    warning: (message, title, duration) => showToast(message, 'warning', title, duration),
+    info: (message, title, duration) => showToast(message, 'info', title, duration)
+  }
+}

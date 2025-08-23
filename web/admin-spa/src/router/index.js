@@ -17,6 +17,8 @@ const RateTemplatesView = () => import('@/views/RateTemplates.vue')
 const PolicyMonitoringView = () => import('@/views/PolicyMonitoringView.vue')
 const SmartRateLimitView = () => import('@/views/SmartRateLimitView.vue')
 const UpstreamErrorsView = () => import('@/views/UpstreamErrorsView.vue')
+const CardTypesView = () => import('@/views/CardTypesView.vue')
+const CardTypeMigrationView = () => import('@/views/CardTypeMigrationView.vue')
 
 const routes = [
   {
@@ -167,6 +169,30 @@ const routes = [
         path: '',
         name: 'UpstreamErrors',
         component: UpstreamErrorsView
+      }
+    ]
+  },
+  {
+    path: '/card-types',
+    component: MainLayout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'CardTypes',
+        component: CardTypesView
+      }
+    ]
+  },
+  {
+    path: '/card-type-migration',
+    component: MainLayout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'CardTypeMigration',
+        component: CardTypeMigrationView
       }
     ]
   },

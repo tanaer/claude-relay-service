@@ -646,6 +646,35 @@ class ApiKeyService {
       .digest('hex')
   }
 
+  // 🔐 加密API Key用于管理员查看
+  _encryptApiKey(apiKey) {
+    const algorithm = 'aes-256-cbc'
+    const iv = crypto.randomBytes(16)
+    const key = crypto.scryptSync(config.security.encryptionKey, 'salt', 32)
+    const cipher = crypto.createCipheriv(algorithm, key, iv)
+    let encrypted = cipher.update(apiKey, 'utf8', 'hex')
+    encrypted += cipher.final('hex')
+    return `${iv.toString('hex')}:${encrypted}`
+  }
+
+  // 🔓 解密API Key（供管理员查看）
+  _decryptApiKey(encryptedApiKey) {
+    try {
+      const algorithm = 'aes-256-cbc'
+      const textParts = encryptedApiKey.split(':')
+      const iv = Buffer.from(textParts.shift(), 'hex')
+      const encryptedText = textParts.join(':')
+      const key = crypto.scryptSync(config.security.encryptionKey, 'salt', 32)
+      const decipher = crypto.createDecipheriv(algorithm, key, iv)
+      let decrypted = decipher.update(encryptedText, 'hex', 'utf8')
+      decrypted += decipher.final('utf8')
+      return decrypted
+    } catch (error) {
+      logger.error('❌ Failed to decrypt API key:', error)
+      return null
+    }
+  }
+
   // 📈 获取使用统计
   async getUsageStats(keyId) {
     return await redis.getUsageStats(keyId)

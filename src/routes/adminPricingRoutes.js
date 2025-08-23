@@ -21,16 +21,16 @@ router.get('/packages', authenticateAdmin, async (req, res) => {
         name: '月卡',
         type: 'M',
         duration: 30, // 天
-        priceUsd: 2100, // 美元 ($70/天 × 30天)
-        description: '有效期30天，每日$80限制，共$2400基于$1=100万TOKENS计算'
+        priceUsd: 2400, // 美元 ($80/天 × 30天 = $2400)
+        description: '有效期30天，每日8000万tokens限制，基于$1=100万TOKENS计算'
       },
       {
         id: 'daily',
         name: '日卡',
         type: 'D',
         duration: 1, // 天
-        priceUsd: 10, // 美元 (用户最新要求)
-        description: '有效期1天，每日用量限制基于$1=100万TOKENS计算'
+        priceUsd: 15, // 美元 ($15 = 1500万tokens)
+        description: '有效期1天，1500万tokens限制，基于$1=100万TOKENS计算'
       }
     ]
 
@@ -189,26 +189,26 @@ function formatTokenCount(tokens) {
   }
 
   if (tokens === 0) {
-    return '0'
+    return '0 Tokens'
   }
 
   // 大数字使用简化格式
   if (tokens >= 100000000) {
     // 1亿以上
-    return `${Math.floor(tokens / 10000000)}千万`
+    return `${Math.floor(tokens / 10000000)}千万 Tokens`
   } else if (tokens >= 10000000) {
     // 1千万以上
-    return `${Math.floor(tokens / 10000000)}千万`
+    return `${Math.floor(tokens / 10000000)}千万 Tokens`
   } else if (tokens >= 1000000) {
     // 百万以上
-    return `${Math.floor(tokens / 1000000)}百万`
+    return `${Math.floor(tokens / 1000000)}百万 Tokens`
   } else if (tokens >= 10000) {
     // 万以上
-    return `${Math.floor(tokens / 10000)}万`
+    return `${Math.floor(tokens / 10000)}万 Tokens`
   } else if (tokens >= 1000) {
-    return `${(tokens / 1000).toFixed(1)}K`
+    return `${(tokens / 1000).toFixed(1)}K Tokens`
   } else {
-    return tokens.toLocaleString()
+    return `${tokens.toLocaleString()} Tokens`
   }
 }
 

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "redis": {
+      "command": "node",
+      "args": [
+        "node_modules/@modelcontextprotocol/server-redis/dist/index.js",
+        "redis://:qq123456.@101.36.120.191:6666/0"
+      ]
+    }
+  }
+}

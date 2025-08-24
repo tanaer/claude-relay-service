@@ -49,10 +49,10 @@ router.get('/v1/models', authenticateApiKey, async (req, res) => {
       })
     }
 
-    // Claude 模型列表 - 只返回 opus-4 和 sonnet-4
+    // Claude 模型列表 - 只返回 opus-4.1 和 sonnet-4
     let models = [
       {
-        id: 'claude-opus-4-20250514',
+        id: 'claude-opus-4-1-20250805',
         object: 'model',
         created: 1736726400, // 2025-01-13
         owned_by: 'anthropic'

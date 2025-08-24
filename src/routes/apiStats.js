@@ -478,35 +478,26 @@ router.post('/api/user-model-stats', async (req, res) => {
       const data = await client.hgetall(key)
 
       if (data && Object.keys(data).length > 0) {
-        const usage = {
-          input_tokens: parseInt(data.inputTokens) || 0,
-          output_tokens: parseInt(data.outputTokens) || 0,
-          cache_creation_input_tokens: parseInt(data.cacheCreateTokens) || 0,
-          cache_read_input_tokens: parseInt(data.cacheReadTokens) || 0
-        }
+        // const usage = {
+        //   input_tokens: parseInt(data.inputTokens) || 0,
+        //   output_tokens: parseInt(data.outputTokens) || 0,
+        //   cache_creation_input_tokens: parseInt(data.cacheCreateTokens) || 0,
+        //   cache_read_input_tokens: parseInt(data.cacheReadTokens) || 0
+        // }
 
-        // 优先使用已记录的实际费用（已应用计费倍率）
-        const actualCost = parseFloat(data.actualCost) || 0
-        const costData =
-          actualCost > 0
-            ? {
-                costs: { total: actualCost },
-                formatted: { total: `$${actualCost.toFixed(6)}` },
-                pricing: null
-              }
-            : CostCalculator.calculateCost(usage, model)
+        // 费用相关代码已移除，改为只使用 Tokens 统计
 
         modelStats.push({
           model,
           requests: parseInt(data.requests) || 0,
-          inputTokens: usage.input_tokens,
-          outputTokens: usage.output_tokens,
-          cacheCreateTokens: usage.cache_creation_input_tokens,
-          cacheReadTokens: usage.cache_read_input_tokens,
-          allTokens: parseInt(data.allTokens) || 0,
-          costs: costData.costs,
-          formatted: costData.formatted,
-          pricing: costData.pricing
+          // inputTokens: usage.input_tokens,
+          // outputTokens: usage.output_tokens,
+          // cacheCreateTokens: usage.cache_creation_input_tokens,
+          // cacheReadTokens: usage.cache_read_input_tokens,
+          allTokens: parseInt(data.allTokens) || 0
+          // costs: costData.costs,
+          // formatted: costData.formatted,
+          // pricing: costData.pricing
         })
       }
     }

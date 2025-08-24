@@ -690,7 +690,6 @@ function createUsageTrendChart() {
   const cacheCreateData = data.map((d) => d.cacheCreateTokens || 0)
   const cacheReadData = data.map((d) => d.cacheReadTokens || 0)
   const requestsData = data.map((d) => d.requests || 0)
-  const costData = data.map((d) => d.cost || 0)
 
   // 根据数据类型确定标签字段和格式
   const labelField = data[0]?.date ? 'date' : 'hour'
@@ -749,14 +748,6 @@ function createUsageTrendChart() {
         borderColor: 'rgb(147, 51, 234)',
         backgroundColor: 'rgba(147, 51, 234, 0.1)',
         tension: 0.3
-      },
-      {
-        label: '费用 (USD)',
-        data: costData,
-        borderColor: 'rgb(34, 197, 94)',
-        backgroundColor: 'rgba(34, 197, 94, 0.1)',
-        tension: 0.3,
-        yAxisID: 'y2'
       },
       {
         label: '请求数',
@@ -877,11 +868,6 @@ function createUsageTrendChart() {
               return value.toLocaleString()
             }
           }
-        },
-        y2: {
-          type: 'linear',
-          display: false, // 隐藏费用轴，在tooltip中显示
-          position: 'right'
         }
       }
     }

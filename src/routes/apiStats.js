@@ -489,12 +489,12 @@ router.post('/api/user-model-stats', async (req, res) => {
 
         modelStats.push({
           model,
-          requests: parseInt(data.requests) || 0,
+          requests: parseInt(data.requests) || 0
           // inputTokens: usage.input_tokens,
           // outputTokens: usage.output_tokens,
           // cacheCreateTokens: usage.cache_creation_input_tokens,
           // cacheReadTokens: usage.cache_read_input_tokens,
-          allTokens: parseInt(data.allTokens) || 0
+          // allTokens: parseInt(data.allTokens) || 0
           // costs: costData.costs,
           // formatted: costData.formatted,
           // pricing: costData.pricing

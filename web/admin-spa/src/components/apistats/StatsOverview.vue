@@ -71,25 +71,22 @@
       <div class="space-y-4">
         <!-- 进度条 -->
         <div class="relative">
-          <!-- <div class="mb-2 flex items-center justify-between">
-            <span class="text-sm text-gray-600">Tokens使用量</span>
-            <span class="text-sm font-medium text-gray-900">
-              {{ formatTokenDisplay(getCurrentDayTokens()) }} /
-              {{ formatTokenDisplay(getDailyTokensLimit()) }}
-            </span>
-          </div> -->
+          <div class="mb-2 flex items-center justify-between">
+            <span class="text-sm text-gray-600">用量使用情况</span>
+            <span class="text-sm font-medium text-gray-900"> {{ usageProgress.toFixed(1) }}% </span>
+          </div>
 
           <div class="h-3 w-full overflow-hidden rounded-full bg-gray-200">
             <div
               class="h-full rounded-full transition-all duration-500 ease-out"
-              :class="getProgressBarClass(tokensProgress)"
-              :style="{ width: tokensProgress + '%' }"
+              :class="getProgressBarClass(usageProgress)"
+              :style="{ width: usageProgress + '%' }"
             ></div>
           </div>
 
           <div class="mt-2 flex items-center justify-between text-xs text-gray-500">
-            <span>{{ tokensProgress.toFixed(1) }}%</span>
-            <span> 最大: {{ formatTokenDisplay(getDailyTokensLimit()) }} </span>
+            <span>{{ usageProgress.toFixed(1) }}%</span>
+            <span> 最大: {{ formatTokenDisplay(getDailyTokensLimit()) }}</span>
           </div>
         </div>
       </div>
@@ -105,10 +102,16 @@ import { computed } from 'vue'
 const apiStatsStore = useApiStatsStore()
 const { statsData } = storeToRefs(apiStatsStore)
 
-// 获取API Key的今日Token使用量
-const getCurrentDayTokens = () => {
-  return parseInt(statsData.value?.usage?.daily?.tokens || 0)
-}
+// 使用接口返回的currentDailyCost/dailyCostLimit计算使用进度百分比
+const usageProgress = computed(() => {
+  const currentCost = parseFloat(statsData.value?.limits?.currentDailyCost || 0)
+  const costLimit = parseFloat(statsData.value?.limits?.dailyCostLimit || 0)
+
+  if (costLimit === 0) return 0
+
+  const progress = (currentCost / costLimit) * 100
+  return Math.min(progress, 100) // 限制最大100%
+})
 
 // 获取每日Tokens限制
 const getDailyTokensLimit = () => {
@@ -120,17 +123,6 @@ const getDailyTokensLimit = () => {
   }
   return 0
 }
-
-// 计算Tokens使用进度百分比
-const tokensProgress = computed(() => {
-  const todayTokens = getCurrentDayTokens()
-  const tokensLimit = getDailyTokensLimit()
-
-  if (tokensLimit === 0) return 0
-
-  const progress = (todayTokens / tokensLimit) * 100
-  return Math.min(progress, 100) // 限制最大100%
-})
 
 // 根据进度获取进度条颜色
 const getProgressBarClass = (progress) => {

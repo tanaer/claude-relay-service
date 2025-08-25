@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Claude Code - AI编程助手</title>
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --secondary-color: #8b5cf6;
+            --background-light: #f8fafc;
+            --background-dark: #0f172a;
+            --text-light: #1e293b;
+            --text-dark: #f1f5f9;
+            --border-light: #e2e8f0;
+            --border-dark: #334155;
+            --sidebar-width: 280px;
+            --header-height: 60px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--background-light);
+            color: var(--text-light);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        body.dark {
+            background: var(--background-dark);
+            color: var(--text-dark);
+        }
+
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* 侧边栏 */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: white;
+            border-right: 1px solid var(--border-light);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease;
+        }
+
+        body.dark .sidebar {
+            background: #1e293b;
+            border-color: var(--border-dark);
+        }
+
+        .sidebar-header {
+            height: var(--header-height);
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        body.dark .sidebar-header {
+            border-color: var(--border-dark);
+        }
+
+        .logo {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        .new-chat-btn {
+            padding: 8px 16px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .new-chat-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .chat-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .chat-item {
+            padding: 12px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 4px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            group: hover;
+        }
+
+        .chat-item:hover {
+            background: var(--background-light);
+        }
+
+        body.dark .chat-item:hover {
+            background: #334155;
+        }
+
+        .chat-item.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .chat-title {
+            font-size: 14px;
+            font-weight: 500;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+        }
+
+        .chat-actions {
+            display: none;
+            gap: 4px;
+        }
+
+        .chat-item:hover .chat-actions {
+            display: flex;
+        }
+
+        .chat-action-btn {
+            padding: 4px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+            color: inherit;
+            opacity: 0.7;
+        }
+
+        .chat-action-btn:hover {
+            opacity: 1;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* 主要内容区域 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: white;
+        }
+
+        body.dark .main-content {
+            background: #0f172a;
+        }
+
+        /* 头部工具栏 */
+        .toolbar {
+            height: var(--header-height);
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            justify-content: between;
+            border-bottom: 1px solid var(--border-light);
+            gap: 16px;
+        }
+
+        body.dark .toolbar {
+            border-color: var(--border-dark);
+        }
+
+        .model-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .model-select {
+            padding: 6px 12px;
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            background: white;
+            color: var(--text-light);
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        body.dark .model-select {
+            background: #1e293b;
+            border-color: var(--border-dark);
+            color: var(--text-dark);
+        }
+
+        .toolbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-left: auto;
+        }
+
+        .tool-btn {
+            padding: 6px 12px;
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-light);
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        body.dark .tool-btn {
+            border-color: var(--border-dark);
+            color: var(--text-dark);
+        }
+
+        .tool-btn:hover {
+            background: var(--background-light);
+        }
+
+        body.dark .tool-btn:hover {
+            background: #334155;
+        }
+
+        .theme-toggle {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+        }
+
+        /* 消息区域 */
+        .messages-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .message {
+            display: flex;
+            gap: 12px;
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .message.user .message-avatar {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .message.assistant .message-avatar {
+            background: var(--secondary-color);
+            color: white;
+        }
+
+        .message.system .message-avatar {
+            background: #ef4444;
+            color: white;
+        }
+
+        .message-content {
+            flex: 1;
+            padding: 12px 16px;
+            border-radius: 12px;
+            position: relative;
+        }
+
+        .message.user .message-content {
+            background: var(--primary-color);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.assistant .message-content {
+            background: var(--background-light);
+            border: 1px solid var(--border-light);
+            border-bottom-left-radius: 4px;
+        }
+
+        body.dark .message.assistant .message-content {
+            background: #1e293b;
+            border-color: var(--border-dark);
+        }
+
+        .message.system .message-content {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            text-align: center;
+        }
+
+        body.dark .message.system .message-content {
+            background: #431e1e;
+            border-color: #7f1d1d;
+            color: #f87171;
+        }
+
+        .message-text {
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .message-actions {
+            margin-top: 8px;
+            display: flex;
+            gap: 8px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .message:hover .message-actions {
+            opacity: 1;
+        }
+
+        .message-action-btn {
+            padding: 4px 8px;
+            font-size: 12px;
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            background: white;
+            color: var(--text-light);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        body.dark .message-action-btn {
+            background: #334155;
+            border-color: var(--border-dark);
+            color: var(--text-dark);
+        }
+
+        .message-action-btn:hover {
+            background: var(--background-light);
+        }
+
+        body.dark .message-action-btn:hover {
+            background: #475569;
+        }
+
+        /* 输入区域 */
+        .input-area {
+            padding: 20px;
+            border-top: 1px solid var(--border-light);
+        }
+
+        body.dark .input-area {
+            border-color: var(--border-dark);
+        }
+
+        .input-container {
+            max-width: 800px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .input-wrapper {
+            display: flex;
+            align-items: flex-end;
+            gap: 12px;
+            background: white;
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            padding: 12px;
+            transition: all 0.2s;
+        }
+
+        body.dark .input-wrapper {
+            background: #1e293b;
+            border-color: var(--border-dark);
+        }
+
+        .input-wrapper:focus-within {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .message-input {
+            flex: 1;
+            border: none;
+            outline: none;
+            resize: none;
+            font-family: inherit;
+            font-size: 14px;
+            line-height: 1.5;
+            max-height: 200px;
+            min-height: 20px;
+            background: transparent;
+            color: inherit;
+        }
+
+        .send-btn {
+            padding: 8px 16px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .send-btn:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .send-btn:not(:disabled):hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        /* 打字指示器 */
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #64748b;
+            font-size: 14px;
+            padding: 16px 0;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 3px;
+        }
+
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            background: #64748b;
+            border-radius: 50%;
+            animation: typing 1.4s ease-in-out infinite;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: 0s; }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+                opacity: 0.4;
+            }
+            30% {
+                transform: translateY(-10px);
+                opacity: 1;
+            }
+        }
+
+        /* 状态栏 */
+        .status-bar {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            background: #1e293b;
+            color: white;
+            border-radius: 20px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 1000;
+            transition: all 0.3s;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-connected { background: #10b981; }
+        .status-connecting { background: #f59e0b; }
+        .status-error { background: #ef4444; }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                height: 100vh;
+                z-index: 1000;
+                transform: translateX(-100%);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                width: 100%;
+            }
+
+            .toolbar {
+                padding: 0 12px;
+            }
+
+            .messages-area {
+                padding: 12px;
+            }
+
+            .input-area {
+                padding: 12px;
+            }
+
+            .message {
+                max-width: 100%;
+            }
+        }
+
+        /* 代码块样式 */
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+            margin: 8px 0;
+        }
+
+        body.dark .code-block {
+            background: #0f172a;
+            border: 1px solid var(--border-dark);
+        }
+
+        /* 工具提示 */
+        .tooltip {
+            position: relative;
+        }
+
+        .tooltip::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            color: white;
+            padding: 6px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            z-index: 1000;
+        }
+
+        .tooltip:hover::after {
+            opacity: 1;
+        }
+
+        /* 加载动画 */
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #e5e7eb;
+            border-top: 2px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 侧边栏 -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">🤖 Claude Code</div>
+                <button class="new-chat-btn" onclick="startNewChat()">
+                    + 新对话
+                </button>
+            </div>
+            <div class="chat-list" id="chatList">
+                <div class="chat-item active" data-chat-id="default">
+                    <span class="chat-title">新的对话</span>
+                    <div class="chat-actions">
+                        <button class="chat-action-btn" onclick="renameChat('default')" data-tooltip="重命名">
+                            ✏️
+                        </button>
+                        <button class="chat-action-btn" onclick="deleteChat('default')" data-tooltip="删除">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主要内容 -->
+        <div class="main-content">
+            <!-- 工具栏 -->
+            <div class="toolbar">
+                <button class="tool-btn" onclick="toggleSidebar()" id="sidebarToggle">
+                    ☰
+                </button>
+                
+                <div class="model-selector">
+                    <label for="modelSelect">模型:</label>
+                    <select class="model-select" id="modelSelect">
+                        <option value="claude-opus-4-1-20250805">Claude Opus 4.1</option>
+                        <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+                    </select>
+                </div>
+
+                <div class="toolbar-actions">
+                    <button class="tool-btn tooltip" onclick="exportChat()" data-tooltip="导出对话">
+                        📄 导出
+                    </button>
+                    <button class="tool-btn tooltip" onclick="clearChat()" data-tooltip="清空对话">
+                        🗑️ 清空
+                    </button>
+                    <button class="tool-btn tooltip" onclick="showSettings()" data-tooltip="设置">
+                        ⚙️ 设置
+                    </button>
+                    <button class="tool-btn theme-toggle tooltip" onclick="toggleTheme()" data-tooltip="切换主题">
+                        🌙
+                    </button>
+                </div>
+            </div>
+
+            <!-- 消息区域 -->
+            <div class="messages-area" id="messagesArea">
+                <div class="message assistant">
+                    <div class="message-avatar">AI</div>
+                    <div class="message-content">
+                        <div class="message-text">👋 你好！我是基于 Claude 的 AI 编程助手。
+
+我可以帮助你：
+• 🔧 编写和调试代码
+• 📚 解释复杂概念
+• 🚀 系统架构设计
+• 📝 代码审查和优化
+• 🤔 算法和数据结构
+
+有什么可以帮助你的吗？</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 输入区域 -->
+            <div class="input-area">
+                <div class="input-container">
+                    <div class="input-wrapper">
+                        <textarea 
+                            class="message-input" 
+                            id="messageInput" 
+                            placeholder="输入你的消息... (Shift+Enter 换行)"
+                            rows="1"
+                        ></textarea>
+                        <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                            <span id="sendBtnText">发送</span>
+                            <span id="sendBtnIcon">📤</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 状态栏 -->
+    <div class="status-bar" id="statusBar">
+        <div class="status-dot status-connecting" id="statusDot"></div>
+        <span id="statusText">正在连接...</span>
+    </div>
+
+    <script>
+        // 全局状态
+        let currentChatId = 'default'
+        let chats = {
+            'default': {
+                id: 'default',
+                title: '新的对话',
+                messages: [],
+                createdAt: new Date().toISOString()
+            }
+        }
+        let isStreaming = false
+        let currentStreamMessage = null
+        let claudeAPI = null
+
+        // Claude API 客户端类
+        class ClaudeAPIClient {
+            constructor(apiKey, baseUrl = '') {
+                this.apiKey = apiKey
+                this.baseUrl = baseUrl
+            }
+
+            async sendMessage(messages, options = {}) {
+                const {
+                    model = 'claude-opus-4-1-20250805',
+                    stream = true,
+                    maxTokens = 4000,
+                    temperature = 0.7
+                } = options
+
+                try {
+                    const response = await fetch(`${this.baseUrl}/openai/claude/v1/chat/completions`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${this.apiKey}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            model,
+                            messages,
+                            stream,
+                            max_tokens: maxTokens,
+                            temperature
+                        })
+                    })
+
+                    if (!response.ok) {
+                        const errorText = await response.text()
+                        console.error('API错误响应:', errorText)
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+                    }
+
+                    if (stream) {
+                        return this.handleStreamResponse(response)
+                    } else {
+                        const data = await response.json()
+                        return data.choices[0].message.content
+                    }
+                } catch (error) {
+                    console.error('发送消息失败:', error)
+                    throw error
+                }
+            }
+
+            async handleStreamResponse(response) {
+                const reader = response.body.getReader()
+                const decoder = new TextDecoder()
+                let fullResponse = ''
+
+                return new Promise((resolve, reject) => {
+                    const processStream = async () => {
+                        try {
+                            while (true) {
+                                const { done, value } = await reader.read()
+                                if (done) break
+
+                                const chunk = decoder.decode(value, { stream: true })
+                                const lines = chunk.split('\n')
+
+                                for (const line of lines) {
+                                    if (line.startsWith('data: ')) {
+                                        const data = line.slice(6).trim()
+                                        if (data === '[DONE]') {
+                                            resolve(fullResponse)
+                                            return
+                                        }
+
+                                        try {
+                                            const parsed = JSON.parse(data)
+                                            const content = parsed.choices[0]?.delta?.content
+                                            if (content) {
+                                                fullResponse += content
+                                                if (this.onStreamChunk) {
+                                                    this.onStreamChunk(content, fullResponse)
+                                                }
+                                            }
+                                        } catch (e) {
+                                            // 忽略JSON解析错误
+                                            console.log('JSON解析错误:', data)
+                                        }
+                                    }
+                                }
+                            }
+                            resolve(fullResponse)
+                        } catch (error) {
+                            reject(error)
+                        }
+                    }
+
+                    processStream()
+                })
+            }
+
+            async getModels() {
+                try {
+                    const response = await fetch(`${this.baseUrl}/openai/claude/v1/models`, {
+                        headers: {
+                            'Authorization': `Bearer ${this.apiKey}`
+                        }
+                    })
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+                    }
+
+                    const data = await response.json()
+                    return data.data
+                } catch (error) {
+                    console.error('获取模型列表失败:', error)
+                    throw error
+                }
+            }
+        }
+
+        // 初始化应用
+        document.addEventListener('DOMContentLoaded', async function() {
+            // 从URL参数或localStorage获取API Key
+            const urlParams = new URLSearchParams(window.location.search)
+            let apiKey = urlParams.get('apiKey') || localStorage.getItem('claude_api_key')
+
+            if (!apiKey) {
+                apiKey = prompt('请输入你的API Key (cr_开头):')
+                if (!apiKey) {
+                    updateStatus('error', '需要API Key才能使用')
+                    return
+                }
+                localStorage.setItem('claude_api_key', apiKey)
+            }
+
+            // 初始化Claude API客户端
+            claudeAPI = new ClaudeAPIClient(apiKey)
+            
+            // 设置流式回调
+            claudeAPI.onStreamChunk = (chunk, fullResponse) => {
+                if (currentStreamMessage) {
+                    const messageText = currentStreamMessage.querySelector('.message-text')
+                    if (messageText) {
+                        messageText.textContent = fullResponse
+                        scrollToBottom()
+                    }
+                }
+            }
+
+            // 测试连接并加载模型
+            try {
+                updateStatus('connecting', '正在连接到Claude API...')
+                const models = await claudeAPI.getModels()
+                updateStatus('connected', `已连接 - ${models.length}个可用模型`)
+                
+                // 更新模型选择器
+                const modelSelect = document.getElementById('modelSelect')
+                modelSelect.innerHTML = ''
+                models.forEach(model => {
+                    const option = document.createElement('option')
+                    option.value = model.id
+                    option.textContent = model.id
+                    modelSelect.appendChild(option)
+                })
+            } catch (error) {
+                updateStatus('error', `连接失败: ${error.message}`)
+                console.error('初始化失败:', error)
+            }
+
+            // 加载保存的对话
+            loadChats()
+
+            // 设置输入框事件
+            setupInputEvents()
+
+            // 加载主题设置
+            loadTheme()
+        })
+
+        // 设置输入框事件
+        function setupInputEvents() {
+            const messageInput = document.getElementById('messageInput')
+            
+            messageInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    sendMessage()
+                }
+            })
+
+            messageInput.addEventListener('input', function() {
+                this.style.height = 'auto'
+                this.style.height = Math.min(this.scrollHeight, 200) + 'px'
+            })
+        }
+
+        // 发送消息
+        async function sendMessage() {
+            if (isStreaming || !claudeAPI) return
+
+            const messageInput = document.getElementById('messageInput')
+            const sendBtn = document.getElementById('sendBtn')
+            const message = messageInput.value.trim()
+
+            if (!message) return
+
+            // 禁用输入
+            isStreaming = true
+            messageInput.disabled = true
+            sendBtn.disabled = true
+            updateSendButton(true)
+
+            // 添加用户消息
+            addMessage('user', message)
+            messageInput.value = ''
+            messageInput.style.height = 'auto'
+
+            // 添加正在输入的消息
+            currentStreamMessage = addMessage('assistant', '', true)
+
+            try {
+                const currentChat = chats[currentChatId]
+                const messages = [...currentChat.messages, { role: 'user', content: message }]
+                const modelSelect = document.getElementById('modelSelect')
+                
+                updateStatus('connecting', '正在发送消息...')
+
+                const response = await claudeAPI.sendMessage(messages, {
+                    model: modelSelect.value,
+                    stream: true
+                })
+
+                // 更新消息历史
+                currentChat.messages.push(
+                    { role: 'user', content: message },
+                    { role: 'assistant', content: response }
+                )
+
+                // 更新聊天标题（如果是新对话）
+                if (currentChat.messages.length === 2 && currentChat.title === '新的对话') {
+                    currentChat.title = message.substring(0, 30) + (message.length > 30 ? '...' : '')
+                    updateChatList()
+                }
+
+                saveChats()
+                updateStatus('connected', '消息发送完成')
+
+            } catch (error) {
+                console.error('发送失败:', error)
+                updateStatus('error', `发送失败: ${error.message}`)
+                
+                // 移除流式消息
+                if (currentStreamMessage) {
+                    currentStreamMessage.remove()
+                }
+                
+                // 添加错误消息
+                addMessage('system', `发送失败: ${error.message}`)
+            } finally {
+                // 恢复输入
+                isStreaming = false
+                messageInput.disabled = false
+                sendBtn.disabled = false
+                updateSendButton(false)
+                messageInput.focus()
+                currentStreamMessage = null
+            }
+        }
+
+        // 添加消息到界面
+        function addMessage(role, content, isStreaming = false) {
+            const messagesArea = document.getElementById('messagesArea')
+            
+            const messageDiv = document.createElement('div')
+            messageDiv.className = `message ${role}`
+
+            let avatar = role === 'user' ? '👤' : role === 'assistant' ? '🤖' : '⚠️'
+            
+            messageDiv.innerHTML = `
+                <div class="message-avatar">${avatar}</div>
+                <div class="message-content">
+                    <div class="message-text">${formatMessage(content)}</div>
+                    ${!isStreaming && role !== 'system' ? `
+                        <div class="message-actions">
+                            <button class="message-action-btn" onclick="copyMessage(this)">复制</button>
+                            ${role === 'assistant' ? '<button class="message-action-btn" onclick="regenerateMessage(this)">重新生成</button>' : ''}
+                        </div>
+                    ` : ''}
+                </div>
+            `
+
+            messagesArea.appendChild(messageDiv)
+            scrollToBottom()
+            
+            return messageDiv
+        }
+
+        // 格式化消息内容
+        function formatMessage(content) {
+            if (!content) return ''
+            
+            // 处理代码块
+            content = content.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
+                return `<div class="code-block"><pre><code>${escapeHtml(code.trim())}</code></pre></div>`
+            })
+            
+            // 处理内联代码
+            content = content.replace(/`([^`]+)`/g, '<code>$1</code>')
+            
+            return content.replace(/\n/g, '<br>')
+        }
+
+        // HTML转义
+        function escapeHtml(text) {
+            const div = document.createElement('div')
+            div.textContent = text
+            return div.innerHTML
+        }
+
+        // 更新发送按钮状态
+        function updateSendButton(loading) {
+            const sendBtnText = document.getElementById('sendBtnText')
+            const sendBtnIcon = document.getElementById('sendBtnIcon')
+            
+            if (loading) {
+                sendBtnText.textContent = '发送中...'
+                sendBtnIcon.innerHTML = '<div class="loading"></div>'
+            } else {
+                sendBtnText.textContent = '发送'
+                sendBtnIcon.textContent = '📤'
+            }
+        }
+
+        // 更新状态
+        function updateStatus(status, message) {
+            const statusDot = document.getElementById('statusDot')
+            const statusText = document.getElementById('statusText')
+            
+            statusDot.className = `status-dot status-${status}`
+            statusText.textContent = message
+        }
+
+        // 滚动到底部
+        function scrollToBottom() {
+            const messagesArea = document.getElementById('messagesArea')
+            messagesArea.scrollTop = messagesArea.scrollHeight
+        }
+
+        // 开始新对话
+        function startNewChat() {
+            const chatId = 'chat_' + Date.now()
+            chats[chatId] = {
+                id: chatId,
+                title: '新的对话',
+                messages: [],
+                createdAt: new Date().toISOString()
+            }
+            
+            switchToChat(chatId)
+            updateChatList()
+            saveChats()
+        }
+
+        // 切换到指定对话
+        function switchToChat(chatId) {
+            currentChatId = chatId
+            loadMessages()
+            updateChatList()
+        }
+
+        // 加载消息
+        function loadMessages() {
+            const messagesArea = document.getElementById('messagesArea')
+            messagesArea.innerHTML = ''
+            
+            // 添加默认欢迎消息
+            if (chats[currentChatId].messages.length === 0) {
+                addMessage('assistant', `👋 你好！我是基于 Claude 的 AI 编程助手。
+
+我可以帮助你：
+• 🔧 编写和调试代码
+• 📚 解释复杂概念  
+• 🚀 系统架构设计
+• 📝 代码审查和优化
+• 🤔 算法和数据结构
+
+有什么可以帮助你的吗？`)
+            } else {
+                // 加载历史消息
+                chats[currentChatId].messages.forEach(msg => {
+                    addMessage(msg.role, msg.content)
+                })
+            }
+        }
+
+        // 更新对话列表
+        function updateChatList() {
+            const chatList = document.getElementById('chatList')
+            chatList.innerHTML = ''
+            
+            Object.values(chats).reverse().forEach(chat => {
+                const chatItem = document.createElement('div')
+                chatItem.className = `chat-item ${chat.id === currentChatId ? 'active' : ''}`
+                chatItem.setAttribute('data-chat-id', chat.id)
+                chatItem.onclick = () => switchToChat(chat.id)
+                
+                chatItem.innerHTML = `
+                    <span class="chat-title">${chat.title}</span>
+                    <div class="chat-actions">
+                        <button class="chat-action-btn tooltip" onclick="event.stopPropagation(); renameChat('${chat.id}')" data-tooltip="重命名">
+                            ✏️
+                        </button>
+                        <button class="chat-action-btn tooltip" onclick="event.stopPropagation(); deleteChat('${chat.id}')" data-tooltip="删除">
+                            🗑️
+                        </button>
+                    </div>
+                `
+                
+                chatList.appendChild(chatItem)
+            })
+        }
+
+        // 重命名对话
+        function renameChat(chatId) {
+            const newTitle = prompt('请输入新的对话标题:', chats[chatId].title)
+            if (newTitle && newTitle.trim()) {
+                chats[chatId].title = newTitle.trim()
+                updateChatList()
+                saveChats()
+            }
+        }
+
+        // 删除对话
+        function deleteChat(chatId) {
+            if (Object.keys(chats).length <= 1) {
+                alert('至少需要保留一个对话')
+                return
+            }
+            
+            if (confirm('确定要删除这个对话吗？')) {
+                delete chats[chatId]
+                
+                if (currentChatId === chatId) {
+                    currentChatId = Object.keys(chats)[0]
+                    loadMessages()
+                }
+                
+                updateChatList()
+                saveChats()
+            }
+        }
+
+        // 保存对话到localStorage
+        function saveChats() {
+            localStorage.setItem('claude_chats', JSON.stringify(chats))
+        }
+
+        // 从localStorage加载对话
+        function loadChats() {
+            const saved = localStorage.getItem('claude_chats')
+            if (saved) {
+                try {
+                    chats = JSON.parse(saved)
+                    updateChatList()
+                    loadMessages()
+                } catch (error) {
+                    console.error('加载对话失败:', error)
+                }
+            }
+        }
+
+        // 清空当前对话
+        function clearChat() {
+            if (confirm('确定要清空当前对话吗？')) {
+                chats[currentChatId].messages = []
+                loadMessages()
+                saveChats()
+            }
+        }
+
+        // 导出对话
+        function exportChat() {
+            const chat = chats[currentChatId]
+            if (chat.messages.length === 0) {
+                alert('当前对话为空，无法导出')
+                return
+            }
+            
+            let exportText = `Claude Code 对话记录\n`
+            exportText += `标题: ${chat.title}\n`
+            exportText += `创建时间: ${new Date(chat.createdAt).toLocaleString()}\n`
+            exportText += `导出时间: ${new Date().toLocaleString()}\n\n`
+            
+            chat.messages.forEach((msg, index) => {
+                const role = msg.role === 'user' ? '用户' : msg.role === 'assistant' ? 'AI助手' : '系统'
+                exportText += `${index + 1}. ${role}:\n${msg.content}\n\n`
+            })
+            
+            // 创建下载
+            const blob = new Blob([exportText], { type: 'text/plain;charset=utf-8' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `${chat.title}_${new Date().toISOString().slice(0, 10)}.txt`
+            a.click()
+            URL.revokeObjectURL(url)
+        }
+
+        // 复制消息
+        function copyMessage(button) {
+            const messageText = button.closest('.message-content').querySelector('.message-text')
+            const text = messageText.textContent || messageText.innerText
+            
+            navigator.clipboard.writeText(text).then(() => {
+                button.textContent = '已复制'
+                setTimeout(() => {
+                    button.textContent = '复制'
+                }, 1000)
+            }).catch(err => {
+                console.error('复制失败:', err)
+                alert('复制失败')
+            })
+        }
+
+        // 重新生成消息
+        function regenerateMessage(button) {
+            // TODO: 实现重新生成功能
+            alert('重新生成功能开发中...')
+        }
+
+        // 切换侧边栏
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar')
+            sidebar.classList.toggle('open')
+        }
+
+        // 切换主题
+        function toggleTheme() {
+            document.body.classList.toggle('dark')
+            const isDark = document.body.classList.contains('dark')
+            localStorage.setItem('theme', isDark ? 'dark' : 'light')
+            
+            const themeBtn = document.querySelector('.theme-toggle')
+            themeBtn.textContent = isDark ? '☀️' : '🌙'
+        }
+
+        // 加载主题
+        function loadTheme() {
+            const theme = localStorage.getItem('theme')
+            if (theme === 'dark') {
+                document.body.classList.add('dark')
+                document.querySelector('.theme-toggle').textContent = '☀️'
+            }
+        }
+
+        // 显示设置
+        function showSettings() {
+            const apiKey = localStorage.getItem('claude_api_key')
+            const newApiKey = prompt('API Key设置:', apiKey || '')
+            
+            if (newApiKey && newApiKey.trim()) {
+                localStorage.setItem('claude_api_key', newApiKey.trim())
+                location.reload() // 重新加载应用
+            }
+        }
+
+        // 响应式处理
+        window.addEventListener('resize', function() {
+            if (window.innerWidth > 768) {
+                const sidebar = document.getElementById('sidebar')
+                sidebar.classList.remove('open')
+            }
+        })
+    </script>
+</body>
+</html>

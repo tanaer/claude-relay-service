@@ -64,7 +64,7 @@ class UnifiedClaudeScheduler {
             `[信息] 使用绑定的 Claude Console 账户：${boundConsoleAccount.name}（${apiKeyData.claudeConsoleAccountId}），用于 API Key ${apiKeyData.name}`
           )
           return {
-            accountId: apiKeyData.claudeConsoleAccountId,
+            accountId: boundConsoleAccount.id, // 使用真实的账户ID，而不是API Key的绑定值
             accountType: 'claude-console'
           }
         } else {

@@ -15,9 +15,19 @@ class UpstreamErrorService {
       authentication: '认证失败，请联系管理员检查配置',
       forbidden: '拒绝访问，请联系管理员',
       bad_request: '请求参数不被接受，请检查后重试',
+      bad_gateway: '网关错误，上游服务暂时不可用',
+      service_unavailable: '服务暂时不可用，正在维护中',
+      gateway_timeout: '网关超时，请求处理时间过长',
       server_error: '服务出现异常，请稍后再试',
       network_error: '通讯异常，请稍后重试',
-      timeout: '与通讯超时，请稍后重试',
+      timeout: '请求超时，请稍后重试',
+      timeout_connection: '连接超时，网络可能不稳定',
+      timeout_request: '请求处理超时，服务响应缓慢',
+      connection_reset: '连接被重置，请重新尝试',
+      connection_refused: '连接被拒绝，服务可能已下线',
+      dns_not_found: 'DNS解析失败，无法找到服务器',
+      socket_hangup: '连接意外中断，请检查网络',
+      dns_resolution_failed: 'DNS解析失败，请检查网络配置',
       not_found: '资源不存在',
       unsupported_model: '当前模型暂不可用，请更换模型后重试。',
       unknown: '服务暂时不可用，请稍后再试。'
@@ -67,6 +77,15 @@ class UpstreamErrorService {
     if (status === 404) {
       return 'not_found'
     }
+    if (status === 502) {
+      return 'bad_gateway'
+    }
+    if (status === 503) {
+      return 'service_unavailable'
+    }
+    if (status === 504) {
+      return 'gateway_timeout'
+    }
     if (status >= 500 && status < 600) {
       return 'server_error'
     }
@@ -77,8 +96,33 @@ class UpstreamErrorService {
     // 其次按网络错误码/文案
     const msg = (message || '').toLowerCase()
     const c = (code || '').toUpperCase()
-    if (c === 'ETIMEDOUT' || msg.includes('timeout')) {
+
+    // 超时错误细分
+    if (c === 'ETIMEDOUT') {
+      return 'timeout_connection'
+    }
+    if (c === 'ECONNABORTED' || msg.includes('timeout of')) {
+      return 'timeout_request'
+    }
+    if (msg.includes('timeout')) {
       return 'timeout'
+    }
+
+    // 连接错误细分
+    if (c === 'ECONNRESET') {
+      return 'connection_reset'
+    }
+    if (c === 'ECONNREFUSED') {
+      return 'connection_refused'
+    }
+    if (c === 'ENOTFOUND') {
+      return 'dns_not_found'
+    }
+    if (msg.includes('socket hang up')) {
+      return 'socket_hangup'
+    }
+    if (msg.includes('resolve')) {
+      return 'dns_resolution_failed'
     }
     if (
       c === 'ECONNRESET' ||
@@ -382,6 +426,183 @@ class UpstreamErrorService {
     } catch (err) {
       logger.error('Failed to get accounts with custom messages:', err)
       return { success: false, data: [] }
+    }
+  }
+
+  /**
+   * 获取错误统计信息
+   */
+  async getErrorStatistics(accountId = null, hours = 24) {
+    try {
+      const client = redis.getClientSafe()
+      const stats = {
+        total: 0,
+        byType: {},
+        byStatus: {},
+        timeRange: {
+          start: new Date(Date.now() - hours * 3600000).toISOString(),
+          end: new Date().toISOString()
+        }
+      }
+
+      // 获取错误日志
+      let logs = []
+      if (accountId) {
+        const key = `upstream_error_logs:${accountId}`
+        const rawLogs = await client.lrange(key, 0, -1)
+        logs = rawLogs
+          .map((log) => {
+            try {
+              return JSON.parse(log)
+            } catch {
+              return null
+            }
+          })
+          .filter(Boolean)
+      } else {
+        // 获取所有账户的错误（需要遍历）
+        const pattern = 'upstream_error_logs:*'
+        const keys = await this._scanKeys(client, pattern)
+        for (const key of keys) {
+          const rawLogs = await client.lrange(key, 0, 100) // 每个账户最多取100条
+          const parsedLogs = rawLogs
+            .map((log) => {
+              try {
+                return JSON.parse(log)
+              } catch {
+                return null
+              }
+            })
+            .filter(Boolean)
+          logs.push(...parsedLogs)
+        }
+      }
+
+      // 过滤时间范围内的日志
+      const cutoffTime = Date.now() - hours * 3600000
+      logs = logs.filter((log) => {
+        const logTime = new Date(log.timestamp).getTime()
+        return logTime >= cutoffTime
+      })
+
+      // 统计
+      logs.forEach((log) => {
+        stats.total++
+
+        // 按错误类型统计
+        const errorType = log.errorType || 'unknown'
+        stats.byType[errorType] = (stats.byType[errorType] || 0) + 1
+
+        // 按状态码统计
+        const status = log.status || 0
+        const statusGroup =
+          status >= 500
+            ? '5xx'
+            : status >= 400
+              ? '4xx'
+              : status >= 300
+                ? '3xx'
+                : status >= 200
+                  ? '2xx'
+                  : 'other'
+        stats.byStatus[statusGroup] = (stats.byStatus[statusGroup] || 0) + 1
+      })
+
+      // 计算百分比
+      stats.byTypePercentage = {}
+      Object.keys(stats.byType).forEach((type) => {
+        stats.byTypePercentage[type] =
+          stats.total > 0 ? `${((stats.byType[type] / stats.total) * 100).toFixed(2)}%` : '0%'
+      })
+
+      return {
+        success: true,
+        data: stats,
+        accountId
+      }
+    } catch (err) {
+      logger.error('Failed to get error statistics:', err)
+      return {
+        success: false,
+        error: err.message,
+        data: null
+      }
+    }
+  }
+
+  /**
+   * 获取最频繁的错误
+   */
+  async getTopErrors(limit = 10, hours = 24) {
+    try {
+      const client = redis.getClientSafe()
+      const errorMap = new Map()
+
+      // 获取所有错误日志
+      const pattern = 'upstream_error_logs:*'
+      const keys = await this._scanKeys(client, pattern)
+
+      const cutoffTime = Date.now() - hours * 3600000
+
+      for (const key of keys) {
+        const rawLogs = await client.lrange(key, 0, 100)
+        const logs = rawLogs
+          .map((log) => {
+            try {
+              return JSON.parse(log)
+            } catch {
+              return null
+            }
+          })
+          .filter(Boolean)
+
+        // 统计错误
+        logs.forEach((log) => {
+          const logTime = new Date(log.timestamp).getTime()
+          if (logTime >= cutoffTime) {
+            const errorKey = `${log.errorType}:${log.status}:${log.message?.substring(0, 50)}`
+            const current = errorMap.get(errorKey) || {
+              errorType: log.errorType,
+              status: log.status,
+              message: log.message,
+              count: 0,
+              lastSeen: log.timestamp,
+              accounts: new Set()
+            }
+            current.count++
+            current.accounts.add(log.accountId)
+            if (new Date(log.timestamp) > new Date(current.lastSeen)) {
+              current.lastSeen = log.timestamp
+            }
+            errorMap.set(errorKey, current)
+          }
+        })
+      }
+
+      // 排序并返回前N个
+      const topErrors = Array.from(errorMap.values())
+        .sort((a, b) => b.count - a.count)
+        .slice(0, limit)
+        .map((error) => ({
+          ...error,
+          accounts: Array.from(error.accounts)
+        }))
+
+      return {
+        success: true,
+        data: topErrors,
+        timeRange: {
+          start: new Date(cutoffTime).toISOString(),
+          end: new Date().toISOString()
+        }
+      }
+    } catch (err) {
+      logger.error('Failed to get top errors:', err)
+      return {
+        success: false,
+        error: err.message,
+        data: []
+      }
     }
   }
 

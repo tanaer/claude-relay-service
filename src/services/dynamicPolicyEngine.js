@@ -345,8 +345,8 @@ class DynamicPolicyEngine {
       }
 
       // 检查API Key是否为日卡类型，如果是则跳过重置
-      const apiKeyService = require('./apiKeyService')
-      const apiKeyData = await apiKeyService.getApiKeyById(apiKeyId)
+      const redisClient = require('../models/redis')
+      const apiKeyData = await redisClient.getApiKey(apiKeyId)
       if (apiKeyData && apiKeyData.tags) {
         let tags = []
         try {

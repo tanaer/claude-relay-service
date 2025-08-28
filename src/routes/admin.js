@@ -27,7 +27,50 @@ const path = require('path')
 const config = require('../../config/config')
 const { v4: uuidv4 } = require('uuid')
 
+const connectionPool = require('../utils/connectionPool')
+
 const router = express.Router()
+// 🔗 连接池监控
+
+// 获取连接池实时状态
+router.get('/connection-pool/stats', async (req, res) => {
+  try {
+    const poolStats = connectionPool.getPoolStats()
+
+    return res.json({
+      success: true,
+      data: poolStats
+    })
+  } catch (error) {
+    logger.error('[错误] 获取连接池统计失败：', error)
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get connection pool stats',
+      message: error.message
+    })
+  }
+})
+
+// 清理连接池空闲连接
+router.post('/connection-pool/cleanup', authenticateAdmin, async (req, res) => {
+  try {
+    connectionPool.cleanup()
+
+    logger.info('🧹 Admin triggered connection pool cleanup')
+    return res.json({
+      success: true,
+      message: 'Connection pool cleanup completed'
+    })
+  } catch (error) {
+    logger.error('[错误] 连接池清理失败：', error)
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to cleanup connection pool',
+      message: error.message
+    })
+  }
+})
+
 // ================ 上游错误聚合与自定义文案 ================
 
 // 获取所有有自定义错误信息的账户列表（用于复制功能选择源账户）
@@ -145,6 +188,45 @@ router.post('/upstream-errors/rebuild-messages-index', authenticateAdmin, async 
     return res.status(500).json({ success: false, message: error.message })
   }
 })
+
+// 🔧 获取错误统计信息
+router.get('/upstream-errors/statistics', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId, hours = 24 } = req.query
+    const result = await upstreamErrorService.getErrorStatistics(accountId, parseInt(hours))
+
+    if (result.success) {
+      return res.json(result)
+    }
+    return res.status(500).json(result)
+  } catch (error) {
+    logger.error('[Admin] Failed to get error statistics:', error)
+    return res.status(500).json({
+      success: false,
+      message: error.message || '获取错误统计失败'
+    })
+  }
+})
+
+// 🔧 获取最频繁的错误
+router.get('/upstream-errors/top-errors', authenticateAdmin, async (req, res) => {
+  try {
+    const { limit = 10, hours = 24 } = req.query
+    const result = await upstreamErrorService.getTopErrors(parseInt(limit), parseInt(hours))
+
+    if (result.success) {
+      return res.json(result)
+    }
+    return res.status(500).json(result)
+  } catch (error) {
+    logger.error('[Admin] Failed to get top errors:', error)
+    return res.status(500).json({
+      success: false,
+      message: error.message || '获取高频错误失败'
+    })
+  }
+})
+
 // 🔑 API Keys 管理
 
 // 调试：获取API Key费用详情

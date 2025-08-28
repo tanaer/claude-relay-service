@@ -349,6 +349,15 @@ const authenticateAdmin = async (req, res, next) => {
   const startTime = Date.now()
 
   try {
+    // 检查是否为公开端点
+    const publicEndpoints = config.admin?.publicEndpoints || []
+    const requestPath = req.path || req.originalUrl
+
+    if (publicEndpoints.includes(requestPath)) {
+      logger.security(`🔓 Public endpoint accessed: ${requestPath} from ${req.ip || 'unknown'}`)
+      return next()
+    }
+
     // 安全提取token，支持多种方式
     let token =
       req.headers['authorization']?.replace(/^Bearer\s+/i, '') ||

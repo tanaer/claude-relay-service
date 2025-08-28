@@ -298,6 +298,173 @@
       </div>
     </div>
 
+    <!-- 连接池监控 -->
+    <div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <!-- HTTP连接池状态 -->
+      <div class="card p-4">
+        <div class="mb-3 flex items-center justify-between">
+          <h4 class="text-sm font-semibold text-gray-700">HTTP连接池</h4>
+          <i class="fas fa-globe text-blue-500" />
+        </div>
+        <div v-if="connectionPoolStats?.http" class="space-y-2">
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-600">活跃连接:</span>
+            <span class="font-medium"
+              >{{ connectionPoolStats.http.sockets }}/{{
+                connectionPoolStats.http.maxSockets
+              }}</span
+            >
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-600">空闲连接:</span>
+            <span class="font-medium"
+              >{{ connectionPoolStats.http.freeSockets }}/{{
+                connectionPoolStats.http.maxFreeSockets
+              }}</span
+            >
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-600">等待请求:</span>
+            <span class="font-medium">{{ connectionPoolStats.http.requests }}</span>
+          </div>
+          <!-- 连接使用率进度条 -->
+          <div class="mt-2">
+            <div class="mb-1 flex justify-between text-xs">
+              <span class="text-gray-500">使用率</span>
+              <span class="text-gray-500"
+                >{{
+                  Math.round(
+                    (connectionPoolStats.http.sockets / connectionPoolStats.http.maxSockets) * 100
+                  )
+                }}%</span
+              >
+            </div>
+            <div class="h-2 w-full rounded-full bg-gray-200">
+              <div
+                class="h-full rounded-full transition-all duration-300"
+                :class="
+                  getPoolUsageColor(
+                    (connectionPoolStats.http.sockets / connectionPoolStats.http.maxSockets) * 100
+                  )
+                "
+                :style="{
+                  width:
+                    Math.round(
+                      (connectionPoolStats.http.sockets / connectionPoolStats.http.maxSockets) * 100
+                    ) + '%'
+                }"
+              />
+            </div>
+          </div>
+        </div>
+        <div v-else class="text-sm text-gray-500">
+          <i class="fas fa-spinner fa-spin mr-1" />
+          加载中...
+        </div>
+      </div>
+
+      <!-- HTTPS连接池状态 -->
+      <div class="card p-4">
+        <div class="mb-3 flex items-center justify-between">
+          <h4 class="text-sm font-semibold text-gray-700">HTTPS连接池</h4>
+          <i class="fas fa-lock text-green-500" />
+        </div>
+        <div v-if="connectionPoolStats?.https" class="space-y-2">
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-600">活跃连接:</span>
+            <span class="font-medium"
+              >{{ connectionPoolStats.https.sockets }}/{{
+                connectionPoolStats.https.maxSockets
+              }}</span
+            >
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-600">空闲连接:</span>
+            <span class="font-medium"
+              >{{ connectionPoolStats.https.freeSockets }}/{{
+                connectionPoolStats.https.maxFreeSockets
+              }}</span
+            >
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-600">等待请求:</span>
+            <span class="font-medium">{{ connectionPoolStats.https.requests }}</span>
+          </div>
+          <!-- 连接使用率进度条 -->
+          <div class="mt-2">
+            <div class="mb-1 flex justify-between text-xs">
+              <span class="text-gray-500">使用率</span>
+              <span class="text-gray-500"
+                >{{
+                  Math.round(
+                    (connectionPoolStats.https.sockets / connectionPoolStats.https.maxSockets) * 100
+                  )
+                }}%</span
+              >
+            </div>
+            <div class="h-2 w-full rounded-full bg-gray-200">
+              <div
+                class="h-full rounded-full transition-all duration-300"
+                :class="
+                  getPoolUsageColor(
+                    (connectionPoolStats.https.sockets / connectionPoolStats.https.maxSockets) * 100
+                  )
+                "
+                :style="{
+                  width:
+                    Math.round(
+                      (connectionPoolStats.https.sockets / connectionPoolStats.https.maxSockets) *
+                        100
+                    ) + '%'
+                }"
+              />
+            </div>
+          </div>
+        </div>
+        <div v-else class="text-sm text-gray-500">
+          <i class="fas fa-spinner fa-spin mr-1" />
+          加载中...
+        </div>
+      </div>
+
+      <!-- 连接池总计与操作 -->
+      <div class="card p-4">
+        <div class="mb-3 flex items-center justify-between">
+          <h4 class="text-sm font-semibold text-gray-700">连接池总览</h4>
+          <i class="fas fa-chart-bar text-purple-500" />
+        </div>
+        <div v-if="connectionPoolStats?.total" class="space-y-2">
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-600">总活跃连接:</span>
+            <span class="font-medium">{{ connectionPoolStats.total.activeSockets }}</span>
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-600">总空闲连接:</span>
+            <span class="font-medium">{{ connectionPoolStats.total.freeSockets }}</span>
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-600">等待请求:</span>
+            <span class="font-medium">{{ connectionPoolStats.total.pendingRequests }}</span>
+          </div>
+          <div class="mt-3 border-t pt-2">
+            <button
+              class="w-full rounded-md bg-orange-500 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="cleanupLoading"
+              @click="cleanupConnectionPool"
+            >
+              <i class="fas fa-broom mr-1" />
+              <span v-if="cleanupLoading">清理中...</span>
+              <span v-else>清理空闲连接</span>
+            </button>
+          </div>
+        </div>
+        <div v-else class="text-sm text-gray-500">
+          <i class="fas fa-spinner fa-spin mr-1" />
+          加载中...
+        </div>
+      </div>
+    </div>
+
     <!-- 模型消费统计 -->
     <div class="mb-8">
       <div class="mb-4 flex flex-col gap-4 sm:mb-6">
@@ -587,6 +754,10 @@ const refreshCountdown = ref(0)
 const countdownTimer = ref(null)
 const isRefreshing = ref(false)
 
+// 连接池监控相关
+const connectionPoolStats = ref(null)
+const cleanupLoading = ref(false)
+
 // 计算倒计时显示
 // const refreshCountdownDisplay = computed(() => {
 //   if (!autoRefreshEnabled.value || refreshCountdown.value <= 0) return ''
@@ -609,6 +780,53 @@ function calculatePercentage(value, stats) {
   const total = stats.reduce((sum, stat) => sum + stat.allTokens, 0)
   if (total === 0) return 0
   return ((value / total) * 100).toFixed(1)
+}
+
+// 获取连接池使用率颜色
+function getPoolUsageColor(percentage) {
+  if (percentage < 50) return 'bg-green-500'
+  if (percentage < 80) return 'bg-yellow-500'
+  return 'bg-red-500'
+}
+
+// 加载连接池统计
+async function loadConnectionPoolStats() {
+  try {
+    const response = await fetch('/admin/connection-pool/stats')
+    if (response.ok) {
+      const result = await response.json()
+      // 如果返回的数据有data字段，则提取data，否则直接使用响应
+      connectionPoolStats.value = result.data || result
+    }
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to load connection pool stats:', error)
+  }
+}
+
+// 清理连接池
+async function cleanupConnectionPool() {
+  if (cleanupLoading.value) return
+
+  cleanupLoading.value = true
+  try {
+    const response = await fetch('/admin/connection-pool/cleanup', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+
+    if (response.ok) {
+      // 清理完成后重新加载统计数据
+      await loadConnectionPoolStats()
+    }
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to cleanup connection pool:', error)
+  } finally {
+    cleanupLoading.value = false
+  }
 }
 
 // 创建模型使用饼图
@@ -1080,7 +1298,7 @@ async function refreshAllData() {
 
   isRefreshing.value = true
   try {
-    await Promise.all([loadDashboardData(), refreshChartsData()])
+    await Promise.all([loadDashboardData(), refreshChartsData(), loadConnectionPoolStats()])
   } finally {
     isRefreshing.value = false
   }

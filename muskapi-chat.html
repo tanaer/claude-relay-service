@@ -308,8 +308,8 @@
     <script>
         class MuskAPIChatBot {
             constructor(apiKey) {
-                // 修正的 API 基础路径（不需要 /api 前缀）
-                this.baseUrl = 'https://muskapi.com'
+                // 使用当前域名作为API基础路径
+                this.baseUrl = window.location.origin
                 this.apiKey = apiKey
                 this.messages = []
             }

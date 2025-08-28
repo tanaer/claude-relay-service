@@ -33,6 +33,16 @@ router.get('/', (req, res) => {
   res.redirect(301, '/admin-next/api-stats')
 })
 
+// 📱 Web Claude Code 聊天界面
+router.get('/chat', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../web-claude-code.html'))
+})
+
+// 📚 Web Claude Code 使用说明
+router.get('/help', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../claude-code-help.html'))
+})
+
 // 🔐 管理员登录
 router.post('/auth/login', async (req, res) => {
   try {

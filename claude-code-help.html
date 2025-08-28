@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Claude Code - 使用说明</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8fafc;
+            color: #1e293b;
+        }
+        
+        .header {
+            text-align: center;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+            padding: 40px 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+        }
+        
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            color: #6366f1;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 8px;
+            margin-bottom: 16px;
+        }
+        
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .feature-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex;
+            align-items: center;
+        }
+        
+        .feature-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .feature-icon {
+            margin-right: 12px;
+            font-size: 1.2em;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 30px 0;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-block;
+        }
+        
+        .btn-primary {
+            background: #6366f1;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5856eb;
+            transform: translateY(-1px);
+        }
+        
+        .btn-secondary {
+            background: #f1f5f9;
+            color: #475569;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .btn-secondary:hover {
+            background: #e2e8f0;
+        }
+        
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: Monaco, monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            margin: 12px 0;
+        }
+        
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin: 16px 0;
+        }
+        
+        .alert-info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+        
+        .alert-warning {
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fbbf24;
+        }
+        
+        .api-endpoint {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-family: Monaco, monospace;
+            font-size: 13px;
+            color: #6366f1;
+            margin: 8px 0;
+        }
+        
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            
+            .header {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🤖 Web Claude Code</h1>
+        <p>基于您的AI中转服务的网页版Claude Code界面</p>
+    </div>
+
+    <div class="card">
+        <h2>🚀 快速开始</h2>
+        <p>您的AI中转服务现在支持两种网页聊天界面：</p>
+        
+        <div class="button-group">
+            <a href="/chat" class="btn btn-primary">🎨 高级Claude Code界面</a>
+            <a href="/muskapi-chat.html" class="btn btn-secondary">🔧 简洁聊天界面</a>
+        </div>
+
+        <div class="alert alert-info">
+            <strong>💡 提示：</strong> 两个界面都支持流式对话、多模型切换、对话历史等功能。高级界面提供更完整的Claude Code体验。
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>✨ 主要特性</h2>
+        <ul class="feature-list">
+            <li>
+                <span class="feature-icon">🌊</span>
+                <div>
+                    <strong>流式对话</strong><br>
+                    <small>实时显示AI响应，体验更流畅</small>
+                </div>
+            </li>
+            <li>
+                <span class="feature-icon">🔄</span>
+                <div>
+                    <strong>多模型支持</strong><br>
+                    <small>支持Claude Opus 4.1和Claude Sonnet 4等多个模型</small>
+                </div>
+            </li>
+            <li>
+                <span class="feature-icon">💾</span>
+                <div>
+                    <strong>对话历史</strong><br>
+                    <small>自动保存对话记录，支持多个对话会话</small>
+                </div>
+            </li>
+            <li>
+                <span class="feature-icon">📱</span>
+                <div>
+                    <strong>响应式设计</strong><br>
+                    <small>完美适配桌面和移动设备</small>
+                </div>
+            </li>
+            <li>
+                <span class="feature-icon">🌙</span>
+                <div>
+                    <strong>主题切换</strong><br>
+                    <small>支持明暗两种主题模式</small>
+                </div>
+            </li>
+            <li>
+                <span class="feature-icon">📄</span>
+                <div>
+                    <strong>导出功能</strong><br>
+                    <small>支持导出对话记录为文本文件</small>
+                </div>
+            </li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>🔧 API 端点说明</h2>
+        <p>您的服务提供以下API端点用于AI对话：</p>
+        
+        <h3>OpenAI兼容的Claude API：</h3>
+        <div class="api-endpoint">POST /openai/claude/v1/chat/completions</div>
+        <p>完全兼容OpenAI的聊天完成API格式，内部转换为Claude API调用。</p>
+        
+        <h3>模型列表：</h3>
+        <div class="api-endpoint">GET /openai/claude/v1/models</div>
+        <p>获取可用的Claude模型列表。</p>
+
+        <div class="alert alert-info">
+            <strong>📝 使用说明：</strong> 
+            <ul>
+                <li>使用您的API Key（以cr_开头）进行身份验证</li>
+                <li>支持流式(stream=true)和非流式响应</li>
+                <li>完全兼容OpenAI API格式</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>🔑 API Key 获取</h2>
+        <p>如果您还没有API Key，可以通过以下方式获取：</p>
+        
+        <div class="button-group">
+            <a href="/admin-next/api-keys" class="btn btn-secondary">🔑 管理API Keys</a>
+            <a href="/" class="btn btn-secondary">🎫 兑换码页面</a>
+        </div>
+
+        <div class="alert alert-warning">
+            <strong>⚠️ 注意：</strong> 请妥善保管您的API Key，��要在公共场所泄露。
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>🛠️ 开发者资源</h2>
+        <p>如果您想要自定义或扩展功能，可以参考以下资源：</p>
+        
+        <h3>cURL示例：</h3>
+        <div class="code-block">curl -X POST http://localhost:3000/openai/claude/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "claude-opus-4-1-20250805",
+    "messages": [
+      {"role": "user", "content": "你好！"}
+    ],
+    "stream": true
+  }'</div>
+
+        <h3>JavaScript示例：</h3>
+        <div class="code-block">const response = await fetch('/openai/claude/v1/chat/completions', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    model: 'claude-opus-4-1-20250805',
+    messages: [{role: 'user', content: '你好！'}],
+    stream: true
+  })
+})</div>
+    </div>
+
+    <div class="card">
+        <h2>❓ 常见问题</h2>
+        
+        <h3>Q: 为什么出现404错误？</h3>
+        <p>A: 请确保使用正确的API端点路径。正确的路径是 <code>/openai/claude/v1/chat/completions</code>。</p>
+        
+        <h3>Q: 如何切换不同的AI模型？</h3>
+        <p>A: 在界面顶部的模型选择器中选择不同模型，或在API请求中指定model参数。</p>
+        
+        <h3>Q: 对话历史保存在哪里？</h3>
+        <p>A: 对话历史保存在浏览器的本地存储中，不会上传到服务器。</p>
+        
+        <h3>Q: 如何重置API Key？</h3>
+        <p>A: 点击界面中的"设置"按钮，或重新访问页面时输入新的API Key。</p>
+    </div>
+
+    <div class="card" style="text-align: center; background: linear-gradient(135deg, #f8fafc, #e2e8f0);">
+        <h2>🎉 开始使用</h2>
+        <p>选择下面的界面开始您的AI对话之旅！</p>
+        
+        <div class="button-group">
+            <a href="/chat" class="btn btn-primary">🚀 启动Claude Code</a>
+            <a href="/muskapi-chat.html" class="btn btn-secondary">💬 简洁聊天</a>
+        </div>
+        
+        <p style="margin-top: 20px; color: #64748b; font-size: 14px;">
+            Powered by your AI relay service | Version 2.0
+        </p>
+    </div>
+</body>
+</html>

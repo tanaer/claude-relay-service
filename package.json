@@ -55,6 +55,7 @@
     "test:pricing-fallback": "node scripts/test-pricing-fallback.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.60.0",
     "@aws-sdk/client-bedrock-runtime": "^3.861.0",
     "@aws-sdk/credential-providers": "^3.859.0",
     "axios": "^1.6.0",

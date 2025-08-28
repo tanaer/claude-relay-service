@@ -4,6 +4,8 @@ const logger = require('../utils/logger')
 const config = require('../../config/config')
 const upstreamErrorService = require('./upstreamErrorService')
 const smartRateLimitService = require('./smartRateLimitService')
+const RetryHelper = require('../utils/retryHelper')
+const connectionPool = require('../utils/connectionPool')
 
 class ClaudeConsoleRelayService {
   constructor() {
@@ -182,7 +184,9 @@ class ClaudeConsoleRelayService {
           ...filteredHeaders
         },
         httpsAgent: proxyAgent,
-        timeout: config.proxy.timeout || 60000,
+        timeout: requestBody.stream
+          ? config.proxy.streamTimeout || 120000
+          : config.proxy.timeout || 60000,
         signal: abortController.signal,
         validateStatus: () => true // 接受所有状态码
       }
@@ -210,12 +214,35 @@ class ClaudeConsoleRelayService {
         logger.debug('[DEBUG] No beta header to add')
       }
 
-      // 发送请求
+      // 使用连接池
+      requestConfig.httpAgent = connectionPool.getHttpAgent()
+      requestConfig.httpsAgent = connectionPool.getHttpsAgent()
+
+      // 发送请求（带重试）
       logger.debug(
         '📤 Sending request to Claude Console API with headers:',
         JSON.stringify(requestConfig.headers, null, 2)
       )
-      const response = await axios(requestConfig)
+
+      const response = await RetryHelper.withRetry(() => axios(requestConfig), {
+        maxRetries: config.proxy.maxRetries || 3,
+        initialDelay: config.proxy.retryDelay || 1000,
+        exponentialBackoff: config.proxy.enableExponentialBackoff !== false,
+        retryCondition: (error) => {
+          // 不重试认证错误和客户端错误
+          if (error.response?.status >= 400 && error.response?.status < 500) {
+            return false
+          }
+          return RetryHelper.shouldRetry(error)
+        },
+        onRetry: (attempt, error) => {
+          logger.warn(`⚠️ Claude Console API retry attempt ${attempt}`, {
+            account: account.name,
+            error: error.message,
+            status: error.response?.status
+          })
+        }
+      })
 
       // 移除监听器（请求成功完成）
       if (clientRequest) {
@@ -444,7 +471,7 @@ class ClaudeConsoleRelayService {
           ...filteredHeaders
         },
         httpsAgent: proxyAgent,
-        timeout: config.proxy.timeout || 60000,
+        timeout: config.proxy.streamTimeout || 120000, // 流式响应使用更长超时
         responseType: 'stream',
         validateStatus: () => true // 接受所有状态码
       }
@@ -464,6 +491,10 @@ class ClaudeConsoleRelayService {
       if (requestOptions.betaHeader) {
         requestConfig.headers['anthropic-beta'] = requestOptions.betaHeader
       }
+
+      // 使用连接池
+      requestConfig.httpAgent = connectionPool.getHttpAgent()
+      requestConfig.httpsAgent = connectionPool.getHttpsAgent()
 
       // 发送请求
       const request = axios(requestConfig)

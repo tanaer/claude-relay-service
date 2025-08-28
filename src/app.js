@@ -21,7 +21,7 @@ const openaiGeminiRoutes = require('./routes/openaiGeminiRoutes')
 const openaiClaudeRoutes = require('./routes/openaiClaudeRoutes')
 const openaiRoutes = require('./routes/openaiRoutes')
 const chatRoutes = require('./routes/chat')
-const bepusdtRoutes = require('./routes/bepusdtRoutes')
+// const bepusdtRoutes = require('./routes/bepusdtRoutes') // 文件不存在，暂时注释
 
 // Import middleware
 const {
@@ -446,7 +446,7 @@ class Application {
       this.app.use('/openai/claude', openaiClaudeRoutes)
       this.app.use('/openai', openaiRoutes)
       this.app.use('/chat', chatRoutes) // Claude Code Chat 聊天界面
-      this.app.use('/api/bepusdt', bepusdtRoutes) // BEpusdt虚拟货币支付
+      // this.app.use('/api/bepusdt', bepusdtRoutes) // BEpusdt虚拟货币支付 - 文件不存在，暂时注释
 
       // 🏠 根路径重定向到新版管理界面
       this.app.get('/', (req, res) => {
